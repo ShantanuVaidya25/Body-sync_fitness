@@ -1,0 +1,28 @@
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded physique reference photos
+backend/uploads/
+
+# Environment / secrets
+.env
+*.env
+.secret_key
+*.secret_key
+
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

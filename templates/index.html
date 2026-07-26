@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solo Leveling Fitness - Hunter Training System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Login/Register Screen -->
+    <div id="auth-screen" class="screen active">
+        <div class="auth-container">
+            <div class="logo-section">
+                <h1 class="main-title">⚔️ SOLO LEVELING FITNESS</h1>
+                <p class="subtitle">Arise, Hunter. Your Journey Begins.</p>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form">
+                <h2>🔐 Hunter Login</h2>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="Enter your password">
+                </div>
+                <button class="btn btn-primary" onclick="login()">Enter the System</button>
+                <p class="form-switch">New Hunter? <a href="#" onclick="showRegister()">Register Here</a></p>
+                <div id="login-error" class="error-message"></div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="auth-form" style="display: none;">
+                <h2>📝 Hunter Registration</h2>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="register-username" placeholder="Choose a username">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="register-email" placeholder="Your email">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="register-password" placeholder="Create a password">
+                </div>
+                <button class="btn btn-primary" onclick="register()">Create Account</button>
+                <p class="form-switch">Already a Hunter? <a href="#" onclick="showLogin()">Login Here</a></p>
+                <div id="register-error" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Setup Screen -->
+    <div id="setup-screen" class="screen">
+        <div class="setup-container">
+            <h2>⚡ System Initialization</h2>
+            <p class="setup-intro">Before you begin your journey, we need to calibrate the system to your current stats.</p>
+            
+            <div class="setup-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="setup-age" placeholder="Your age">
+                    </div>
+                    <div class="form-group">
+                        <label>Height (cm)</label>
+                        <input type="number" step="0.1" id="setup-height" placeholder="Your height">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (kg)</label>
+                        <input type="number" step="0.1" id="setup-weight" placeholder="Your weight">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Target Height (cm) - Optional</label>
+                        <input type="number" step="0.1" id="setup-target-height" placeholder="Your target height">
+                    </div>
+                    <div class="form-group">
+                        <label>Target Weight (kg) - Optional</label>
+                        <input type="number" step="0.1" id="setup-target-weight" placeholder="Your target weight">
+                    </div>
+                </div>
+
+                <h3>🎯 Primary Objective Path</h3>
+                <p class="info-text">Select everything you want to focus on — you can pick more than one. Your daily quests will be built around this combination.</p>
+
+                <div class="objective-path-grid">
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="strength">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">💪</div>
+                            <div class="objective-name">Strength</div>
+                        </div>
+                    </label>
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="muscle_gain">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">🏋️</div>
+                            <div class="objective-name">Muscle Gain</div>
+                        </div>
+                    </label>
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="weight_loss">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">🔥</div>
+                            <div class="objective-name">Weight Loss</div>
+                        </div>
+                    </label>
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="endurance">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">🏃</div>
+                            <div class="objective-name">Endurance & Stamina</div>
+                        </div>
+                    </label>
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="flexibility">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">🧘</div>
+                            <div class="objective-name">Flexibility & Mobility</div>
+                        </div>
+                    </label>
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="height_growth">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">📏</div>
+                            <div class="objective-name">Height Growth</div>
+                        </div>
+                    </label>
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="general_fitness">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">❤️</div>
+                            <div class="objective-name">General Fitness & Health</div>
+                        </div>
+                    </label>
+                    <label class="objective-card">
+                        <input type="checkbox" name="objective-path" value="athletic_performance">
+                        <div class="objective-card-content">
+                            <div class="objective-icon">⚡</div>
+                            <div class="objective-name">Sport / Athletic Performance</div>
+                        </div>
+                    </label>
+                </div>
+                <div id="objective-path-error" class="error-message"></div>
+
+                <div class="form-row" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label>Training Experience</label>
+                        <select id="setup-experience">
+                            <option value="beginner">Beginner (new to training)</option>
+                            <option value="intermediate">Intermediate (6+ months)</option>
+                            <option value="advanced">Advanced (2+ years)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Days Per Week You Can Train</label>
+                        <select id="setup-days-per-week">
+                            <option value="3">3 days</option>
+                            <option value="4">4 days</option>
+                            <option value="5" selected>5 days</option>
+                            <option value="6">6 days</option>
+                            <option value="7">7 days (with active recovery)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h3>💪 Current Exercise Capabilities</h3>
+                <p class="info-text">Tell us what you can currently do. This helps us generate appropriate quests.</p>
+                
+                <div id="exercise-inputs">
+                    <div class="exercise-input-row">
+                        <select class="exercise-select">
+                            <option value="push_ups">Push-ups</option>
+                            <option value="pull_ups">Pull-ups</option>
+                            <option value="squats">Squats</option>
+                            <option value="sit_ups">Sit-ups</option>
+                            <option value="running">Running (minutes)</option>
+                        </select>
+                        <input type="number" class="exercise-reps" placeholder="Max reps or minutes">
+                        <button class="btn-small" onclick="addExerciseInput()">+</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-large" onclick="setupProfile()">
+                    🚀 Begin My Journey
+                </button>
+                <div id="setup-error" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard-screen" class="screen">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">⚔️ Solo Leveling Fitness</div>
+            <div class="nav-menu">
+                <a href="#" onclick="showTab('dashboard')" class="nav-link active" data-tab="dashboard">
+                    🏠 Dashboard
+                </a>
+                <a href="#" onclick="showTab('quest')" class="nav-link" data-tab="quest">
+                    🎯 Daily Quest
+                </a>
+                <a href="#" onclick="showTab('stats')" class="nav-link" data-tab="stats">
+                    📊 Stats & Progress
+                </a>
+                <a href="#" onclick="showTab('goals')" class="nav-link" data-tab="goals">
+                    🎖️ Goals
+                </a>
+                <a href="#" onclick="showTab('physique')" class="nav-link" data-tab="physique">
+                    🎭 Become Like...
+                </a>
+                <a href="#" onclick="showTab('social')" class="nav-link" data-tab="social">
+                    👥 Social
+                </a>
+            </div>
+            <div class="nav-user">
+                <span id="nav-username">Hunter</span>
+                <button class="btn btn-small" onclick="logout()">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="dashboard-grid">
+                <!-- Player Card -->
+                <div class="card player-card">
+                    <div class="card-header">
+                        <h2>🏆 Hunter Profile</h2>
+                    </div>
+                    <div class="player-info">
+                        <div class="player-avatar">
+                            <div class="level-badge" id="player-level">1</div>
+                        </div>
+                        <h3 id="player-name">Hunter</h3>
+                        <div class="rank-badge" id="player-rank">E-Rank</div>
+                    </div>
+                    
+                    <div class="exp-section">
+                        <div class="exp-label">
+                            <span>EXP</span>
+                            <span id="exp-text">0 / 100</span>
+                        </div>
+                        <div class="exp-bar">
+                            <div class="exp-fill" id="exp-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-icon">💪</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Strength</div>
+                                <div class="stat-value" id="stat-strength">10</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon">🏃</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Endurance</div>
+                                <div class="stat-value" id="stat-endurance">10</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon">⚡</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Agility</div>
+                                <div class="stat-value" id="stat-agility">10</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon">❤️</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Vitality</div>
+                                <div class="stat-value" id="stat-vitality">10</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-points-section" id="stat-points-section" style="display: none;">
+                        <h4>Available Stat Points: <span id="available-points">0</span></h4>
+                        <div class="stat-allocation">
+                            <button onclick="allocateStatPoint('strength')">+💪</button>
+                            <button onclick="allocateStatPoint('endurance')">+🏃</button>
+                            <button onclick="allocateStatPoint('agility')">+⚡</button>
+                            <button onclick="allocateStatPoint('vitality')">+❤️</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📈 Today's Overview</h2>
+                    </div>
+                    <div class="quick-stats">
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon">🔥</div>
+                            <div class="quick-stat-info">
+                                <div class="quick-stat-label">Daily Streak</div>
+                                <div class="quick-stat-value" id="daily-streak">0 days</div>
+                            </div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon">✅</div>
+                            <div class="quick-stat-info">
+                                <div class="quick-stat-label">Quests Completed</div>
+                                <div class="quick-stat-value" id="total-quests">0</div>
+                            </div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon">📏</div>
+                            <div class="quick-stat-info">
+                                <div class="quick-stat-label">Height Progress</div>
+                                <div class="quick-stat-value" id="height-progress">0 cm</div>
+                            </div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon">⚖️</div>
+                            <div class="quick-stat-info">
+                                <div class="quick-stat-label">Weight Progress</div>
+                                <div class="quick-stat-value" id="weight-progress">0 kg</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's Quest Preview -->
+                <div class="card quest-preview-card">
+                    <div class="card-header">
+                        <h2>🎯 Today's Quest</h2>
+                    </div>
+                    <div id="quest-preview">
+                        <p class="loading">Loading today's quest...</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="showTab('quest')">
+                        View Full Quest →
+                    </button>
+                </div>
+
+                <!-- Recent Achievements -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🏅 Recent Achievements</h2>
+                    </div>
+                    <div id="recent-achievements">
+                        <p class="no-data">Complete quests to unlock achievements!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quest Tab -->
+        <div id="tab-quest" class="tab-content">
+            <div class="quest-container">
+                <div class="quest-header" id="quest-header">
+                    <h1 id="quest-title">Loading Quest...</h1>
+                    <div class="quest-meta">
+                        <span class="quest-difficulty" id="quest-difficulty"></span>
+                        <span class="quest-reward" id="quest-reward"></span>
+                    </div>
+                </div>
+
+                <div id="quest-content">
+                    <!-- Quest exercises will be loaded here -->
+                </div>
+
+                <div class="quest-actions">
+                    <button class="btn btn-success btn-large" id="complete-quest-btn" onclick="completeQuest()">
+                        ✅ Complete Quest
+                    </button>
+                    <button class="btn btn-secondary" onclick="generateNewQuest()">
+                        🔄 Generate New Quest
+                    </button>
+                </div>
+
+                <!-- 7-Day Weekly Quest Schedule -->
+                <div class="card" style="margin-top: 30px;">
+                    <div class="card-header">
+                        <h2>📅 Active 7-Day Quest Schedule</h2>
+                    </div>
+                    <p class="info-text">
+                        Your complete weekly training split (Monday to Sunday) generated from your active build goal or target path. Today's active day is highlighted.
+                    </p>
+                    <div id="weekly-schedule-grid" class="weekly-schedule-grid">
+                        <p class="loading">Loading weekly quest schedule...</p>
+                    </div>
+                </div>
+
+                <div id="quest-completion-modal" class="modal">
+                    <div class="modal-content celebration">
+                        <h2>🎉 QUEST COMPLETED!</h2>
+                        <div id="completion-rewards"></div>
+                        <button class="btn btn-primary" onclick="closeModal()">Continue Training</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats & Progress Tab -->
+        <div id="tab-stats" class="tab-content">
+            <div class="stats-container">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📊 Progress Charts</h2>
+                        <select id="chart-timeframe" onchange="updateCharts()">
+                            <option value="7">Last 7 Days</option>
+                            <option value="30" selected>Last 30 Days</option>
+                            <option value="90">Last 90 Days</option>
+                        </select>
+                    </div>
+                    <canvas id="progress-chart"></canvas>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>💪 Exercise Records</h2>
+                    </div>
+                    <div id="exercise-records"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📅 Quest History</h2>
+                    </div>
+                    <div id="quest-history"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Goals Tab -->
+        <div id="tab-goals" class="tab-content">
+            <div class="goals-container">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🎯 Your Goals</h2>
+                        <button class="btn btn-primary" onclick="showAddGoalModal()">+ Add Goal</button>
+                    </div>
+                    <div id="goals-list"></div>
+                </div>
+            </div>
+
+            <!-- Add Goal Modal -->
+            <div id="add-goal-modal" class="modal">
+                <div class="modal-content">
+                    <h2>➕ Create New Goal</h2>
+                    <div class="form-group">
+                        <label>Goal Type</label>
+                        <select id="goal-type">
+                            <option value="strength">Strength</option>
+                            <option value="endurance">Endurance</option>
+                            <option value="weight">Weight</option>
+                            <option value="height">Height</option>
+                            <option value="exercise">Exercise Mastery</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Goal Name</label>
+                        <input type="text" id="goal-name" placeholder="e.g., 100 Push-ups">
+                    </div>
+                    <div class="form-group">
+                        <label>Target Value</label>
+                        <input type="number" id="goal-target" placeholder="Target number">
+                    </div>
+                    <div class="form-group">
+                        <label>Deadline (Optional)</label>
+                        <input type="date" id="goal-deadline">
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" onclick="addGoal()">Create Goal</button>
+                        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Physique Goals Tab ("Become Like...") -->
+        <div id="tab-physique" class="tab-content">
+            <div class="physique-container">
+                <div class="card physique-intro-card">
+                    <div class="card-header">
+                        <h2>🎭 Become Like... AI Physique Analyzer</h2>
+                    </div>
+                    <p class="info-text">
+                        Name an anime character or real-life person whose physique you want to build 
+                        toward, or upload a reference photo. The AI Game Master will analyze the build 
+                        and generate a full gamified Quest Log — Dailies, a weekly training split, 
+                        Side Quests, and Level Up Milestones — tailored to that goal. Once generated, 
+                        your weekly split automatically becomes your daily quests.
+                    </p>
+                    <div id="physique-not-configured" class="warning-box" style="display: none;">
+                        ⚠️ AI analysis isn't configured for your account yet. Add your own free Gemini 
+                        API key below to enable this feature.
+                    </div>
+                    <div id="physique-shared-key-notice" class="info-box" style="display: none;">
+                        ℹ️ You're currently using the site's shared AI key. You can add your own personal 
+                        key below anytime for guaranteed availability under your own quota.
+                    </div>
+                </div>
+
+                <div class="card" id="api-key-card">
+                    <div class="card-header">
+                        <h2>🔑 Your AI API Key</h2>
+                    </div>
+                    <p class="info-text">
+                        This app uses Google Gemini to power physique analysis. Get a free key at
+                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>
+                        and paste it here — it's encrypted before being stored, and only used for your 
+                        own requests.
+                    </p>
+                    <div id="api-key-status" class="api-key-status"></div>
+                    <div class="form-group">
+                        <label>Gemini API Key</label>
+                        <div class="api-key-input-row">
+                            <input type="password" id="api-key-input" placeholder="Paste your Gemini API key here">
+                            <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-small btn-danger" id="remove-api-key-btn" onclick="removeApiKey()" style="display: none;">
+                        Remove My Key
+                    </button>
+                    <div id="api-key-error" class="error-message"></div>
+                </div>
+
+                <div class="card">
+                    <div class="physique-input-tabs">
+                        <button class="physique-mode-btn active" onclick="setPhysiqueMode('name')" id="mode-btn-name">
+                            📝 Name a Character/Person
+                        </button>
+                        <button class="physique-mode-btn" onclick="setPhysiqueMode('image')" id="mode-btn-image">
+                            📷 Upload a Photo
+                        </button>
+                    </div>
+
+                    <div id="physique-name-input" class="physique-input-section">
+                        <div class="form-group">
+                            <label>Character or Person's Name</label>
+                            <input type="text" id="physique-target-name" 
+                                   placeholder="e.g., Levi Ackerman, Saitama, a specific athlete...">
+                        </div>
+                    </div>
+
+                    <div id="physique-image-input" class="physique-input-section" style="display: none;">
+                        <div class="form-group">
+                            <label>Upload Reference Photo</label>
+                            <input type="file" id="physique-image-file" accept="image/png,image/jpeg,image/webp">
+                            <div id="physique-image-preview"></div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-large" onclick="analyzePhysique()" id="analyze-btn">
+                        ⚡ Analyze & Generate Quest Log
+                    </button>
+                    <div id="physique-error" class="error-message"></div>
+                </div>
+
+                <div id="physique-loading" class="card" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p class="loading">The Game Master is analyzing the physique and drafting your Quest Log... this can take up to a minute.</p>
+                </div>
+
+                <div id="physique-result-card" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="physique-result-title">🎯 Your Quest Log</h2>
+                    </div>
+                    <div id="physique-result-content" class="quest-log-markdown"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📚 Past Build Goals</h2>
+                    </div>
+                    <div id="physique-history"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Social Tab -->
+        <div id="tab-social" class="tab-content">
+            <div class="social-container">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🏆 Leaderboard</h2>
+                        <select id="leaderboard-scope" onchange="loadLeaderboard()">
+                            <option value="global">Global</option>
+                            <option value="friends">Friends Only</option>
+                        </select>
+                    </div>
+                    <div id="leaderboard"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>👥 Friends</h2>
+                        <input type="text" id="friend-search" placeholder="Search hunters..." 
+                               oninput="searchFriends()">
+                    </div>
+                    <div id="friend-search-results"></div>
+                    <div id="friends-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

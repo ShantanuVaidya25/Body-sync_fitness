@@ -1,0 +1,330 @@
+================================================================
+ SOLO LEVELING FITNESS - CLEAN SETUP GUIDE (START FROM ZERO)
+================================================================
+
+This guide assumes NOTHING is currently set up. Follow it top to
+bottom, in order. It builds in every fix discovered during earlier
+setup attempts, so following it exactly should avoid all of them.
+
+
+----------------------------------------------------------------
+STEP 0: DELETE ANY PREVIOUS ATTEMPT
+----------------------------------------------------------------
+
+To avoid mixing old broken folders with the new clean copy, remove
+any previous project folder first:
+
+    Remove-Item C:\Projects\solo_leveling_fitness -Recurse -Force
+
+(Skip this if C:\Projects\solo_leveling_fitness doesn't exist yet.)
+
+
+----------------------------------------------------------------
+STEP 1: PICK THE RIGHT LOCATION (avoid OneDrive)
+----------------------------------------------------------------
+
+Do NOT use a OneDrive-synced folder (Documents, Desktop, etc. are
+often OneDrive-synced on Windows by default). OneDrive actively
+locks/syncs files while Python and Git are trying to write to them,
+which caused most of the earlier problems.
+
+Use a plain local folder:
+
+    C:\Projects\solo_leveling_fitness
+
+Extract the project zip DIRECTLY into this path using Windows'
+"Extract All" -- do this ONCE, don't extract-then-move-then-extract
+again (that's what caused the nested-folder duplication before).
+
+Verify immediately after extracting:
+
+    cd C:\Projects\solo_leveling_fitness
+    dir
+
+You should see EXACTLY these items directly inside, nothing nested:
+    backend
+    templates
+    static
+    requirements.txt
+    README.md
+    .gitignore
+    start.bat
+    start.sh
+
+If you instead see a SECOND "solo_leveling_fitness" folder inside
+this one, STOP -- that means the zip extracted into an extra
+subfolder. Fix it before continuing:
+
+    Move-Item solo_leveling_fitness\* . -Force
+    Remove-Item solo_leveling_fitness -Recurse -Force
+    dir
+
+Confirm again that backend/templates/static are directly visible
+before moving to Step 2.
+
+
+----------------------------------------------------------------
+STEP 2: INSTALL PYTHON (skip if already installed)
+----------------------------------------------------------------
+
+    python --version
+
+Should print Python 3.9 or higher. If it errors:
+  1. https://www.python.org/downloads/
+  2. Run the installer -- CHECK "Add Python to PATH"
+  3. Close and reopen VS Code / PowerShell entirely
+  4. Run "python --version" again to confirm
+
+
+----------------------------------------------------------------
+STEP 3: OPEN IN VS CODE
+----------------------------------------------------------------
+
+  1. Open VS Code
+  2. File -> Open Folder -> C:\Projects\solo_leveling_fitness
+  3. Install the Python extension if prompted
+  4. Open terminal: Ctrl + ` (backtick)
+
+
+----------------------------------------------------------------
+STEP 4: ALLOW POWERSHELL SCRIPTS (one-time, per computer)
+----------------------------------------------------------------
+
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+Type Y if prompted. You never need to repeat this on this computer.
+
+
+----------------------------------------------------------------
+STEP 5: CREATE AND ACTIVATE THE VIRTUAL ENVIRONMENT
+----------------------------------------------------------------
+
+Confirm you're in the project root first:
+
+    pwd
+
+Should show C:\Projects\solo_leveling_fitness (NOT ...\backend, not
+a duplicated nested path).
+
+    python -m venv venv
+    .\venv\Scripts\Activate.ps1
+
+Your prompt MUST now show (venv) at the start. Do not proceed to
+Step 6 until you see it. Every command from here on assumes (venv)
+is active -- if you ever open a NEW terminal window later, you must
+run the Activate.ps1 line again in that new window.
+
+
+----------------------------------------------------------------
+STEP 6: INSTALL DEPENDENCIES (into the venv, not global Python)
+----------------------------------------------------------------
+
+With (venv) showing and still in the project root:
+
+    pip install -r requirements.txt
+
+This installs: Flask, Flask-CORS, Werkzeug, google-genai, cryptography
+
+VERIFY it actually landed in the venv (this specific check would
+have caught an earlier problem instantly):
+
+    pip show cryptography
+
+Look at the "Location:" line in the output. It MUST contain
+"\venv\" somewhere in that path. If it does NOT contain "\venv\",
+the venv isn't active -- go back to Step 5.
+
+
+----------------------------------------------------------------
+STEP 7: GENERATE YOUR TWO SECRET KEYS
+----------------------------------------------------------------
+
+This app needs two generated secrets. Generate both now and SAVE
+them somewhere (a text file, a password manager -- anywhere you
+won't lose them) before setting them as environment variables.
+
+Key A -- encrypts personal API keys users save in the app:
+
+    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+Key B -- secures login sessions:
+
+    python -c "import secrets; print(secrets.token_hex(32))"
+
+Write both outputs down now. You'll paste them in Step 8.
+
+IMPORTANT: once you set Key A and start saving personal API keys
+in the app, do NOT regenerate Key A later -- doing so makes every
+already-saved key unreadable (users would just need to re-enter
+theirs, not catastrophic, but avoidable).
+
+
+----------------------------------------------------------------
+STEP 8: SET ALL ENVIRONMENT VARIABLES PERMANENTLY (do this ONCE)
+----------------------------------------------------------------
+
+Earlier attempts used $env:VAR="value" directly in PowerShell --
+that only lasts for the current terminal window, which is why the
+encryption error kept coming back after closing/reopening VS Code.
+Setting them permanently up front avoids that entirely.
+
+  1. Press Windows key -> type "environment variables" -> open
+     "Edit the system environment variables"
+  2. Click "Environment Variables..." button
+  3. Under "User variables" (top section), click "New..." three
+     times, once for each of the following:
+
+     Variable name:  GEMINI_API_KEY
+     Variable value: (your key from https://aistudio.google.com/apikey)
+
+     Variable name:  APP_ENCRYPTION_KEY
+     Variable value: (Key A you generated in Step 7)
+
+     Variable name:  FLASK_SECRET_KEY
+     Variable value: (Key B you generated in Step 7)
+
+  4. Click OK on all open dialogs
+  5. FULLY CLOSE VS Code (all windows, not just the terminal) and
+     any open PowerShell windows
+  6. Reopen VS Code -> open the project folder again -> new terminal
+
+VERIFY all three actually stuck, in the fresh terminal:
+
+    echo $env:GEMINI_API_KEY
+    echo $env:APP_ENCRYPTION_KEY
+    echo $env:FLASK_SECRET_KEY
+
+All three must print a real value, not blank. If any is blank,
+redo step 3 for that specific variable, making sure to click OK
+on every dialog, then fully close and reopen VS Code again.
+
+
+----------------------------------------------------------------
+STEP 9: RE-ACTIVATE THE VENV (new terminal = fresh environment)
+----------------------------------------------------------------
+
+    cd C:\Projects\solo_leveling_fitness
+    .\venv\Scripts\Activate.ps1
+
+Confirm (venv) shows again.
+
+
+----------------------------------------------------------------
+STEP 10: RUN THE SERVER
+----------------------------------------------------------------
+
+    cd backend
+    python app.py
+
+Expected output:
+
+    ==========================================
+    SOLO LEVELING FITNESS SYSTEM
+    ==========================================
+    Server starting...
+    Access at: http://localhost:5000
+
+You should NOT see the FLASK_SECRET_KEY warning message -- if you
+do, Step 8 didn't fully take effect; re-check it.
+
+Leave this terminal running.
+
+
+----------------------------------------------------------------
+STEP 11: TEST IN BROWSER
+----------------------------------------------------------------
+
+Open http://localhost:5000
+
+  1. Register a new account
+  2. Complete profile setup (age, height, weight, pick your
+     Primary Objective Path goals)
+  3. Go to the "Become Like..." tab
+  4. Check API Key status -- should show "No key configured" with
+     no red encryption error (if you see the red error, APP_
+     ENCRYPTION_KEY isn't set -- recheck Step 8)
+  5. Paste your Gemini key into the box and click Save Key --
+     should show "saved securely"
+  6. Try analyzing a character name -- confirm it generates a
+     Quest Log
+  7. Check the "Daily Quest" tab -- should now reflect the
+     weekly plan from that analysis
+
+
+----------------------------------------------------------------
+STEP 12: COMMIT THE WORKING STATE TO GIT
+----------------------------------------------------------------
+
+    git init
+    git add .
+    git commit -m "Clean working setup"
+    git branch -M main
+    git remote add origin https://github.com/ShantanuVaidya25/solo-leveling-.git
+    git push -u origin main --force
+
+(--force is safe if the remote only has broken content from earlier
+attempts. Skip --force if you want to preserve remote history and
+instead resolve conflicts manually.)
+
+
+================================================================
+ EVERY TIME YOU RETURN LATER (after this one-time setup)
+================================================================
+
+Because Step 8 made the keys permanent, you do NOT need to set any
+environment variables again. Just:
+
+    cd C:\Projects\solo_leveling_fitness
+    .\venv\Scripts\Activate.ps1
+    cd backend
+    python app.py
+
+Then open http://localhost:5000. That's it.
+
+
+================================================================
+ TROUBLESHOOTING INDEX (fixes for every issue hit previously)
+================================================================
+
+"Activate.ps1 cannot be loaded, running scripts is disabled"
+  -> Redo Step 4.
+
+"venv/Scripts/Activate.ps1 is not recognized" / path not found
+  -> The venv wasn't created, or you're in the wrong folder.
+     Run "pwd" and "dir" to check, then redo Step 5.
+
+"ModuleNotFoundError: No module named 'flask'" (or 'google' or
+'cryptography')
+  -> Dependencies installed into the wrong Python. Confirm (venv)
+     is showing, then "pip show <package>" and check its Location
+     line contains \venv\. If not, redo Step 6 with venv active.
+
+"Server-side encryption is not configured"
+  -> APP_ENCRYPTION_KEY isn't set in this terminal. If you did
+     Step 8 (permanent) correctly and reopened VS Code fully, this
+     shouldn't happen. Run "echo $env:APP_ENCRYPTION_KEY" to check.
+
+"429 RESOURCE_EXHAUSTED" from Gemini
+  -> Free tier rate limit hit, or wrong model tier. Wait ~60
+     seconds and retry. If it persists, check MODEL_NAME in
+     backend/physique_analyzer.py is set to a model your account
+     has free-tier access to (run the models.list() check from
+     earlier troubleshooting if unsure).
+
+"404 NOT_FOUND" on a Gemini model name
+  -> Google deprecated/renamed that model. Check backend/
+     physique_analyzer.py's MODEL_NAME constant against what's
+     currently available for your account.
+
+Nested/duplicate folders (e.g. solo_leveling_fitness\solo_leveling_fitness)
+  -> Re-extract fresh per Step 1 rather than trying to manually
+     move files around again -- it's faster and less error-prone.
+
+Small unusable input boxes / stray UI elements
+  -> Already fixed in this build's static/css/style.css. If you
+     still see this, confirm you're running the CURRENT version of
+     that file (this guide's zip has the fix already applied).
+
+================================================================
+END OF GUIDE
+================================================================
