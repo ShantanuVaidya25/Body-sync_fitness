@@ -1107,8 +1107,115 @@ h1, h2, h3, h4 {
     margin-bottom: 4px;
 }
 
+/* Active Target Character Banner & Main Story Quests */
+.active-target-banner {
+    width: 100%;
+}
+
+.target-banner-content {
+    background: var(--card-bg);
+    border: 2px solid var(--primary-color);
+    border-radius: 14px;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.25);
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(99, 102, 241, 0.15) 100%);
+}
+
+.target-banner-content.no-target-banner {
+    border-color: var(--card-border);
+    box-shadow: none;
+    background: var(--card-bg);
+}
+
+.target-banner-info {
+    flex: 1;
+}
+
+.target-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--primary-color);
+    color: #ffffff;
+    margin-bottom: 8px;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.target-badge.inactive {
+    background: var(--card-border);
+    color: var(--text-secondary);
+}
+
+.target-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+
+.target-highlight {
+    background: linear-gradient(135deg, #6366f1 0%, #10b981 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.target-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.target-banner-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.quest-target-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(16, 185, 129, 0.25) 100%);
+    border: 1px solid var(--primary-color);
+    color: #a5b4fc;
+    margin-bottom: 6px;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.main-story-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.quest-log-modal-content {
+    max-width: 800px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
+    .target-banner-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .target-banner-actions {
+        width: 100%;
+    }
+
     .dashboard-grid {
         grid-template-columns: 1fr;
     }

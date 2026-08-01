@@ -11,10 +11,14 @@ import hashlib
 import secrets
 
 
+import os
+
 class Database:
     """Main database handler for the Solo Leveling Fitness System"""
     
-    def __init__(self, db_path: str = "fitness_hunter.db"):
+    def __init__(self, db_path: str = None):
+        if not db_path:
+            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fitness_hunter.db")
         self.db_path = db_path
         self.init_database()
     
@@ -655,9 +659,10 @@ class WeeklyPlanManager:
         conn = self.db.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT * FROM weekly_training_plan
-            WHERE user_id = ? AND day_of_week = ?
-            ORDER BY created_at DESC LIMIT 1
+            SELECT w.* FROM weekly_training_plan w
+            JOIN physique_quests p ON w.physique_quest_id = p.id
+            WHERE w.user_id = ? AND w.day_of_week = ? AND p.is_active = 1
+            ORDER BY w.created_at DESC LIMIT 1
         ''', (user_id, today_weekday))
         row = cursor.fetchone()
         conn.close()
@@ -677,9 +682,10 @@ class WeeklyPlanManager:
         conn = self.db.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT * FROM weekly_training_plan
-            WHERE user_id = ?
-            ORDER BY day_of_week ASC
+            SELECT w.* FROM weekly_training_plan w
+            JOIN physique_quests p ON w.physique_quest_id = p.id
+            WHERE w.user_id = ? AND p.is_active = 1
+            ORDER BY w.day_of_week ASC
         ''', (user_id,))
         rows = cursor.fetchall()
         conn.close()

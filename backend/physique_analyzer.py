@@ -135,21 +135,19 @@ class PhysiqueAnalyzer:
                 'error': f'AI generation failed: {str(e)}'
             }
 
-    def extract_structured_weekly_plan(self, quest_log_markdown: str) -> Dict:
+    def extract_structured_weekly_plan(self, quest_log_markdown: str, target_name: Optional[str] = None) -> Dict:
         """
-        Take the freeform Quest Log markdown and ask Gemini to convert the
-        "Main Story Quests" weekly training split specifically into strict
-        structured JSON, so the daily quest system can actually run it day
-        by day instead of the plan just sitting there as text.
+        Take the freeform Quest Log markdown and convert the "Main Story Quests"
+        weekly training split specifically into structured JSON data. Uses Gemini AI
+        when configured, and falls back to a deterministic markdown parser to guarantee
+        a 7-day plan is always available.
         """
-        if not self.is_configured():
-            return {'success': False, 'error': 'AI analysis is not configured.'}
+        if self.is_configured():
+            main_quests_section = extract_section(quest_log_markdown, 'Main Story Quests')
+            if not main_quests_section:
+                main_quests_section = quest_log_markdown
 
-        main_quests_section = extract_section(quest_log_markdown, 'Main Story Quests')
-        if not main_quests_section:
-            main_quests_section = quest_log_markdown  # fall back to full text
-
-        structuring_prompt = f"""Convert the following weekly workout split into STRICT JSON only -- no markdown fences, no commentary, no explanation, just the raw JSON object.
+            structuring_prompt = f"""Convert the following weekly workout split into STRICT JSON only -- no markdown fences, no commentary, no explanation, just the raw JSON object.
 
 Weekly split to convert:
 ---
@@ -180,37 +178,32 @@ Return JSON matching EXACTLY this schema (all 7 days, Monday through Sunday, day
 
 If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/active days consistent with a realistic weekly structure. Rest days should have "is_rest": true and an empty exercises array. Output ONLY the JSON object, nothing else."""
 
-        try:
-            response = self.client.models.generate_content(
-                model=MODEL_NAME,
-                contents=[structuring_prompt]
-            )
+            try:
+                response = self.client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=[structuring_prompt]
+                )
 
-            raw_text = response.text.strip()
+                raw_text = response.text.strip()
 
-            # Defensive cleanup in case the model wraps it in a code fence anyway
-            if raw_text.startswith('```'):
-                raw_text = raw_text.split('```')[1]
-                if raw_text.startswith('json'):
-                    raw_text = raw_text[4:]
-                raw_text = raw_text.strip()
+                if raw_text.startswith('```'):
+                    raw_text = raw_text.split('```')[1]
+                    if raw_text.startswith('json'):
+                        raw_text = raw_text[4:]
+                    raw_text = raw_text.strip()
 
-            import json
-            parsed = json.loads(raw_text)
+                import json
+                parsed = json.loads(raw_text)
 
-            days = parsed.get('days', [])
-            if len(days) != 7:
-                return {
-                    'success': False,
-                    'error': f'Expected 7 days in structured plan, got {len(days)}. Try re-analyzing.'
-                }
+                days = parsed.get('days', [])
+                if len(days) == 7:
+                    return {'success': True, 'days': days}
+            except Exception as e:
+                print(f"⚠️  Gemini JSON structuring failed ({e}), falling back to deterministic parser.")
 
-            return {'success': True, 'days': days}
-
-        except json.JSONDecodeError as e:
-            return {'success': False, 'error': f'AI returned invalid JSON: {str(e)}'}
-        except Exception as e:
-            return {'success': False, 'error': f'Weekly plan structuring failed: {str(e)}'}
+        # Deterministic markdown parsing fallback (guarantees a 7-day split is always built)
+        fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name)
+        return {'success': True, 'days': fallback_days, 'fallback_used': True}
 
 
 def extract_section(markdown_text: str, header: str) -> str:
@@ -230,3 +223,115 @@ def extract_section(markdown_text: str, header: str) -> str:
             section_lines.append(line)
 
     return '\n'.join(section_lines).strip()
+
+
+def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Optional[str] = None) -> list:
+    """
+    Fallback parser that converts markdown text into a structured 7-day plan
+    (Monday through Sunday) when AI JSON extraction is unavailable or fails.
+    """
+    import re
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    main_section = extract_section(quest_log_markdown, 'Main Story Quests')
+    if not main_section:
+        main_section = quest_log_markdown
+        
+    lines = [line.strip() for line in main_section.split('\n') if line.strip()]
+    
+    day_blocks = []
+    current_day = None
+    
+    for line in lines:
+        day_match = re.search(r'(?:Day\s*(\d)|(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))', line, re.IGNORECASE)
+        if (line.startswith('#') or line.startswith('-') or line.startswith('*') or line.startswith('**')) and day_match:
+            if current_day:
+                day_blocks.append(current_day)
+            current_day = {'header': line, 'lines': []}
+        elif current_day:
+            current_day['lines'].append(line)
+            
+    if current_day:
+        day_blocks.append(current_day)
+        
+    t_name = target_name or "Character"
+    days = []
+    
+    if day_blocks:
+        for idx in range(7):
+            day_name = day_names[idx]
+            if idx < len(day_blocks):
+                block = day_blocks[idx]
+                header = block['header']
+                focus_clean = re.sub(r'^[#\-\*\s\d\:\(\)\*]+', '', header).strip()
+                if not focus_clean:
+                    focus_clean = f"{t_name} Training Day {idx+1}"
+                
+                is_rest = 'rest' in focus_clean.lower() or 'recovery' in focus_clean.lower()
+                
+                exercises = []
+                if not is_rest:
+                    for ex_line in block['lines']:
+                        cleaned_ex = re.sub(r'^[\-\*\d\.\s]+', '', ex_line).strip()
+                        if cleaned_ex and len(cleaned_ex) > 3 and not cleaned_ex.startswith('#'):
+                            sets_match = re.search(r'(\d+)\s*sets', cleaned_ex, re.IGNORECASE)
+                            reps_match = re.search(r'(\d+(?:-\d+)?)\s*(?:reps|seconds|sec|min)?', cleaned_ex, re.IGNORECASE)
+                            
+                            ex_name = cleaned_ex.split(':')[0].split('-')[0].strip()
+                            sets_val = int(sets_match.group(1)) if sets_match else 3
+                            reps_val = reps_match.group(1) if reps_match else "10-12"
+                            
+                            exercises.append({
+                                'name': ex_name,
+                                'sets': sets_val,
+                                'reps': reps_val,
+                                'rest_seconds': 60,
+                                'notes': f"Part of {t_name}'s Main Story Quest"
+                            })
+                    
+                    if not exercises:
+                        exercises = [
+                            {'name': f'{t_name} Power Protocol', 'sets': 4, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Focus on explosive execution'},
+                            {'name': f'{t_name} Core Mastery', 'sets': 3, 'reps': '15-20', 'rest_seconds': 45, 'notes': 'Core stabilization'},
+                            {'name': f'{t_name} Conditioning Circuit', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Form and control'}
+                        ]
+                
+                days.append({
+                    'day_of_week': idx,
+                    'day_label': day_name,
+                    'focus': focus_clean,
+                    'is_rest': is_rest,
+                    'exercises': exercises if not is_rest else []
+                })
+            else:
+                is_rest = (idx == 6)
+                days.append({
+                    'day_of_week': idx,
+                    'day_label': day_name,
+                    'focus': 'Rest & Recovery' if is_rest else f'{t_name} Workout Day {idx+1}',
+                    'is_rest': is_rest,
+                    'exercises': [] if is_rest else [
+                        {'name': f'{t_name} Training Circuit', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Build strength and stamina'}
+                    ]
+                })
+    else:
+        default_splits = [
+            {'focus': f'{t_name} Upper Body Power', 'is_rest': False, 'exercises': [{'name': f'{t_name} Push-ups', 'sets': 4, 'reps': '15', 'notes': 'Chest & shoulders'}, {'name': f'{t_name} Pull-ups', 'sets': 3, 'reps': '8', 'notes': 'Back & arms'}, {'name': 'Dips', 'sets': 3, 'reps': '12', 'notes': 'Triceps & chest'}]},
+            {'focus': f'{t_name} Lower Body & Legs', 'is_rest': False, 'exercises': [{'name': f'{t_name} Squats', 'sets': 4, 'reps': '20', 'notes': 'Leg power'}, {'name': 'Lunges', 'sets': 3, 'reps': '12', 'notes': 'Quads & glutes'}, {'name': 'Calf Raises', 'sets': 4, 'reps': '20', 'notes': 'Calf endurance'}]},
+            {'focus': f'{t_name} Active Recovery', 'is_rest': True, 'exercises': []},
+            {'focus': f'{t_name} Core & Agility', 'is_rest': False, 'exercises': [{'name': f'{t_name} Planks', 'sets': 3, 'reps': '60 sec', 'notes': 'Core stability'}, {'name': 'Russian Twists', 'sets': 3, 'reps': '20', 'notes': 'Obliques'}, {'name': 'Mountain Climbers', 'sets': 3, 'reps': '30 sec', 'notes': 'Agility'}]},
+            {'focus': f'{t_name} Full Body Conditioning', 'is_rest': False, 'exercises': [{'name': f'{t_name} Burpees', 'sets': 4, 'reps': '10', 'notes': 'Stamina'}, {'name': 'Jumping Jacks', 'sets': 3, 'reps': '30', 'notes': 'Cardio'}, {'name': 'Pike Push-ups', 'sets': 3, 'reps': '10', 'notes': 'Shoulders'}]},
+            {'focus': f'{t_name} Master Trial Workout', 'is_rest': False, 'exercises': [{'name': f'{t_name} Diamond Push-ups', 'sets': 3, 'reps': '12', 'notes': 'Tricep focus'}, {'name': 'Jump Squats', 'sets': 3, 'reps': '15', 'notes': 'Explosive legs'}, {'name': 'V-Ups', 'sets': 3, 'reps': '12', 'notes': 'Abs'}]},
+            {'focus': f'{t_name} Rest & Reset Day', 'is_rest': True, 'exercises': []}
+        ]
+        
+        for idx in range(7):
+            split = default_splits[idx]
+            days.append({
+                'day_of_week': idx,
+                'day_label': day_names[idx],
+                'focus': split['focus'],
+                'is_rest': split['is_rest'],
+                'exercises': split['exercises']
+            })
+            
+    return days

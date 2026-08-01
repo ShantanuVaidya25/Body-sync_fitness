@@ -361,12 +361,45 @@
         <!-- Quest Tab -->
         <div id="tab-quest" class="tab-content">
             <div class="quest-container">
+                <!-- Mini Hunter Profile Bar for Daily Quests -->
+                <div class="card quest-hunter-profile-bar" style="margin-bottom: 20px; padding: 16px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="level-badge" id="quest-player-level" style="font-size: 1.2rem; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">1</div>
+                            <div>
+                                <h3 style="font-size: 1.1rem; margin: 0;" id="quest-player-name">Hunter</h3>
+                                <span class="rank-badge" id="quest-player-rank" style="font-size: 0.75rem; padding: 2px 8px;">E-Rank Hunter</span>
+                            </div>
+                        </div>
+                        <div style="flex: 1; max-width: 380px; min-width: 200px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">
+                                <span>Profile EXP</span>
+                                <span id="quest-exp-text">0 / 100</span>
+                            </div>
+                            <div class="exp-bar" style="height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden;">
+                                <div class="exp-fill" id="quest-exp-fill" style="width: 0%; height: 100%; transition: width 0.4s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Character Target Banner -->
+                <div id="active-target-banner" class="active-target-banner" style="margin-bottom: 20px;"></div>
+
                 <div class="quest-header" id="quest-header">
                     <h1 id="quest-title">Loading Quest...</h1>
                     <div class="quest-meta">
                         <span class="quest-difficulty" id="quest-difficulty"></span>
                         <span class="quest-reward" id="quest-reward"></span>
                     </div>
+                </div>
+
+                <!-- Master Quest Completion Checkbox Card -->
+                <div class="card quest-master-check-card" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, var(--card-bg) 100%); border: 1px solid var(--secondary-color);">
+                    <label class="master-checkbox-label" style="display: flex; align-items: center; gap: 12px; cursor: pointer; font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">
+                        <input type="checkbox" id="master-quest-complete-check" onchange="toggleAllQuestCheckboxes(this)" style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--secondary-color);">
+                        <span>☑️ Check All Exercises for Today's Quest</span>
+                    </label>
                 </div>
 
                 <div id="quest-content">
@@ -382,16 +415,19 @@
                     </button>
                 </div>
 
-                <!-- 7-Day Weekly Quest Schedule -->
-                <div class="card" style="margin-top: 30px;">
-                    <div class="card-header">
-                        <h2>📅 Active 7-Day Quest Schedule</h2>
+                <!-- Main Story Quests (Target Split) -->
+                <div class="card main-story-card" style="margin-top: 30px;">
+                    <div class="card-header main-story-header">
+                        <h2 id="main-story-title">📖 Main Story Quests</h2>
+                        <button class="btn btn-small btn-secondary" id="view-full-quest-log-btn" onclick="openActiveQuestLogModal()" style="display: none;">
+                            📜 View Full Character Quest Log
+                        </button>
                     </div>
-                    <p class="info-text">
-                        Your complete weekly training split (Monday to Sunday) generated from your active build goal or target path. Today's active day is highlighted.
+                    <p class="info-text" id="main-story-subtitle">
+                        Your complete weekly training split (Monday to Sunday) tailored to your active target character. Today's active day is highlighted.
                     </p>
                     <div id="weekly-schedule-grid" class="weekly-schedule-grid">
-                        <p class="loading">Loading weekly quest schedule...</p>
+                        <p class="loading">Loading Main Story Quests...</p>
                     </div>
                 </div>
 
@@ -400,6 +436,17 @@
                         <h2>🎉 QUEST COMPLETED!</h2>
                         <div id="completion-rewards"></div>
                         <button class="btn btn-primary" onclick="closeModal()">Continue Training</button>
+                    </div>
+                </div>
+
+                <!-- Active Character Quest Log Modal -->
+                <div id="active-quest-log-modal" class="modal">
+                    <div class="modal-content quest-log-modal-content">
+                        <div class="modal-header">
+                            <h2 id="active-quest-log-modal-title">📜 Full Character Quest Log</h2>
+                            <button class="btn btn-small btn-secondary" onclick="closeModal()" style="float: right;">✕ Close</button>
+                        </div>
+                        <div id="active-quest-log-modal-body" class="quest-log-markdown" style="margin-top: 15px;"></div>
                     </div>
                 </div>
             </div>
@@ -439,12 +486,49 @@
         <!-- Goals Tab -->
         <div id="tab-goals" class="tab-content">
             <div class="goals-container">
+                <!-- Goals Progress Overview Card -->
+                <div class="card goals-summary-card" style="margin-bottom: 20px; padding: 18px 22px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.3rem;">📊 Goals Progress Overview</h2>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
+                                Track your target progress, increase reps/values, and unlock goal completions!
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 20px; align-items: center;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.4rem; font-weight: 800; color: var(--primary-color);" id="goals-count-active">0</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">ACTIVE</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.4rem; font-weight: 800; color: var(--secondary-color);" id="goals-count-completed">0</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">COMPLETED</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.4rem; font-weight: 800; color: #a5b4fc;" id="goals-completion-rate">0%</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">COMPLETED %</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">
-                        <h2>🎯 Your Goals</h2>
+                        <h2>🎯 Your Active Goals & Progress</h2>
                         <button class="btn btn-primary" onclick="showAddGoalModal()">+ Add Goal</button>
                     </div>
                     <div id="goals-list"></div>
+                </div>
+
+                <!-- Best Exercises Guide Card -->
+                <div class="card" style="margin-top: 30px;">
+                    <div class="card-header">
+                        <h2>💡 Recommended Best Exercises by Goal Category</h2>
+                    </div>
+                    <p class="info-text">
+                        Explore top-rated exercises tailored specifically for each goal category. Click any category to view exercises, sets, reps, and form tips, or quickly add them as your active goal!
+                    </p>
+                    <div id="best-exercises-guide" class="best-exercises-guide" style="margin-top: 15px;"></div>
                 </div>
             </div>
 

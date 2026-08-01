@@ -261,28 +261,52 @@ async function loadDashboard() {
 }
 
 function updatePlayerCard(stats) {
-    document.getElementById('player-level').textContent = stats.level;
-    document.getElementById('stat-strength').textContent = stats.strength;
-    document.getElementById('stat-endurance').textContent = stats.endurance;
-    document.getElementById('stat-agility').textContent = stats.agility;
-    document.getElementById('stat-vitality').textContent = stats.vitality;
+    if (!stats) return;
     
-    // Update EXP bar
-    const expPercent = (stats.exp / stats.exp_to_next_level) * 100;
-    document.getElementById('exp-fill').style.width = `${expPercent}%`;
-    document.getElementById('exp-text').textContent = 
-        `${stats.exp} / ${stats.exp_to_next_level}`;
-    
-    // Update rank
     const rank = getRankFromLevel(stats.level);
-    document.getElementById('player-rank').textContent = rank;
+    const expPercent = Math.min(100, Math.max(0, (stats.exp / stats.exp_to_next_level) * 100));
+    
+    // Dashboard elements
+    const dashLevel = document.getElementById('player-level');
+    if (dashLevel) dashLevel.textContent = stats.level;
+    const dashStr = document.getElementById('stat-strength');
+    if (dashStr) dashStr.textContent = stats.strength;
+    const dashEnd = document.getElementById('stat-endurance');
+    if (dashEnd) dashEnd.textContent = stats.endurance;
+    const dashAgi = document.getElementById('stat-agility');
+    if (dashAgi) dashAgi.textContent = stats.agility;
+    const dashVit = document.getElementById('stat-vitality');
+    if (dashVit) dashVit.textContent = stats.vitality;
+    
+    const dashExpFill = document.getElementById('exp-fill');
+    if (dashExpFill) dashExpFill.style.width = `${expPercent}%`;
+    const dashExpText = document.getElementById('exp-text');
+    if (dashExpText) dashExpText.textContent = `${stats.exp} / ${stats.exp_to_next_level}`;
+    
+    const dashRank = document.getElementById('player-rank');
+    if (dashRank) dashRank.textContent = rank;
+    
+    // Quest Tab Mini Profile Bar
+    const questLevel = document.getElementById('quest-player-level');
+    if (questLevel) questLevel.textContent = stats.level;
+    const questName = document.getElementById('quest-player-name');
+    if (questName && currentUser) questName.textContent = currentUser.username || 'Hunter';
+    const questRank = document.getElementById('quest-player-rank');
+    if (questRank) questRank.textContent = rank;
+    const questExpFill = document.getElementById('quest-exp-fill');
+    if (questExpFill) questExpFill.style.width = `${expPercent}%`;
+    const questExpText = document.getElementById('quest-exp-text');
+    if (questExpText) questExpText.textContent = `${stats.exp} / ${stats.exp_to_next_level}`;
     
     // Show stat points if available
-    if (stats.stat_points > 0) {
-        document.getElementById('stat-points-section').style.display = 'block';
-        document.getElementById('available-points').textContent = stats.stat_points;
-    } else {
-        document.getElementById('stat-points-section').style.display = 'none';
+    const statPointsSec = document.getElementById('stat-points-section');
+    if (statPointsSec) {
+        if (stats.stat_points > 0) {
+            statPointsSec.style.display = 'block';
+            document.getElementById('available-points').textContent = stats.stat_points;
+        } else {
+            statPointsSec.style.display = 'none';
+        }
     }
 }
 
@@ -427,7 +451,16 @@ function getQuestRankLetter(difficulty) {
 function displayFullQuest(quest) {
     if (!quest) return;
     
-    document.getElementById('quest-title').textContent = quest.title || 'Daily Quest';
+    let titleHtml = quest.title || 'Daily Quest';
+    if (quest.target_name && !quest.title.includes(quest.target_name)) {
+        titleHtml = `⚔️ Main Story Quest: Becoming ${quest.target_name}`;
+    }
+    
+    document.getElementById('quest-title').innerHTML = `
+        ${quest.target_name ? `<span class="quest-target-badge">🎭 Target: ${quest.target_name}</span><br>` : ''}
+        ${titleHtml}
+    `;
+    
     const rankLetter = getQuestRankLetter(quest.difficulty || 1);
     document.getElementById('quest-difficulty').textContent = `Rank: ${rankLetter}`;
     document.getElementById('quest-reward').textContent = 
@@ -439,7 +472,7 @@ function displayFullQuest(quest) {
     if (quest.is_rest_day) {
         content.innerHTML = `
             <div class="card">
-                <h3>🛌 Rest Day Activities</h3>
+                <h3>🛌 Rest Day Activities ${quest.target_name ? `(${quest.target_name}'s Split)` : ''}</h3>
                 <p>${quest.notes || 'Rest and recover today, Hunter!'}</p>
             </div>
         `;
@@ -476,35 +509,74 @@ function displayFullQuest(quest) {
     }
 }
 
+function toggleAllQuestCheckboxes(masterCheckbox) {
+    const isChecked = masterCheckbox.checked;
+    const exerciseChecks = document.querySelectorAll('.exercise-complete-check');
+    const setChecks = document.querySelectorAll('.set-complete-check');
+    
+    exerciseChecks.forEach(cb => { cb.checked = isChecked; });
+    setChecks.forEach(cb => { cb.checked = isChecked; });
+}
+
+function updateMasterCheckboxState() {
+    const exerciseChecks = document.querySelectorAll('.exercise-complete-check');
+    const masterCheck = document.getElementById('master-quest-complete-check');
+    if (masterCheck && exerciseChecks.length > 0) {
+        const allChecked = Array.from(exerciseChecks).every(cb => cb.checked);
+        masterCheck.checked = allChecked;
+    }
+}
+
+function updateExerciseCheckState(exIndex) {
+    const setChecks = document.querySelectorAll(`.set-complete-check[data-exercise="${exIndex}"]`);
+    const exCheck = document.querySelector(`.exercise-complete-check[data-index="${exIndex}"]`);
+    if (exCheck && setChecks.length > 0) {
+        const allSetsChecked = Array.from(setChecks).every(cb => cb.checked);
+        exCheck.checked = allSetsChecked;
+        updateMasterCheckboxState();
+    }
+}
+
 function createExerciseCard(exercise, index) {
+    const setCount = exercise.sets || 3;
+    const setCheckboxes = Array.from({ length: setCount }, (_, sIndex) => `
+        <label class="set-checkbox-item" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; background: var(--dark-bg); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
+            <input type="checkbox" class="set-complete-check" data-exercise="${index}" data-set="${sIndex}" onchange="updateExerciseCheckState(${index})" style="accent-color: var(--secondary-color); cursor: pointer;">
+            <span>Set ${sIndex + 1}</span>
+        </label>
+    `).join('');
+
     return `
-        <div class="exercise-card" data-exercise-index="${index}">
+        <div class="exercise-card" data-exercise-index="${index}" style="border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 15px; padding: 18px;">
             <div class="exercise-header">
-                <div class="exercise-name">${exercise.name}</div>
+                <div class="exercise-name" style="font-size: 1.15rem; font-weight: 700;">${exercise.name}</div>
                 <div class="exercise-category">${exercise.category}</div>
             </div>
             <div class="exercise-details">
                 <div class="exercise-detail">
                     <div class="exercise-detail-label">Sets</div>
-                    <div class="exercise-detail-value">${exercise.sets}</div>
+                    <div class="exercise-detail-value">${exercise.sets || 3}</div>
                 </div>
                 <div class="exercise-detail">
                     <div class="exercise-detail-label">Target</div>
                     <div class="exercise-detail-value">
                         ${exercise.target_reps ? exercise.target_reps + ' reps' : 
-                          exercise.target_duration_minutes + ' min'}
+                          (exercise.target_duration_minutes ? exercise.target_duration_minutes + ' min' : '10 reps')}
                     </div>
                 </div>
                 <div class="exercise-detail">
                     <div class="exercise-detail-label">Rest</div>
-                    <div class="exercise-detail-value">${exercise.rest_between_sets}s</div>
+                    <div class="exercise-detail-value">${exercise.rest_between_sets || 60}s</div>
                 </div>
             </div>
-            <p class="info-text">${exercise.description}</p>
-            <div class="exercise-progress">
-                <label>
-                    <input type="checkbox" class="exercise-complete-check" data-index="${index}">
-                    Mark as completed
+            <p class="info-text">${exercise.description || ''}</p>
+            <div class="sets-checkbox-row" style="margin-top: 12px; margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                ${setCheckboxes}
+            </div>
+            <div class="exercise-progress" style="background: rgba(16, 185, 129, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+                    <input type="checkbox" class="exercise-complete-check" data-index="${index}" onchange="updateMasterCheckboxState()" style="width: 18px; height: 18px; accent-color: var(--secondary-color); cursor: pointer;">
+                    <span>Mark ${exercise.name} as Completed</span>
                 </label>
             </div>
         </div>
@@ -513,30 +585,41 @@ function createExerciseCard(exercise, index) {
 
 function createRestExerciseCard(exercise, index) {
     return `
-        <div class="exercise-card">
+        <div class="exercise-card" style="border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 15px; padding: 18px;">
             <div class="exercise-header">
-                <div class="exercise-name">${exercise.name}</div>
+                <div class="exercise-name" style="font-size: 1.15rem; font-weight: 700;">${exercise.name}</div>
             </div>
             <p>${exercise.description}</p>
             <p><strong>Duration:</strong> ${exercise.duration_minutes} minutes</p>
+            <div class="exercise-progress" style="margin-top: 12px; background: rgba(16, 185, 129, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+                    <input type="checkbox" class="exercise-complete-check" data-index="${index}" onchange="updateMasterCheckboxState()" style="width: 18px; height: 18px; accent-color: var(--secondary-color); cursor: pointer;">
+                    <span>Mark ${exercise.name} as Completed</span>
+                </label>
+            </div>
         </div>
     `;
 }
 
 async function completeQuest() {
+    const masterCheck = document.getElementById('master-quest-complete-check');
+    if (masterCheck && masterCheck.checked) {
+        toggleAllQuestCheckboxes(masterCheck);
+    }
+    
     const checkboxes = document.querySelectorAll('.exercise-complete-check');
     const allCompleted = Array.from(checkboxes).every(cb => cb.checked);
     
     if (!allCompleted) {
-        showToast('Please complete all exercises first!');
+        showToast('Please check off all exercises (or check the Master Completion box) first!');
         return;
     }
     
     // Gather completion data
-    const completions = currentQuest.exercises.map((exercise, index) => ({
+    const completions = (currentQuest.exercises || []).map((exercise, index) => ({
         exercise_name: exercise.name,
         category: exercise.category,
-        sets: exercise.sets,
+        sets: exercise.sets || 3,
         reps: exercise.target_reps || 0,
         duration: exercise.target_duration_minutes ? exercise.target_duration_minutes * 60 : 0
     }));
@@ -557,6 +640,9 @@ async function completeQuest() {
         if (response.ok) {
             showQuestCompletionModal(data);
             await loadDashboard();
+            await loadTodaysQuest();
+        } else {
+            showToast(data.message || 'Failed to complete quest');
         }
     } catch (error) {
         console.error('Failed to complete quest:', error);
@@ -616,9 +702,75 @@ async function generateNewQuest() {
     }
 }
 
-// ============================================================================
-// GOALS FUNCTIONS
-// ============================================================================
+const BEST_EXERCISES_PER_GOAL = {
+    'strength': [
+        { name: 'Diamond Push-ups', sets: 4, reps: '12-15', benefit: 'Progressive overload for chest, triceps & core power' },
+        { name: 'Pull-ups / Chin-ups', sets: 3, reps: '8-10', benefit: 'Lats, upper back & bicep pulling strength' },
+        { name: 'Bulgarian Split Squats', sets: 4, reps: '12', benefit: 'Unilateral leg strength & quad/glute development' },
+        { name: 'Pike Push-ups', sets: 3, reps: '10', benefit: 'Deltoid shoulder strength & overhead push power' }
+    ],
+    'endurance': [
+        { name: 'Full-Body Burpees', sets: 4, reps: '15', benefit: 'Maximal cardiovascular stamina & aerobic speed' },
+        { name: 'Jump Rope Intervals', sets: 5, reps: '2 min', benefit: 'Footwork speed & high heart-rate endurance' },
+        { name: 'Mountain Climbers', sets: 4, reps: '45 sec', benefit: 'Core stamina & continuous aerobic tempo' },
+        { name: 'High Knees Sprint', sets: 6, reps: '30 sec', benefit: 'VO2 max elevation & explosive stamina' }
+    ],
+    'weight': [
+        { name: 'Burpee Circuit Finisher', sets: 4, reps: '12-15', benefit: 'Highest calorie burn per minute of exercise' },
+        { name: 'Jump Squats & Lunges', sets: 4, reps: '15', benefit: 'High metabolic demand & leg muscle toning' },
+        { name: 'Shadow Boxing', sets: 3, reps: '3 min', benefit: 'Continuous aerobic fat loss & upper body agility' },
+        { name: 'Jumping Jacks & Butt Kicks', sets: 4, reps: '45 sec', benefit: 'Sustained heart-rate elevation for fat burn' }
+    ],
+    'height': [
+        { name: 'Bar Dead Hang', sets: 3, reps: '45-60 sec', benefit: 'Spinal decompression & gravity posture alignment' },
+        { name: 'Cobra & Cat-Cow Stretch', sets: 3, reps: '60 sec', benefit: 'Spinal flexibility & posture lengthening' },
+        { name: 'Pike Toe Touches', sets: 3, reps: '45 sec', benefit: 'Posterior chain hamstring & spine mobility' },
+        { name: 'Glute Bridges & Wall Sits', sets: 3, reps: '12', benefit: 'Pelvic alignment & core posture support' }
+    ],
+    'exercise': [
+        { name: 'Progressive Overload Sets', sets: 4, reps: '10-12', benefit: 'Systematic rep & load progression for mastery' },
+        { name: 'Tempo / Pause Reps', sets: 3, reps: '8-10', benefit: 'Time under tension & strict execution control' },
+        { name: 'Burnout Finisher Set', sets: 1, reps: 'Max', benefit: 'Peak muscle fiber recruitment & stamina' }
+    ]
+};
+
+function getBestExercisesForGoal(goalType, goalName) {
+    const typeKey = (goalType || 'strength').toLowerCase();
+    let exercises = BEST_EXERCISES_PER_GOAL[typeKey] || BEST_EXERCISES_PER_GOAL['strength'];
+    
+    const nameLower = (goalName || '').toLowerCase();
+    if (nameLower.includes('push') || nameLower.includes('chest')) {
+        return [
+            { name: 'Diamond Push-ups', sets: 4, reps: '12-15', benefit: 'Tricep & inner chest overload' },
+            { name: 'Wide Push-ups', sets: 3, reps: '15', benefit: 'Outer chest & shoulder breadth' },
+            { name: 'Pike Push-ups', sets: 3, reps: '10', benefit: 'Deltoid shoulder strength' },
+            { name: 'Decline Push-ups', sets: 3, reps: '12', benefit: 'Upper chest development' }
+        ];
+    } else if (nameLower.includes('pull') || nameLower.includes('back')) {
+        return [
+            { name: 'Pull-ups', sets: 4, reps: '8-10', benefit: 'Lat width & back power' },
+            { name: 'Chin-ups', sets: 3, reps: '10', benefit: 'Bicep & lower lat recruitment' },
+            { name: 'Inverted Rows', sets: 3, reps: '12', benefit: 'Rhomboid & posture thickness' },
+            { name: 'Dead Hang', sets: 3, reps: '45 sec', benefit: 'Grip strength & spine lengthening' }
+        ];
+    } else if (nameLower.includes('squat') || nameLower.includes('leg')) {
+        return [
+            { name: 'Bulgarian Split Squats', sets: 4, reps: '12', benefit: 'Unilateral quad & glute power' },
+            { name: 'Jump Squats', sets: 3, reps: '15', benefit: 'Explosive leg power' },
+            { name: 'Wall Sits', sets: 3, reps: '45 sec', benefit: 'Isometric quad endurance' },
+            { name: 'Calf Raises', sets: 4, reps: '20', benefit: 'Calf & ankle stability' }
+        ];
+    } else if (nameLower.includes('abs') || nameLower.includes('core') || nameLower.includes('plank')) {
+        return [
+            { name: 'Planks & Side Planks', sets: 3, reps: '60 sec', benefit: 'Transverse abdominis stability' },
+            { name: 'Hanging Leg Raises', sets: 3, reps: '12', benefit: 'Lower ab development' },
+            { name: 'Russian Twists', sets: 3, reps: '20', benefit: 'Oblique strength & rotational power' },
+            { name: 'V-Ups', sets: 3, reps: '12', benefit: 'Full abdominal compression' }
+        ];
+    }
+    
+    return exercises;
+}
 
 async function loadGoals() {
     try {
@@ -628,34 +780,195 @@ async function loadGoals() {
         const data = await response.json();
         
         const goalsList = document.getElementById('goals-list');
+        const activeGoals = (data.goals || []).filter(g => g.status === 'active');
+        const completedGoals = (data.goals || []).filter(g => g.status === 'completed');
+        const totalGoals = (data.goals || []).length;
+        const rate = totalGoals > 0 ? Math.round((completedGoals.length / totalGoals) * 100) : 0;
         
-        if (data.goals.length === 0) {
-            goalsList.innerHTML = '<p class="no-data">No goals yet. Create one to get started!</p>';
-            return;
+        const activeEl = document.getElementById('goals-count-active');
+        if (activeEl) activeEl.textContent = activeGoals.length;
+        const compEl = document.getElementById('goals-count-completed');
+        if (compEl) compEl.textContent = completedGoals.length;
+        const rateEl = document.getElementById('goals-completion-rate');
+        if (rateEl) rateEl.textContent = `${rate}%`;
+        
+        if (!data.goals || data.goals.length === 0) {
+            goalsList.innerHTML = '<p class="no-data">No active goals yet. Create one above or choose from the recommended exercise guide below!</p>';
+        } else {
+            goalsList.innerHTML = data.goals.map(goal => {
+                const bestExs = getBestExercisesForGoal(goal.goal_type, goal.goal_name);
+                const targetVal = goal.target_value || 1;
+                const currentVal = goal.current_value || 0;
+                const percent = Math.min(100, Math.round((currentVal / targetVal) * 100));
+                
+                return `
+                    <div class="card" style="margin-bottom: 20px; border: 1px solid var(--card-border);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                            <div style="flex: 1; min-width: 240px;">
+                                <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">${goal.goal_name}</h3>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap;">
+                                    <span class="badge" style="background: var(--primary-color); color: #fff; padding: 2px 8px; border-radius: 4px; text-transform: capitalize; font-size: 0.8rem;">Category: ${goal.goal_type}</span>
+                                    <span class="status-badge ${goal.status === 'completed' ? 'status-active' : ''}">${goal.status.toUpperCase()}</span>
+                                    ${goal.deadline ? `<span style="font-size: 0.82rem; color: var(--text-secondary);">📅 Deadline: ${goal.deadline}</span>` : ''}
+                                </div>
+                                
+                                <!-- Progress Bar & Numeric Tracker -->
+                                <div style="margin-top: 14px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: 700; margin-bottom: 6px;">
+                                        <span>Goal Target Progress</span>
+                                        <span style="color: var(--secondary-color);">${percent}% (${currentVal} / ${targetVal})</span>
+                                    </div>
+                                    <div class="exp-bar" style="height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                                        <div class="exp-fill" style="width: ${percent}%; height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); transition: width 0.4s ease;"></div>
+                                    </div>
+                                    
+                                    ${goal.status === 'active' ? `
+                                    <div style="display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap;">
+                                        <span style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 600;">Log Progress:</span>
+                                        <button class="btn btn-small btn-secondary" onclick="incrementGoalProgress(${goal.id}, ${currentVal}, 1, ${targetVal})">+1</button>
+                                        <button class="btn btn-small btn-secondary" onclick="incrementGoalProgress(${goal.id}, ${currentVal}, 5, ${targetVal})">+5</button>
+                                        <button class="btn btn-small btn-secondary" onclick="incrementGoalProgress(${goal.id}, ${currentVal}, 10, ${targetVal})">+10</button>
+                                        <button class="btn btn-small btn-primary" onclick="updateGoalProgress(${goal.id}, ${currentVal})">✏️ Custom Value</button>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            ${goal.status === 'active' ? `
+                            <div>
+                                <button class="btn btn-small btn-success" onclick="completeGoal(${goal.id})">✅ Mark Completed</button>
+                            </div>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Best Exercises for This Specific Goal -->
+                        <div class="best-exercises-for-goal" style="margin-top: 16px; padding: 14px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 10px;">
+                            <h4 style="color: #a5b4fc; margin-bottom: 10px; font-size: 0.95rem; font-family: 'Orbitron', sans-serif; display: flex; align-items: center; gap: 6px;">
+                                🔥 Best Exercises to Achieve "${goal.goal_name}"
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;">
+                                ${bestExs.map(ex => `
+                                    <div style="background: var(--dark-bg); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--card-border);">
+                                        <div style="font-weight: 700; color: var(--secondary-color); font-size: 0.9rem;">${ex.name}</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                                            <strong>Target:</strong> ${ex.sets} sets × ${ex.reps}
+                                        </div>
+                                        <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px; line-height: 1.3;">
+                                            💡 <em>${ex.benefit}</em>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
         
-        goalsList.innerHTML = data.goals.map(goal => `
-            <div class="card" style="margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                    <div>
-                        <h3>${goal.goal_name}</h3>
-                        <p><strong>Type:</strong> ${goal.goal_type}</p>
-                        <p><strong>Progress:</strong> ${goal.current_value} / ${goal.target_value}</p>
-                        <p><strong>Status:</strong> <span class="status-badge ${goal.status === 'completed' ? 'status-active' : ''}">${goal.status}</span></p>
-                        ${goal.deadline ? `<p><strong>Deadline:</strong> ${goal.deadline}</p>` : ''}
-                    </div>
-                    ${goal.status === 'active' ? `
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="btn btn-small btn-secondary" onclick="updateGoalProgress(${goal.id}, ${goal.current_value})">Update Progress</button>
-                        <button class="btn btn-small btn-success" onclick="completeGoal(${goal.id})">Mark Complete</button>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
-        `).join('');
+        loadBestExercisesGuide();
     } catch (error) {
         console.error('Failed to load goals:', error);
     }
+}
+
+async function incrementGoalProgress(goalId, currentValue, amount, targetValue) {
+    const newVal = currentValue + amount;
+    const isCompleted = newVal >= targetValue;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/goals/${goalId}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                current_value: newVal,
+                ...(isCompleted ? { status: 'completed' } : {})
+            }),
+            credentials: 'include'
+        });
+        const data = await response.json();
+        if (response.ok) {
+            if (isCompleted) {
+                showToast('🎉 Goal 100% Reached & Completed!');
+            } else {
+                showToast(`Progress logged: +${amount}! (${newVal}/${targetValue})`);
+            }
+            await loadGoals();
+        }
+    } catch (error) {
+        console.error('Failed to increment goal progress:', error);
+    }
+}
+
+function loadBestExercisesGuide() {
+    const guideDiv = document.getElementById('best-exercises-guide');
+    if (!guideDiv) return;
+    
+    const categories = [
+        { key: 'strength', label: '💪 Strength & Muscle', desc: 'Top exercises to maximize power, hypertrophy & muscle strength' },
+        { key: 'endurance', label: '🏃 Endurance & Stamina', desc: 'Top exercises for cardiovascular capacity, VO2 max & stamina' },
+        { key: 'weight', label: '🔥 Weight Loss & Fat Burn', desc: 'Highest metabolic demand exercises for maximum fat burn' },
+        { key: 'height', label: '🧘 Height, Posture & Stretch', desc: 'Spinal decompression, posture reset & flexibility mobility' },
+        { key: 'exercise', label: '⚔️ Exercise Mastery', desc: 'Progressive overload & time-under-tension protocols' }
+    ];
+    
+    guideDiv.innerHTML = `
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px;">
+            ${categories.map((c, i) => `
+                <button class="btn btn-small ${i === 0 ? 'btn-primary' : 'btn-secondary'}" onclick="selectBestExerciseCategory('${c.key}', this)">
+                    ${c.label}
+                </button>
+            `).join('')}
+        </div>
+        <div id="best-exercise-category-content"></div>
+    `;
+    
+    renderBestExerciseCategoryContent('strength');
+}
+
+function selectBestExerciseCategory(catKey, btn) {
+    document.querySelectorAll('#best-exercises-guide .btn').forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-secondary');
+    });
+    if (btn) {
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary');
+    }
+    renderBestExerciseCategoryContent(catKey);
+}
+
+function renderBestExerciseCategoryContent(catKey) {
+    const contentDiv = document.getElementById('best-exercise-category-content');
+    if (!contentDiv) return;
+    
+    const exercises = BEST_EXERCISES_PER_GOAL[catKey] || BEST_EXERCISES_PER_GOAL['strength'];
+    
+    contentDiv.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+            ${exercises.map(ex => `
+                <div class="card" style="background: var(--dark-bg); border: 1px solid var(--card-border); margin: 0; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <h4 style="color: var(--secondary-color); font-size: 1rem; margin-bottom: 4px;">${ex.name}</h4>
+                        <p style="font-size: 0.85rem; color: var(--text-primary);"><strong>Recommended Target:</strong> ${ex.sets} sets × ${ex.reps}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 6px;">💡 ${ex.benefit}</p>
+                    </div>
+                    <button class="btn btn-small btn-primary" onclick="quickAddGoal('${catKey}', '${ex.name}', 100)" style="margin-top: 12px; align-self: flex-start;">
+                        + Set as My Goal
+                    </button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function quickAddGoal(type, name, defaultTarget) {
+    showAddGoalModal();
+    const typeSelect = document.getElementById('goal-type');
+    const nameInput = document.getElementById('goal-name');
+    const targetInput = document.getElementById('goal-target');
+    
+    if (typeSelect) typeSelect.value = type;
+    if (nameInput) nameInput.value = name;
+    if (targetInput) targetInput.value = defaultTarget;
 }
 
 async function updateGoalProgress(goalId, currentValue) {
@@ -1209,6 +1522,63 @@ function showTab(tabName) {
     }
 }
 
+function renderActiveTargetBanner(targetName) {
+    const bannerEl = document.getElementById('active-target-banner');
+    if (!bannerEl) return;
+    
+    if (targetName) {
+        bannerEl.innerHTML = `
+            <div class="target-banner-content active-build-banner">
+                <div class="target-banner-info">
+                    <span class="target-badge">🎭 ACTIVE TARGET</span>
+                    <h2 class="target-title">Training to Become: <span class="target-highlight">${targetName}</span></h2>
+                    <p class="target-subtitle">Daily Quests & Main Story Split are dynamically tailored to build ${targetName}'s physique.</p>
+                </div>
+                <div class="target-banner-actions">
+                    ${window._activeQuestLogMarkdown ? `<button class="btn btn-small btn-primary" onclick="openActiveQuestLogModal()">📜 View Quest Log</button>` : ''}
+                    <button class="btn btn-small btn-secondary" onclick="showTab('physique')">🔄 Change Target</button>
+                </div>
+            </div>
+        `;
+    } else {
+        bannerEl.innerHTML = `
+            <div class="target-banner-content no-target-banner">
+                <div class="target-banner-info">
+                    <span class="target-badge inactive">ℹ️ NO TARGET SELECTED</span>
+                    <h3 class="target-title">Choose a Character in "Become Like..."</h3>
+                    <p class="target-subtitle">Select any anime character or athlete (e.g. Sung Jinwoo, Saitama, Levi) to unlock their custom Main Story Quests!</p>
+                </div>
+                <div class="target-banner-actions">
+                    <button class="btn btn-primary" onclick="showTab('physique')">🎭 Choose Character Target</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function openActiveQuestLogModal() {
+    const modal = document.getElementById('active-quest-log-modal');
+    const titleEl = document.getElementById('active-quest-log-modal-title');
+    const bodyEl = document.getElementById('active-quest-log-modal-body');
+    
+    if (!modal || !bodyEl) return;
+    
+    const targetName = window._activeTargetName || 'Target Character';
+    const markdown = window._activeQuestLogMarkdown;
+    
+    if (titleEl) titleEl.textContent = `📜 Quest Log: Becoming ${targetName}`;
+    
+    if (markdown) {
+        bodyEl.innerHTML = typeof marked !== 'undefined' 
+            ? marked.parse(markdown) 
+            : `<pre>${markdown}</pre>`;
+    } else {
+        bodyEl.innerHTML = '<p class="no-data">No Quest Log markdown available. Select or analyze a character target in "Become Like..." to generate one.</p>';
+    }
+    
+    modal.classList.add('active');
+}
+
 async function loadWeeklySchedule() {
     const grid = document.getElementById('weekly-schedule-grid');
     if (!grid) return;
@@ -1219,8 +1589,27 @@ async function loadWeeklySchedule() {
         });
         const data = await response.json();
         
+        window._activeTargetName = data.target_name || null;
+        window._activeQuestLogMarkdown = data.quest_log_markdown || null;
+        
+        renderActiveTargetBanner(data.target_name);
+        
+        const titleEl = document.getElementById('main-story-title');
+        const subtitleEl = document.getElementById('main-story-subtitle');
+        const viewQuestLogBtn = document.getElementById('view-full-quest-log-btn');
+        
+        if (data.target_name) {
+            if (titleEl) titleEl.textContent = `📖 Main Story Quests — Becoming ${data.target_name}`;
+            if (subtitleEl) subtitleEl.textContent = `Weekly training split for ${data.target_name}. Today's active day is highlighted.`;
+            if (viewQuestLogBtn) viewQuestLogBtn.style.display = data.quest_log_markdown ? 'inline-block' : 'none';
+        } else {
+            if (titleEl) titleEl.textContent = '📖 Main Story Quests';
+            if (subtitleEl) subtitleEl.textContent = 'Your complete weekly training split (Monday to Sunday). Select a character in Become Like... to personalize.';
+            if (viewQuestLogBtn) viewQuestLogBtn.style.display = 'none';
+        }
+        
         if (!data.schedule || data.schedule.length === 0) {
-            grid.innerHTML = '<p class="no-data">No weekly schedule generated yet.</p>';
+            grid.innerHTML = '<p class="no-data">No Main Story Quests generated yet.</p>';
             return;
         }
         
@@ -1261,8 +1650,8 @@ async function loadWeeklySchedule() {
             `;
         }).join('');
     } catch (error) {
-        console.error('Failed to load weekly schedule:', error);
-        if (grid) grid.innerHTML = '<p class="error-message">Failed to load weekly schedule</p>';
+        console.error('Failed to load Main Story Quests schedule:', error);
+        if (grid) grid.innerHTML = '<p class="error-message">Failed to load Main Story Quests schedule</p>';
     }
 }
 

@@ -93,11 +93,18 @@ class AIQuestGenerator:
         exercises = exercise_manager.get_user_exercises(user_id)
         difficulty = self.calculate_difficulty_level(user_id)
         
-        # If the user has an active "Become Like..." build goal with a
-        # structured weekly plan, that plan takes priority over the
-        # generic algorithmic quest -- it already accounts for its own
-        # rest days by design, so we build directly from it.
         todays_plan = weekly_plan_manager.get_plan_for_today(user_id)
+        if todays_plan is None:
+            active_physique = self.get_active_physique_quest(user_id)
+            if active_physique:
+                from physique_analyzer import parse_weekly_plan_from_markdown
+                fallback_days = parse_weekly_plan_from_markdown(
+                    active_physique.get('quest_log_markdown', ''),
+                    active_physique.get('target_name')
+                )
+                weekly_plan_manager.save_weekly_plan(user_id, active_physique['id'], fallback_days)
+                todays_plan = weekly_plan_manager.get_plan_for_today(user_id)
+
         if todays_plan is not None:
             if todays_plan['is_rest']:
                 return self.generate_rest_day_quest(user_id, plan_focus=todays_plan.get('focus'))
@@ -175,17 +182,40 @@ class AIQuestGenerator:
         # Rest if: scheduled rest day OR worked out 6+ days straight
         return rest_scheduled > 0 or workout_days >= 6
     
+    def get_active_physique_quest(self, user_id: int) -> Optional[Dict]:
+        """Fetch active physique build goal for the user if present"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, target_name, source_type, image_path, quest_log_markdown, created_at
+            FROM physique_quests
+            WHERE user_id = ? AND is_active = 1
+            ORDER BY created_at DESC LIMIT 1
+        ''', (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
     def generate_rest_day_quest(self, user_id: int, plan_focus: str = None) -> Dict:
         """Generate a recovery-focused quest for rest days"""
-        title = '🛌 Recovery Day: Active Rest'
-        notes = 'Rest is crucial for growth. Take it easy today, Hunter!'
+        active_physique = self.get_active_physique_quest(user_id)
+        target_name = active_physique.get('target_name') if active_physique else None
         
-        if plan_focus:
+        if target_name:
+            title = f'🛌 Main Story Quest: Becoming {target_name} (Rest & Recovery)'
+            notes = f'Scheduled rest day from {target_name}\'s training split ({plan_focus or "Recovery"}). Growth occurs during rest!'
+        else:
+            title = '🛌 Recovery Day: Active Rest'
+            notes = 'Rest is crucial for growth. Take it easy today, Hunter!'
+        
+        if plan_focus and not target_name:
             notes = f'Scheduled rest day from your active build plan ({plan_focus}). Recovery is part of the training, not a break from it.'
         
         return {
             'date': datetime.now().strftime('%Y-%m-%d'),
             'title': title,
+            'target_name': target_name,
+            'physique_quest_id': active_physique.get('id') if active_physique else None,
             'difficulty': 1,
             'is_rest_day': True,
             'exercises': [
@@ -223,6 +253,9 @@ class AIQuestGenerator:
         training split into the same quest schema the rest of the app uses,
         so it renders and completes identically to an algorithmic quest.
         """
+        active_physique = self.get_active_physique_quest(user_id)
+        target_name = active_physique.get('target_name') if active_physique else None
+        
         cardio_keywords = ('run', 'sprint', 'jump rope', 'row', 'bike', 'cycling',
                            'cardio', 'hiit', 'jog', 'burpee', 'mountain climber')
         flexibility_keywords = ('stretch', 'yoga', 'mobility', 'foam roll')
@@ -253,12 +286,16 @@ class AIQuestGenerator:
                 'target_duration_minutes': target_duration,
                 'rest_between_sets': ex.get('rest_seconds', 60),
                 'exp_per_set': 10 + difficulty,
-                'description': ex.get('notes') or f"Part of your build-goal training split"
+                'description': ex.get('notes') or (f"Part of {target_name}'s workout split" if target_name else "Part of your build-goal training split")
             })
         
+        title = f"⚔️ Main Story Quest: Becoming {target_name} - {plan_entry.get('focus', 'Training Day')}" if target_name else f"⚔️ Main Story Quest: {plan_entry.get('focus', 'Training Day')}"
+
         return {
             'date': datetime.now().strftime('%Y-%m-%d'),
-            'title': f"🎭 Build Quest: {plan_entry.get('focus', 'Training Day')}",
+            'title': title,
+            'target_name': target_name,
+            'physique_quest_id': active_physique.get('id') if active_physique else None,
             'difficulty': difficulty,
             'from_weekly_plan': True,
             'exercises': exercises,
@@ -272,11 +309,25 @@ class AIQuestGenerator:
         from models import WeeklyPlanManager
         weekly_plan_manager = WeeklyPlanManager(self.db)
         
+        active_physique = self.get_active_physique_quest(user_id)
+        target_name = active_physique.get('target_name') if active_physique else None
+        physique_quest_id = active_physique.get('id') if active_physique else None
+        quest_log_markdown = active_physique.get('quest_log_markdown') if active_physique else None
+
         difficulty = self.calculate_difficulty_level(user_id)
         today_weekday = datetime.now().weekday()  # Monday=0 ... Sunday=6
         day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         
         plan_days = weekly_plan_manager.get_all_days(user_id)
+        if not plan_days and active_physique:
+            from physique_analyzer import parse_weekly_plan_from_markdown
+            fallback_days = parse_weekly_plan_from_markdown(
+                active_physique.get('quest_log_markdown', ''),
+                active_physique.get('target_name')
+            )
+            weekly_plan_manager.save_weekly_plan(user_id, active_physique['id'], fallback_days)
+            plan_days = weekly_plan_manager.get_all_days(user_id)
+
         schedule = []
         
         if plan_days:
@@ -334,6 +385,9 @@ class AIQuestGenerator:
         
         return {
             'has_active_build_goal': len(plan_days) > 0,
+            'target_name': target_name,
+            'physique_quest_id': physique_quest_id,
+            'quest_log_markdown': quest_log_markdown,
             'schedule': schedule
         }
     
@@ -601,6 +655,14 @@ class AIQuestGenerator:
             quest_data = json.loads(quest_row['quest_data'])
             quest_data['id'] = quest_row['id']
             quest_data['completed'] = bool(quest_row['completed'])
+            
+            active_physique = self.get_active_physique_quest(user_id)
+            if active_physique:
+                quest_data['target_name'] = active_physique.get('target_name')
+                quest_data['physique_quest_id'] = active_physique.get('id')
+                if not quest_data.get('title', '').startswith('⚔️ Main Story Quest') and not quest_data.get('title', '').startswith('🛌 Main Story Quest'):
+                    focus_text = quest_data.get('focus_areas', ['Training'])[0] if quest_data.get('focus_areas') else 'Training'
+                    quest_data['title'] = f"⚔️ Main Story Quest: Becoming {active_physique.get('target_name')} - {focus_text}"
             return quest_data
         
         return None

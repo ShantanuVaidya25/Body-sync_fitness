@@ -362,11 +362,21 @@ def get_todays_quest():
         
         print(f"✅ User stats found - Level {stats['level']}")
         
-        # Check if quest already exists for today
+        active_physique = quest_generator.get_active_physique_quest(user_id)
         quest = quest_generator.get_todays_quest(user_id)
         
+        # If user has an active build goal target character, ensure today's quest is built from that active target
+        if active_physique and quest:
+            target_name = active_physique.get('target_name')
+            if quest.get('target_name') != target_name or not quest.get('from_weekly_plan'):
+                print(f"🔄 Active build goal ({target_name}) differs from current quest ({quest.get('target_name')}) - regenerating today's quest for target!")
+                try:
+                    quest = quest_generator.regenerate_daily_quest(user_id, [], [])
+                except Exception as ex_reg:
+                    print(f"⚠️ Failed to regenerate quest for target: {ex_reg}")
+        
         if quest:
-            print(f"✅ Existing quest found for today")
+            print(f"✅ Active quest found for today")
             print(f"   Title: {quest['title']}")
             print(f"   Exercises: {len(quest['exercises'])}")
             print(f"   Completed: {quest.get('completed', False)}")
@@ -771,7 +781,10 @@ def analyze_physique():
         
         # Convert the weekly split into structured data so it drives the
         # actual daily quests, not just a wall of text the user reads once.
-        weekly_result = analyzer.extract_structured_weekly_plan(result['quest_log_markdown'])
+        weekly_result = analyzer.extract_structured_weekly_plan(
+            result['quest_log_markdown'],
+            target_name=result.get('target_name')
+        )
         if weekly_result.get('success'):
             weekly_plan_manager.save_weekly_plan(user_id, physique_quest_id, weekly_result['days'])
             try:
@@ -825,13 +838,14 @@ def activate_physique_quest(quest_log_id):
     conn = db.get_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT id, quest_log_markdown FROM physique_quests WHERE id = ? AND user_id = ?',
+    cursor.execute('SELECT id, target_name, quest_log_markdown FROM physique_quests WHERE id = ? AND user_id = ?',
                    (quest_log_id, user_id))
     row = cursor.fetchone()
     if not row:
         conn.close()
         return jsonify({'error': 'Quest Log not found'}), 404
     
+    target_name = row['target_name']
     quest_log_markdown = row['quest_log_markdown']
     
     cursor.execute('UPDATE physique_quests SET is_active = 0 WHERE user_id = ?', (user_id,))
@@ -842,7 +856,7 @@ def activate_physique_quest(quest_log_id):
     # Re-derive the structured weekly plan for the newly-activated goal so
     # daily quests immediately reflect it instead of the previous one.
     analyzer = get_analyzer_for_user(user_id)
-    weekly_result = analyzer.extract_structured_weekly_plan(quest_log_markdown)
+    weekly_result = analyzer.extract_structured_weekly_plan(quest_log_markdown, target_name=target_name)
     if weekly_result.get('success'):
         weekly_plan_manager.save_weekly_plan(user_id, quest_log_id, weekly_result['days'])
         try:
