@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "⚔️  SOLO LEVELING FITNESS SYSTEM ⚔️"
+echo "⚔️  BODY SYNC FITNESS SYSTEM ⚔️"
 echo "===================================="
 echo ""
 echo "Starting the Hunter Training System..."

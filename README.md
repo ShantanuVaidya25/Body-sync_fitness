@@ -1,6 +1,6 @@
-# ⚔️ SOLO LEVELING FITNESS SYSTEM
+# ⚔️ BODY SYNC FITNESS SYSTEM
 
-**An AI-Powered Fitness Progression System Inspired by Solo Leveling**
+**An AI-Powered Fitness Progression System - Body Sync**
 
 Transform your fitness journey into an epic RPG adventure! Level up, gain stats, complete daily quests, and become the strongest version of yourself.
 
@@ -385,7 +385,7 @@ The system uses SQLite with these main tables:
 
 ### Frontend (HTML/CSS/JavaScript)
 - **index.html**: Single-page application structure
-- **style.css**: Solo Leveling themed design
+- **style.css**: Body Sync themed design
 - **app.js**: Client-side logic and API calls
 
 ### Features
@@ -495,13 +495,13 @@ Planned features:
 
 ## 📄 LICENSE
 
-This project is for educational and personal use. Solo Leveling is a trademark of its respective owners.
+This project is for educational and personal use. Body Sync is an AI-powered fitness progression platform.
 
 ---
 
 ## 🙏 ACKNOWLEDGMENTS
 
-- Inspired by **Solo Leveling** manhwa/anime
+- Inspired by gamified fitness progression (**Body Sync**)
 - Built with Flask, SQLite, and vanilla JavaScript
 - Designed for fitness enthusiasts and gamers
 

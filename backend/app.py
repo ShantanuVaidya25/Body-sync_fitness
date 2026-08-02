@@ -1,5 +1,5 @@
 """
-Solo Leveling Fitness - Flask Backend API (IMPROVED)
+Body Sync Fitness - Flask Backend API (IMPROVED)
 Fixed quest generation with better error handling
 """
 
@@ -1199,7 +1199,7 @@ def get_progress_data():
 
 if __name__ == '__main__':
     print("\n" + "="*60)
-    print("⚔️  SOLO LEVELING FITNESS SYSTEM")
+    print("⚔️  BODY SYNC FITNESS SYSTEM")
     print("="*60)
     print("\n🚀 Server starting...")
     print(f"📍 Access at: http://localhost:5000")

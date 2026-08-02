@@ -1,4 +1,4 @@
-// Solo Leveling Fitness - Main Application JavaScript
+// Body Sync Fitness - Main Application JavaScript
 
 // Global state
 let currentUser = null;

@@ -1,5 +1,5 @@
 """
-Solo Leveling Fitness - Encryption Utilities
+Body Sync Fitness - Encryption Utilities
 Encrypts/decrypts user-submitted API keys before storing them in the
 database, using Fernet (AES-128 in CBC mode + HMAC authentication).
 

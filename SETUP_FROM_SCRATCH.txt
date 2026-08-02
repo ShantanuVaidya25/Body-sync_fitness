@@ -1,5 +1,5 @@
 ================================================================
- SOLO LEVELING FITNESS - CLEAN SETUP GUIDE (START FROM ZERO)
+ BODY SYNC FITNESS - CLEAN SETUP GUIDE (START FROM ZERO)
 ================================================================
 
 This guide assumes NOTHING is currently set up. Follow it top to
@@ -219,7 +219,7 @@ STEP 10: RUN THE SERVER
 Expected output:
 
     ==========================================
-    SOLO LEVELING FITNESS SYSTEM
+    BODY SYNC FITNESS SYSTEM
     ==========================================
     Server starting...
     Access at: http://localhost:5000

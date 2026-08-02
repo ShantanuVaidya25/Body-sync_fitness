@@ -1,5 +1,5 @@
 """
-Solo Leveling Fitness - AI Physique Analyzer (Google Gemini version)
+Body Sync Fitness - AI Physique Analyzer (Google Gemini version)
 Analyzes a named character/person OR an uploaded photo and generates a
 gamified Quest Log (Dailies, Main Story Quests, Side Quests, Level Up
 Milestones) using Google's Gemini API.

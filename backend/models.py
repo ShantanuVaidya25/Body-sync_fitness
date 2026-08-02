@@ -1,5 +1,5 @@
 """
-Solo Leveling Fitness - Database Models
+Body Sync Fitness - Database Models
 Comprehensive models for user progression, exercises, and social features
 """
 
@@ -14,7 +14,7 @@ import secrets
 import os
 
 class Database:
-    """Main database handler for the Solo Leveling Fitness System"""
+    """Main database handler for the Body Sync Fitness System"""
     
     def __init__(self, db_path: str = None):
         if not db_path:

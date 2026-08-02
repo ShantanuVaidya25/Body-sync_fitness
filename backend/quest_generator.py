@@ -1,5 +1,5 @@
 """
-Solo Leveling Fitness - AI Quest Generator
+Body Sync Fitness - AI Quest Generator
 Generates personalized daily quests based on user stats, goals, and progression
 """
 
