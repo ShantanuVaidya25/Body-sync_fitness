@@ -28,13 +28,24 @@ function showRegister() {
 }
 
 async function register() {
-    const username = document.getElementById('register-username').value;
-    const email = document.getElementById('register-email').value;
-    const password = document.getElementById('register-password').value;
+    const usernameInput = document.getElementById('register-username');
+    const emailInput = document.getElementById('register-email');
+    const passwordInput = document.getElementById('register-password');
+    const registerBtn = document.querySelector('#register-form button');
+    
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
     
     if (!username || !email || !password) {
         showError('register-error', 'All fields are required');
         return;
+    }
+    
+    // Prevent accidental double clicks / taps on mobile
+    if (registerBtn) {
+        registerBtn.disabled = true;
+        registerBtn.innerText = 'Creating Account...';
     }
     
     try {
@@ -48,13 +59,18 @@ async function register() {
         const data = await response.json();
         
         if (response.ok) {
-            showToast('Registration successful! Please login.');
-            showLogin();
+            showToast('Registration successful! Welcome Hunter.');
+            await checkAuth();
         } else {
             showError('register-error', data.error);
         }
     } catch (error) {
         showError('register-error', 'Registration failed. Please try again.');
+    } finally {
+        if (registerBtn) {
+            registerBtn.disabled = false;
+            registerBtn.innerText = 'Create Account';
+        }
     }
 }
 

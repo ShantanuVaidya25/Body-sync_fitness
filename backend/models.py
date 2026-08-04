@@ -346,6 +346,24 @@ class User:
         conn.close()
         return None
     
+    def get_user_by_username(self, username: str) -> Optional[Dict]:
+        """Get user by username (case-insensitive)"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE LOWER(username) = LOWER(?)', (username.strip(),))
+        user = cursor.fetchone()
+        conn.close()
+        return dict(user) if user else None
+
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """Get user by email (case-insensitive)"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', (email.strip(),))
+        user = cursor.fetchone()
+        conn.close()
+        return dict(user) if user else None
+
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Get user by ID"""
         conn = self.db.get_connection()

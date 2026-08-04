@@ -97,20 +97,30 @@ def index():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    """Register a new user"""
-    data = request.json
+    """Register a new user and automatically log them in"""
+    data = request.json or {}
     
-    username = data.get('username')
-    email = data.get('email')
+    username = (data.get('username') or '').strip()
+    email = (data.get('email') or '').strip().lower()
     password = data.get('password')
     
-    if not all([username, email, password]):
+    if not username or not email or not password:
         return jsonify({'error': 'Missing required fields'}), 400
+    
+    # Specific check for existing username or email
+    if user_manager.get_user_by_username(username):
+        return jsonify({'error': f"Username '{username}' is already taken. Try logging in."}), 409
+
+    if user_manager.get_user_by_email(email):
+        return jsonify({'error': f"Email '{email}' is already registered. Try logging in."}), 409
     
     user_id = user_manager.create_user(username, email, password)
     
     if user_id:
-        print(f"✅ New user registered: {username} (ID: {user_id})")
+        # Establish session automatically for seamless onboarding
+        session['user_id'] = user_id
+        session['username'] = username
+        print(f"✅ New user registered and logged in: {username} (ID: {user_id})")
         return jsonify({
             'success': True,
             'message': 'Account created successfully!',
@@ -118,6 +128,7 @@ def register():
         }), 201
     else:
         return jsonify({'error': 'Username or email already exists'}), 409
+
 
 
 @app.route('/api/login', methods=['POST'])
