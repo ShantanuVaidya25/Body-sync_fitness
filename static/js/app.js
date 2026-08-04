@@ -253,8 +253,9 @@ async function loadDashboard() {
         await loadTodaysQuest();
         
         // Set username
-        document.getElementById('nav-username').textContent = currentUser.username;
-        document.getElementById('player-name').textContent = currentUser.username;
+        if (document.getElementById('nav-username')) document.getElementById('nav-username').textContent = currentUser.username;
+        if (document.getElementById('nav-username-mobile')) document.getElementById('nav-username-mobile').textContent = currentUser.username;
+        if (document.getElementById('player-name')) document.getElementById('player-name').textContent = currentUser.username;
     } catch (error) {
         console.error('Failed to load dashboard:', error);
     }
@@ -1491,18 +1492,34 @@ function showScreen(screenId) {
     document.getElementById(screenId).classList.add('active');
 }
 
+function toggleMobileMenu() {
+    const navMenu = document.getElementById('nav-menu');
+    const navToggle = document.getElementById('nav-toggle');
+    if (navMenu) navMenu.classList.toggle('open');
+    if (navToggle) navToggle.classList.toggle('open');
+}
+
 function showTab(tabName) {
-    // Update nav links
-    document.querySelectorAll('.nav-link').forEach(link => {
+    // Close mobile menu if open
+    const navMenu = document.getElementById('nav-menu');
+    const navToggle = document.getElementById('nav-toggle');
+    if (navMenu) navMenu.classList.remove('open');
+    if (navToggle) navToggle.classList.remove('open');
+
+    // Update top and bottom nav links
+    document.querySelectorAll('.nav-link, .bottom-nav-link').forEach(link => {
         link.classList.remove('active');
     });
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    document.querySelectorAll(`[data-tab="${tabName}"]`).forEach(link => {
+        link.classList.add('active');
+    });
     
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.getElementById(`tab-${tabName}`).classList.add('active');
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    if (targetTab) targetTab.classList.add('active');
     
     // Load data for specific tabs
     if (tabName === 'quest') {

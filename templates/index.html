@@ -202,7 +202,12 @@
         <!-- Navigation -->
         <nav class="navbar">
             <div class="nav-brand">⚔️ Body Sync Fitness</div>
-            <div class="nav-menu">
+            <button class="nav-hamburger" id="nav-toggle" onclick="toggleMobileMenu()" aria-label="Toggle navigation">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <div class="nav-menu" id="nav-menu">
                 <a href="#" onclick="showTab('dashboard')" class="nav-link active" data-tab="dashboard">
                     🏠 Dashboard
                 </a>
@@ -221,6 +226,10 @@
                 <a href="#" onclick="showTab('social')" class="nav-link" data-tab="social">
                     👥 Social
                 </a>
+                <div class="nav-user-mobile">
+                    <span id="nav-username-mobile" class="mobile-username">Hunter</span>
+                    <button class="btn btn-small btn-secondary" onclick="logout()">Logout</button>
+                </div>
             </div>
             <div class="nav-user">
                 <span id="nav-username">Hunter</span>
@@ -690,8 +699,35 @@
                     <div id="friend-search-results"></div>
                     <div id="friends-list"></div>
                 </div>
-            </div>
         </div>
+
+        <!-- Mobile Bottom Navigation Bar -->
+        <nav class="mobile-bottom-bar">
+            <a href="#" onclick="showTab('dashboard')" class="bottom-nav-link active" data-tab="dashboard">
+                <span class="bottom-nav-icon">🏠</span>
+                <span class="bottom-nav-label">Dash</span>
+            </a>
+            <a href="#" onclick="showTab('quest')" class="bottom-nav-link" data-tab="quest">
+                <span class="bottom-nav-icon">🎯</span>
+                <span class="bottom-nav-label">Quest</span>
+            </a>
+            <a href="#" onclick="showTab('stats')" class="bottom-nav-link" data-tab="stats">
+                <span class="bottom-nav-icon">📊</span>
+                <span class="bottom-nav-label">Stats</span>
+            </a>
+            <a href="#" onclick="showTab('goals')" class="bottom-nav-link" data-tab="goals">
+                <span class="bottom-nav-icon">🎖️</span>
+                <span class="bottom-nav-label">Goals</span>
+            </a>
+            <a href="#" onclick="showTab('physique')" class="bottom-nav-link" data-tab="physique">
+                <span class="bottom-nav-icon">🎭</span>
+                <span class="bottom-nav-label">Become</span>
+            </a>
+            <a href="#" onclick="showTab('social')" class="bottom-nav-link" data-tab="social">
+                <span class="bottom-nav-icon">👥</span>
+                <span class="bottom-nav-label">Social</span>
+            </a>
+        </nav>
     </div>
 
     <!-- Toast Notification -->
