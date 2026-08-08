@@ -698,7 +698,15 @@
 
                     <div id="physique-name-input" class="physique-input-section">
                         <div class="form-group">
-                            <label>Character or Person's Name</label>
+                            <label>Popular Character Build Presets</label>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Sung Jin-Woo')">⚔️ Jin-Woo</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Toji Fushiguro')">🗡️ Toji</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Garou')">🐉 Garou</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Baki Hanma')">🥊 Baki</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Goku')">💥 Goku</button>
+                            </div>
+                            <label>Or Type Custom Character / Athlete Name</label>
                             <input type="text" id="physique-target-name" 
                                    placeholder="e.g., Levi Ackerman, Saitama, a specific athlete...">
                         </div>

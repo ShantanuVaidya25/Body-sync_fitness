@@ -1582,7 +1582,32 @@ async function loadLeaderboard() {
         const leaderboard = document.getElementById('leaderboard');
         if (!leaderboard) return;
         
-        leaderboard.innerHTML = data.leaderboard.map((player, index) => {
+        let podiumsHTML = '';
+        if (data.leaderboard && data.leaderboard.length >= 3 && scope === 'global') {
+            const top3 = data.leaderboard.slice(0, 3);
+            podiumsHTML = `
+                <div class="leaderboard-podium-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                    ${top3.map((p, i) => {
+                        const rankLetter = getRankLetterFromLevel(p.level || 1);
+                        const crown = i === 0 ? '👑 1ST MONARCH' : (i === 1 ? '🥈 2ND HUNTER' : '🥉 3RD HUNTER');
+                        const borderStyle = i === 0 
+                            ? 'border: 2px solid #f59e0b; background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(15, 23, 42, 0.95) 100%); box-shadow: 0 0 25px rgba(245, 158, 11, 0.25);'
+                            : (i === 1 ? 'border: 2px solid #38bdf8; background: linear-gradient(135deg, rgba(56, 189, 248, 0.16) 0%, rgba(15, 23, 42, 0.95) 100%);'
+                                       : 'border: 2px solid #a855f7; background: linear-gradient(135deg, rgba(168, 85, 247, 0.16) 0%, rgba(15, 23, 42, 0.95) 100%);');
+                        return `
+                            <div class="card podium-card" style="${borderStyle} padding: 18px; text-align: center; border-radius: 16px; transition: transform 0.25s ease;">
+                                <div style="font-size: 0.72rem; font-weight: 900; font-family: 'Orbitron', sans-serif; letter-spacing: 0.8px; margin-bottom: 6px; ${i === 0 ? 'color: #f59e0b;' : (i === 1 ? 'color: #38bdf8;' : 'color: #c084fc;')}">${crown}</div>
+                                <div class="clickable-username" onclick="viewHunterProfile(${p.id})" style="font-weight: 800; font-size: 1.05rem; color: #f8fafc; font-family: 'Orbitron', sans-serif;">${escapeHtml(p.username)}</div>
+                                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">${rankLetter}-Rank • Level ${p.level || 1}</div>
+                                <div style="font-size: 0.8rem; font-weight: 800; color: #f59e0b; font-family: 'Orbitron', sans-serif; margin-top: 4px;">${p.exp || 0} EXP</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        const itemsHTML = data.leaderboard.map((player, index) => {
             let actionBtn = '';
             if (currentUser && player.id === currentUser.id) {
                 actionBtn = `<span class="status-badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc;">You</span>`;
@@ -1590,10 +1615,8 @@ async function loadLeaderboard() {
                 actionBtn = `<span class="status-badge status-active">Friends</span>`;
             } else if (player.friendship_status === 'pending') {
                 if (player.request_sender_id === currentUser.id) {
-                    // User 1 (Sender) sees ONLY Cancel Request button
                     actionBtn = `<button class="btn btn-small btn-secondary" onclick="declineFriend(${player.id})">Cancel Request</button>`;
                 } else {
-                    // User 2 (Recipient) sees Accept Request and Cancel buttons
                     actionBtn = `
                         <div style="display: flex; gap: 6px;">
                             <button class="btn btn-small btn-success" onclick="acceptFriend(${player.id})">Accept Request</button>
@@ -1622,6 +1645,8 @@ async function loadLeaderboard() {
                 </div>
             `;
         }).join('');
+
+        leaderboard.innerHTML = podiumsHTML + itemsHTML;
     } catch (error) {
         console.error('Failed to load leaderboard:', error);
     }
