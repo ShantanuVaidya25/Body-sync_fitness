@@ -25,11 +25,27 @@
                 <h2>🔐 Hunter Login</h2>
                 <div class="form-group">
                     <label>Username or Email</label>
-                    <input type="text" id="login-username" placeholder="Enter your username or email" required autocomplete="username">
+                    <div class="input-group-custom">
+                        <span class="input-prefix-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        </span>
+                        <input type="text" id="login-username" placeholder="Enter your username or email" required autocomplete="username">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+                    <div class="input-group-custom">
+                        <span class="input-prefix-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </span>
+                        <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+                        <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('login-password', this)" title="Show/Hide Password">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+                        <a href="#" onclick="openForgotPasswordModal()" style="font-size: 0.83rem; color: #a5b4fc; text-decoration: none; font-weight: 600;">🔑 Forgot Password?</a>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary" id="login-submit-btn" style="width: 100%;">Enter the System</button>
                 <p class="form-switch" style="margin-top: 15px;">New Hunter? <a href="#" onclick="showRegister()">Register Here</a></p>
@@ -41,15 +57,33 @@
                 <h2>📝 Hunter Registration</h2>
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" id="register-username" placeholder="Choose a username" required autocomplete="username">
+                    <div class="input-group-custom">
+                        <span class="input-prefix-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        </span>
+                        <input type="text" id="register-username" placeholder="Choose a username" required autocomplete="username">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Email</label>
-                    <input type="email" id="register-email" placeholder="Your email" required autocomplete="email">
+                    <div class="input-group-custom">
+                        <span class="input-prefix-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        </span>
+                        <input type="email" id="register-email" placeholder="Your email" required autocomplete="email">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="register-password" placeholder="Create a password" required autocomplete="new-password">
+                    <div class="input-group-custom">
+                        <span class="input-prefix-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </span>
+                        <input type="password" id="register-password" placeholder="Create a password" required autocomplete="new-password">
+                        <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('register-password', this)" title="Show/Hide Password">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary" id="register-submit-btn">Create Account</button>
                 <p class="form-switch">Already a Hunter? <a href="#" onclick="showLogin()">Login Here</a></p>
@@ -842,12 +876,89 @@
         </div>
     </div>
 
+    <!-- Forgot Password Modal (2-Step Security Verification) -->
+    <div id="forgot-password-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeForgotPasswordModal()">
+        <div class="modal-content hunter-inspection-modal" style="max-width: 440px; padding: 24px;">
+            <div class="modal-header" style="align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.4rem;">🔐</span>
+                    <h2 style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: #f8fafc;">Security Password Reset</h2>
+                </div>
+                <button class="modal-close-btn" onclick="closeForgotPasswordModal()">✕</button>
+            </div>
+
+            <!-- Step 1: Send Security Verification Code -->
+            <div id="reset-step-1">
+                <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px;">
+                    Enter your registered Hunter email to receive a 6-digit security verification OTP code.
+                </p>
+                <form onsubmit="event.preventDefault(); requestResetCode();">
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="font-size: 0.82rem; color: #cbd5e1;">Registered Email</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            </span>
+                            <input type="email" id="reset-email" placeholder="e.g. hunter@example.com" required>
+                        </div>
+                    </div>
+                    <button type="submit" id="request-code-btn" class="btn btn-primary" style="width: 100%;">Send Security Verification Code</button>
+                </form>
+            </div>
+
+            <!-- Step 2: Verify Code & Set New Password -->
+            <div id="reset-step-2" style="display: none;">
+                <div style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); padding: 10px 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.82rem; color: #a5b4fc;">
+                    📩 6-Digit Verification Code sent! Check terminal / server log for code.
+                </div>
+                <form onsubmit="event.preventDefault(); confirmResetPassword();">
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label style="font-size: 0.82rem; color: #cbd5e1;">6-Digit Security Code</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            </span>
+                            <input type="text" id="reset-code" placeholder="Enter 6-digit OTP code" maxlength="6" required style="letter-spacing: 2px; font-weight: 700;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label style="font-size: 0.82rem; color: #cbd5e1;">New Password</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            </span>
+                            <input type="password" id="reset-new-password" placeholder="Create new password" required>
+                            <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('reset-new-password', this)" title="Show/Hide Password">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label style="font-size: 0.82rem; color: #cbd5e1;">Confirm New Password</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            </span>
+                            <input type="password" id="reset-confirm-password" placeholder="Confirm new password" required>
+                            <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('reset-confirm-password', this)" title="Show/Hide Password">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" id="reset-submit-btn" class="btn btn-primary" style="width: 100%;">Verify & Update Password</button>
+                </form>
+            </div>
+
+            <div id="reset-error" class="error-message" style="margin-top: 12px; color: #ef4444; font-weight: bold; font-size: 0.85rem;"></div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="/static/js/app.js?v=20260808_15"></script>
+    <script src="/static/js/app.js?v=20260808_19"></script>
 </body>
 </html>

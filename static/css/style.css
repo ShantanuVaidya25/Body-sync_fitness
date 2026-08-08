@@ -30,7 +30,10 @@ body {
     line-height: 1.6;
 }
 
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4 {
     font-family: 'Orbitron', sans-serif;
 }
 
@@ -121,6 +124,69 @@ h1, h2, h3, h4 {
 .form-group textarea:focus {
     outline: none;
     border-color: var(--primary-color);
+}
+
+/* Integrated Custom Input Group (Lock Prefix + Input + Eye Suffix Button) */
+.input-group-custom {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: var(--dark-bg);
+    border: 2px solid var(--card-border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.input-group-custom:focus-within {
+    border-color: #6366f1;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+}
+
+.input-prefix-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    height: 46px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #94a3b8;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.input-group-custom input {
+    flex: 1;
+    height: 46px;
+    padding: 0 14px !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-primary);
+    font-size: 0.98rem;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.input-suffix-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    height: 46px;
+    background: rgba(255, 255, 255, 0.04);
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.input-suffix-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
 }
 
 .form-switch {
@@ -367,8 +433,15 @@ h1, h2, h3, h4 {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .dashboard-grid {
@@ -691,8 +764,15 @@ h1, h2, h3, h4 {
 }
 
 @keyframes celebrate {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
 }
 
 .modal-content h2 {
@@ -811,7 +891,7 @@ h1, h2, h3, h4 {
     transition: all 0.25s;
 }
 
-.objective-card input:checked + .objective-card-content {
+.objective-card input:checked+.objective-card-content {
     border-color: var(--primary-color);
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%);
     box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
@@ -889,7 +969,7 @@ h1, h2, h3, h4 {
     .api-key-input-row {
         flex-direction: column;
     }
-    
+
     .api-key-input-row button {
         width: 100%;
     }
@@ -974,7 +1054,9 @@ h1, h2, h3, h4 {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Quest Log Markdown Rendering */
@@ -1260,6 +1342,7 @@ h1, h2, h3, h4 {
     .navbar {
         padding: 12px 20px;
     }
+
     .nav-link {
         padding: 8px 12px;
         font-size: 0.9rem;
@@ -1319,6 +1402,7 @@ h1, h2, h3, h4 {
             opacity: 0;
             transform: translateY(-10px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -1465,7 +1549,7 @@ h1, h2, h3, h4 {
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .target-banner-actions {
         width: 100%;
     }
@@ -1504,6 +1588,7 @@ h1, h2, h3, h4 {
 }
 
 @media (max-width: 420px) {
+
     .stats-grid,
     .quick-stats {
         grid-template-columns: 1fr;

@@ -17,6 +17,150 @@ document.addEventListener('DOMContentLoaded', () => {
 // AUTHENTICATION FUNCTIONS
 // ============================================================================
 
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    
+    if (btn) {
+        if (isPassword) {
+            btn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>
+            `;
+            btn.title = "Hide Password";
+        } else {
+            btn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            `;
+            btn.title = "Show Password";
+        }
+    }
+}
+
+function openForgotPasswordModal() {
+    const modal = document.getElementById('forgot-password-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('reset-step-1').style.display = 'block';
+        document.getElementById('reset-step-2').style.display = 'none';
+        const err = document.getElementById('reset-error');
+        if (err) err.textContent = '';
+    }
+}
+
+function closeForgotPasswordModal() {
+    const modal = document.getElementById('forgot-password-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function requestResetCode() {
+    const emailInput = document.getElementById('reset-email');
+    const reqBtn = document.getElementById('request-code-btn');
+    const email = emailInput ? emailInput.value.trim() : '';
+    
+    if (!email) {
+        showError('reset-error', 'Please enter your registered email address.');
+        return;
+    }
+    
+    if (reqBtn) {
+        reqBtn.disabled = true;
+        reqBtn.innerText = 'Sending Code...';
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/request-reset-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json().catch(() => ({}));
+        
+        if (response.ok) {
+            showToast('Verification code generated! Check server logs.');
+            document.getElementById('reset-step-1').style.display = 'none';
+            document.getElementById('reset-step-2').style.display = 'block';
+            const err = document.getElementById('reset-error');
+            if (err) err.textContent = '';
+        } else {
+            showError('reset-error', data.error || 'Failed to send reset code.');
+        }
+    } catch (error) {
+        console.error('Request reset code error:', error);
+        showError('reset-error', 'Connection error. Please try again.');
+    } finally {
+        if (reqBtn) {
+            reqBtn.disabled = false;
+            reqBtn.innerText = 'Send Security Verification Code';
+        }
+    }
+}
+
+async function confirmResetPassword() {
+    const emailInput = document.getElementById('reset-email');
+    const codeInput = document.getElementById('reset-code');
+    const newPasswordInput = document.getElementById('reset-new-password');
+    const confirmPasswordInput = document.getElementById('reset-confirm-password');
+    const resetBtn = document.getElementById('reset-submit-btn');
+    
+    const email = emailInput ? emailInput.value.trim() : '';
+    const code = codeInput ? codeInput.value.trim() : '';
+    const newPassword = newPasswordInput ? newPasswordInput.value : '';
+    const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
+    
+    if (!email || !code || !newPassword || !confirmPassword) {
+        showError('reset-error', 'Please fill in all fields.');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showError('reset-error', 'Passwords do not match.');
+        return;
+    }
+    
+    if (resetBtn) {
+        resetBtn.disabled = true;
+        resetBtn.innerText = 'Verifying...';
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/confirm-reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code, new_password: newPassword }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json().catch(() => ({}));
+        
+        if (response.ok) {
+            showToast('Password updated successfully! You can now log in.');
+            closeForgotPasswordModal();
+            const loginUser = document.getElementById('login-username');
+            if (loginUser) loginUser.value = email;
+        } else {
+            showError('reset-error', data.error || 'Failed to update password.');
+        }
+    } catch (error) {
+        console.error('Confirm reset password error:', error);
+        showError('reset-error', 'Connection error. Please try again.');
+    } finally {
+        if (resetBtn) {
+            resetBtn.disabled = false;
+            resetBtn.innerText = 'Verify & Update Password';
+        }
+    }
+}
+
 function showLogin() {
     document.getElementById('login-form').style.display = 'block';
     document.getElementById('register-form').style.display = 'none';
@@ -121,7 +265,7 @@ async function login() {
                 showScreen('setup-screen');
             }
         } else {
-            showError('login-error', data.error || 'Invalid credentials. Try demo login or register a new account.');
+            showError('login-error', data.error || 'Incorrect username or password');
         }
     } catch (error) {
         console.error('Login error:', error);

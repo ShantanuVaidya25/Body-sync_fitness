@@ -163,33 +163,91 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     """Authenticate user"""
-    data = request.json
+    data = request.json or {}
     
-    username = data.get('username')
-    password = data.get('password')
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    
+    if not username or not password:
+        return jsonify({'error': 'Please enter your username/email and password.'}), 400
+    
+    # Specific check: if user doesn't exist vs wrong password
+    user_record = user_manager.get_user_by_username_or_email(username)
+    if not user_record:
+        return jsonify({'error': 'Incorrect username or email'}), 401
     
     user = user_manager.authenticate(username, password)
+    if not user:
+        return jsonify({'error': 'Incorrect password'}), 401
+        
+    session['user_id'] = user['id']
+    session['username'] = user['username']
     
-    if user:
-        session['user_id'] = user['id']
-        session['username'] = user['username']
+    # Get player stats
+    stats = stats_manager.get_player_stats(user['id'])
+    
+    print(f"✅ User logged in: {username} (Has stats: {stats is not None})")
+    
+    return jsonify({
+        'success': True,
+        'message': 'Welcome back, Hunter!',
+        'user': {
+            'id': user['id'],
+            'username': user['username'],
+            'has_stats': stats is not None
+        }
+    })
+
+
+import random
+
+
+@app.route('/api/request-reset-code', methods=['POST'])
+def request_reset_code():
+    """Generate and send 6-digit security OTP reset code for email"""
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    
+    if not email:
+        return jsonify({'error': 'Please enter your registered email address'}), 400
         
-        # Get player stats
-        stats = stats_manager.get_player_stats(user['id'])
+    user = user_manager.get_user_by_email(email)
+    if not user:
+        return jsonify({'error': 'No Hunter account registered with this email address'}), 404
         
-        print(f"✅ User logged in: {username} (Has stats: {stats is not None})")
+    code = str(random.randint(100000, 999999))
+    user_manager.store_reset_code(email, code)
+    
+    print("=" * 60)
+    print(f"🔐 SECURITY OTP VERIFICATION CODE for {email}: {code}")
+    print("=" * 60)
+    
+    return jsonify({
+        'success': True,
+        'message': f'Security 6-digit verification code generated! Check server logs for OTP code ({code}).'
+    })
+
+
+@app.route('/api/confirm-reset-password', methods=['POST'])
+def confirm_reset_password():
+    """Verify 6-digit OTP code and set new password"""
+    data = request.json or {}
+    
+    email = (data.get('email') or '').strip().lower()
+    code = (data.get('code') or '').strip()
+    new_password = data.get('new_password')
+    
+    if not email or not code or not new_password:
+        return jsonify({'error': 'Email, verification code, and new password are required'}), 400
         
-        return jsonify({
-            'success': True,
-            'message': 'Welcome back, Hunter!',
-            'user': {
-                'id': user['id'],
-                'username': user['username'],
-                'has_stats': stats is not None
-            }
-        })
+    if len(new_password) < 3:
+        return jsonify({'error': 'Password must be at least 3 characters long'}), 400
+        
+    success, message = user_manager.verify_and_reset_password(email, code, new_password)
+    if success:
+        return jsonify({'success': True, 'message': message})
     else:
-        return jsonify({'error': 'Invalid credentials'}), 401
+        return jsonify({'error': message}), 400
 
 
 @app.route('/api/logout', methods=['POST'])
