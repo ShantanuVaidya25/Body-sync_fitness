@@ -524,6 +524,21 @@ function updateAdminNavVisibility() {
     });
 }
 
+function switchAdminSubTab(subTabName) {
+    document.querySelectorAll('.admin-subnav-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.admin-subview').forEach(view => view.style.display = 'none');
+
+    const activeBtn = document.getElementById(`admin-subtab-btn-${subTabName}`);
+    const activeView = document.getElementById(`admin-subview-${subTabName}`);
+
+    if (activeBtn) activeBtn.classList.add('active');
+    if (activeView) activeView.style.display = 'block';
+
+    if (subTabName === 'exercises') {
+        loadAdminExercises();
+    }
+}
+
 async function loadAdminTab() {
     if (!currentUser || !currentUser.is_admin) {
         showToast('Administrator access required');
@@ -598,33 +613,55 @@ function renderAdminUsers(users) {
         const isSelf = currentUser && currentUser.id === u.id;
         const isAdmin = Boolean(u.is_admin);
         const roleBadge = isAdmin
-            ? '<span class="status-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-weight: 800;">👑 ADMIN</span>'
-            : '<span class="status-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">🏹 HUNTER</span>';
+            ? '<span class="status-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 800; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px;">👑 OVERLORD ADMIN</span>'
+            : '<span class="status-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); font-weight: 700; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px;">🏹 HUNTER</span>';
 
-        const statsText = u.level
-            ? `STR: ${u.strength || 10} • END: ${u.endurance || 10} • AGI: ${u.agility || 10} • VIT: ${u.vitality || 10}`
-            : 'No Stats Initialized';
+        const rankLetter = getRankLetterFromLevel(u.level || 1);
+        const rankBadgeStyle = {
+            'SS': 'background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); color: #fff; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);',
+            'S':  'background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); color: #fff;',
+            'A':  'background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%); color: #fff;',
+            'B':  'background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;',
+            'C':  'background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: #fff;',
+            'D':  'background: linear-gradient(135deg, #64748b 0%, #334155 100%); color: #fff;',
+            'E':  'background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #0f172a;'
+        }[rankLetter] || 'background: #334155; color: #fff;';
+
+        const statsPills = u.level
+            ? `<div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                 <span style="font-size: 0.72rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 6px; border-radius: 6px; font-weight: 700;">STR ${u.strength || 10}</span>
+                 <span style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 6px; border-radius: 6px; font-weight: 700;">END ${u.endurance || 10}</span>
+                 <span style="font-size: 0.72rem; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 6px; border-radius: 6px; font-weight: 700;">AGI ${u.agility || 10}</span>
+                 <span style="font-size: 0.72rem; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 6px; border-radius: 6px; font-weight: 700;">VIT ${u.vitality || 10}</span>
+               </div>`
+            : '<span style="color: #64748b; font-size: 0.78rem;">Uninitialized</span>';
 
         return `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); transition: background 0.2s ease;">
-                <td style="padding: 12px 10px; font-weight: 700; color: #94a3b8;">#${u.id}</td>
-                <td style="padding: 12px 10px;">
-                    <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+            <tr>
+                <td style="font-weight: 700; color: #94a3b8; font-family: 'Orbitron', sans-serif; font-size: 0.85rem;">#${u.id}</td>
+                <td>
+                    <div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 28px; height: 28px; border-radius: 50%; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: #a5b4fc;">${(u.username || 'H')[0].toUpperCase()}</span>
                         ${escapeHtml(u.username)}
-                        ${isSelf ? '<span style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 6px; border-radius: 4px; font-weight: 800;">YOU</span>' : ''}
+                        ${isSelf ? '<span style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 1px 5px; border-radius: 4px; font-weight: 800;">YOU</span>' : ''}
                     </div>
                 </td>
-                <td style="padding: 12px 10px; color: #cbd5e1; font-size: 0.85rem;">${escapeHtml(u.email || '')}</td>
-                <td style="padding: 12px 10px;">
-                    <div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; font-family: 'Orbitron', sans-serif;">${u.rank || 'E-Rank'}</div>
-                    <div style="font-size: 0.75rem; color: #94a3b8;">Level ${u.level || 1} • ${u.exp || 0} EXP</div>
+                <td style="color: #cbd5e1; font-size: 0.85rem;">${escapeHtml(u.email || '')}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="padding: 2px 8px; border-radius: 6px; font-family: 'Orbitron', sans-serif; font-size: 0.75rem; font-weight: 900; ${rankBadgeStyle}">${rankLetter}</span>
+                        <div>
+                            <div style="font-weight: 700; color: #f59e0b; font-size: 0.82rem; font-family: 'Orbitron', sans-serif;">${u.rank || 'E-Rank'}</div>
+                            <div style="font-size: 0.72rem; color: #94a3b8;">Lvl ${u.level || 1} • ${u.exp || 0} EXP</div>
+                        </div>
+                    </div>
                 </td>
-                <td style="padding: 12px 10px; font-size: 0.78rem; color: #94a3b8;">${statsText}</td>
-                <td style="padding: 12px 10px;">${roleBadge}</td>
-                <td style="padding: 12px 10px; text-align: right;">
+                <td>${statsPills}</td>
+                <td>${roleBadge}</td>
+                <td style="text-align: right;">
                     <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
                         <button class="btn btn-small btn-secondary" onclick="openAdminEditModal(${u.id})" title="Edit user stats and permissions">✏️ Edit</button>
-                        <button class="btn btn-small" onclick="activateGodMode(${u.id})" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);" title="Grant Max Stats & Level 100">⚡ God Mode</button>
+                        <button class="btn btn-small" onclick="activateGodMode(${u.id})" style="background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 700;" title="Grant Max Stats & Level 100">⚡ God Mode</button>
                         <button class="btn btn-small btn-secondary" onclick="openAdminResetPasswordModal(${u.id}, '${escapeHtml(u.username)}')" title="Reset Password">🔑 Password</button>
                         ${!isSelf ? `<button class="btn btn-small btn-danger" onclick="adminDeleteUser(${u.id}, '${escapeHtml(u.username)}')" title="Delete Account">🗑️ Delete</button>` : ''}
                     </div>
@@ -823,13 +860,16 @@ async function loadAdminActivityFeed() {
             }
 
             feed.innerHTML = workouts.map(w => `
-                <div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span style="font-weight: 700; color: #60a5fa;">${escapeHtml(w.username)}</span>
-                        <span style="color: #94a3b8; font-size: 0.85rem; margin-left: 8px;">completed <strong>${w.total_exercises} exercise(s)</strong> (${w.total_reps} total reps)</span>
+                <div style="padding: 12px 16px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="width: 32px; height: 32px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">💪</span>
+                        <div>
+                            <span style="font-weight: 700; color: #f8fafc; font-size: 0.92rem;">${escapeHtml(w.username)}</span>
+                            <span style="color: #94a3b8; font-size: 0.85rem; margin-left: 6px;">completed <strong style="color: #34d399;">${w.total_exercises} exercise(s)</strong> (${w.total_reps} total reps)</span>
+                        </div>
                     </div>
                     <div style="text-align: right; font-size: 0.78rem; color: #94a3b8;">
-                        <div style="color: #f59e0b; font-weight: 700;">+${w.exp_gained} EXP</div>
+                        <div style="color: #f59e0b; font-weight: 800; font-family: 'Orbitron', sans-serif;">+${w.exp_gained} EXP</div>
                         <div>${new Date(w.created_at || w.workout_date).toLocaleDateString()}</div>
                     </div>
                 </div>
@@ -837,6 +877,38 @@ async function loadAdminActivityFeed() {
         }
     } catch (e) {
         console.error('Failed to load admin activity feed:', e);
+    }
+}
+
+async function loadAdminExercises() {
+    const listEl = document.getElementById('admin-exercises-list');
+    if (!listEl) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/exercises`, { credentials: 'include' });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            const exercises = data.exercises || [];
+            if (exercises.length === 0) {
+                listEl.innerHTML = '<p class="no-data">No custom exercise records found.</p>';
+                return;
+            }
+
+            listEl.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+                    ${exercises.map(ex => `
+                        <div style="padding: 16px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; transition: transform 0.2s;">
+                            <div style="font-weight: 800; font-family: 'Orbitron', sans-serif; color: #f8fafc; font-size: 0.95rem;">${escapeHtml(ex.exercise_name || ex.name || 'Exercise')}</div>
+                            <div style="font-size: 0.75rem; font-weight: 700; color: #f59e0b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(ex.category || 'general')}</div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 8px;">Personal Record: <strong style="color: #38bdf8;">${ex.personal_record || 0}</strong></div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.error('Failed to load admin exercises:', e);
     }
 }
 

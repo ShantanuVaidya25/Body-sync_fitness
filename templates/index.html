@@ -775,85 +775,165 @@
         <!-- Admin Panel Tab -->
         <div id="tab-admin" class="tab-content">
             <div class="admin-container">
-                <!-- Admin Header Banner -->
-                <div class="card admin-header-card" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(245, 158, 11, 0.4);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <!-- Admin Header Hero Banner -->
+                <div class="card admin-hero-card">
+                    <div class="admin-hero-content">
                         <div>
-                            <div style="font-size: 0.8rem; font-weight: 800; color: #f59e0b; letter-spacing: 1px; text-transform: uppercase;">👑 SYSTEM OVERLORD CONTROL</div>
-                            <h1 style="margin: 4px 0 0 0; font-family: 'Orbitron', sans-serif; font-size: 1.6rem; color: #f8fafc;">System Administrator Dashboard</h1>
-                            <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #94a3b8;">Full administrative privileges over all hunters, stats, quests, database records, and system settings.</p>
+                            <div class="admin-protocol-badge">
+                                <span class="pulsing-dot"></span>
+                                👑 SYSTEM OVERLORD CONTROL PROTOCOL
+                            </div>
+                            <h1 class="admin-hero-title">System Administrator Dashboard</h1>
+                            <p class="admin-hero-subtitle">Full administrative control over all hunters, player attributes, database records, and system operations.</p>
                         </div>
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button class="btn btn-primary" onclick="activateGodMode(null)" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; font-weight: 700; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);">
+                        <div class="admin-hero-actions">
+                            <button class="btn btn-primary god-mode-hero-btn" onclick="activateGodMode(null)">
                                 ⚡ Activate God Mode (Self)
                             </button>
-                            <button class="btn btn-secondary" onclick="loadAdminTab()" style="font-weight: 600;">
-                                🔄 Refresh System Data
+                            <button class="btn btn-secondary" onclick="loadAdminTab()">
+                                🔄 Sync System Data
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- System Metrics Cards -->
-                <div class="admin-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #60a5fa;">
-                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">TOTAL HUNTERS</div>
-                        <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #f8fafc; margin-top: 4px;" id="admin-metric-users">0</div>
-                        <div style="font-size: 0.75rem; color: #60a5fa; margin-top: 2px;" id="admin-metric-admins">0 Admins</div>
+                <!-- Admin Sub Navigation Bar -->
+                <div class="admin-subnav-bar">
+                    <button class="admin-subnav-btn active" onclick="switchAdminSubTab('users')" id="admin-subtab-btn-users">
+                        👥 Hunter Management
+                    </button>
+                    <button class="admin-subnav-btn" onclick="switchAdminSubTab('activity')" id="admin-subtab-btn-activity">
+                        ⚡ Live Activity Feed
+                    </button>
+                    <button class="admin-subnav-btn" onclick="switchAdminSubTab('exercises')" id="admin-subtab-btn-exercises">
+                        🏋️ Exercise Catalog
+                    </button>
+                    <button class="admin-subnav-btn" onclick="switchAdminSubTab('system')" id="admin-subtab-btn-system">
+                        🛡️ System Diagnostics
+                    </button>
+                </div>
+
+                <!-- System Metrics KPI Grid -->
+                <div class="admin-metrics-grid">
+                    <div class="card metric-card metric-users">
+                        <div class="metric-header">
+                            <span class="metric-title">TOTAL HUNTERS</span>
+                            <span class="metric-icon">👥</span>
+                        </div>
+                        <div class="metric-value" id="admin-metric-users">0</div>
+                        <div class="metric-subtitle" id="admin-metric-admins">0 Admins • 0 Regular</div>
                     </div>
-                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #10b981;">
-                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">WORKOUTS LOGGED</div>
-                        <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #f8fafc; margin-top: 4px;" id="admin-metric-workouts">0</div>
-                        <div style="font-size: 0.75rem; color: #10b981; margin-top: 2px;">System-wide Total</div>
+                    <div class="card metric-card metric-workouts">
+                        <div class="metric-header">
+                            <span class="metric-title">WORKOUTS LOGGED</span>
+                            <span class="metric-icon">🔥</span>
+                        </div>
+                        <div class="metric-value" id="admin-metric-workouts">0</div>
+                        <div class="metric-subtitle">System-wide Workout Sessions</div>
                     </div>
-                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #f59e0b;">
-                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">QUESTS COMPLETED</div>
-                        <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #f8fafc; margin-top: 4px;" id="admin-metric-quests">0</div>
-                        <div style="font-size: 0.75rem; color: #f59e0b; margin-top: 2px;">Verified Completions</div>
+                    <div class="card metric-card metric-quests">
+                        <div class="metric-header">
+                            <span class="metric-title">QUESTS COMPLETED</span>
+                            <span class="metric-icon">🎯</span>
+                        </div>
+                        <div class="metric-value" id="admin-metric-quests">0</div>
+                        <div class="metric-subtitle">Verified Quest Logs</div>
                     </div>
-                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #a855f7;">
-                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">SYSTEM STATUS</div>
-                        <div style="font-size: 1.2rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #a855f7; margin-top: 8px;" id="admin-metric-status">ONLINE</div>
-                        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Full Overlord Access</div>
+                    <div class="card metric-card metric-status">
+                        <div class="metric-header">
+                            <span class="metric-title">SYSTEM STATUS</span>
+                            <span class="metric-icon">⚡</span>
+                        </div>
+                        <div class="metric-value status-online" id="admin-metric-status">ONLINE</div>
+                        <div class="metric-subtitle">Overlord Privileges Active</div>
                     </div>
                 </div>
 
-                <!-- User Management Section -->
-                <div class="card" style="margin-bottom: 20px;">
-                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <h2>👥 Hunter User Management</h2>
-                        <div style="display: flex; gap: 10px; align-items: center; max-width: 320px; width: 100%;">
-                            <input type="text" id="admin-user-search" placeholder="Search by username or email..." oninput="filterAdminUsers()" style="padding: 8px 12px; font-size: 0.88rem; width: 100%; border-radius: 8px; background: var(--dark-bg); color: var(--text-primary); border: 1px solid var(--card-border);">
+                <!-- Subview 1: Hunter User Management -->
+                <div id="admin-subview-users" class="admin-subview active">
+                    <div class="card">
+                        <div class="card-header admin-table-header">
+                            <div>
+                                <h2>👥 Hunter Database & Account Management</h2>
+                                <p class="info-text" style="margin-top: 2px;">Search, edit attributes, grant God Mode, reset passwords, or elevate roles.</p>
+                            </div>
+                            <div class="admin-search-wrapper">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" id="admin-user-search" placeholder="Search hunter by name or email..." oninput="filterAdminUsers()">
+                            </div>
+                        </div>
+
+                        <div class="table-responsive-container">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Hunter Name</th>
+                                        <th>Email</th>
+                                        <th>Rank & Level</th>
+                                        <th>Attribute Parameters</th>
+                                        <th>Role</th>
+                                        <th style="text-align: right;">Overlord Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-users-tbody">
+                                    <!-- Dynamic user rows -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+                </div>
 
-                    <div style="overflow-x: auto; margin-top: 15px;">
-                        <table class="admin-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
-                            <thead>
-                                <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                    <th style="padding: 12px 10px;">ID</th>
-                                    <th style="padding: 12px 10px;">Hunter Name</th>
-                                    <th style="padding: 12px 10px;">Email</th>
-                                    <th style="padding: 12px 10px;">Rank & Level</th>
-                                    <th style="padding: 12px 10px;">Attributes</th>
-                                    <th style="padding: 12px 10px;">Role</th>
-                                    <th style="padding: 12px 10px; text-align: right;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-users-tbody">
-                                <!-- Dynamic user rows -->
-                            </tbody>
-                        </table>
+                <!-- Subview 2: System Activity Feed -->
+                <div id="admin-subview-activity" class="admin-subview" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>⚡ System-Wide Live Workout Feed</h2>
+                        </div>
+                        <p class="info-text">Live stream of workout history logged by hunters across the system.</p>
+                        <div id="admin-activity-feed" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
+                            <p class="no-data">Loading system activity...</p>
+                        </div>
                     </div>
                 </div>
 
-                <!-- System Activity Feed -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>⚡ System-Wide Live Activity Monitor</h2>
+                <!-- Subview 3: Exercise Catalog -->
+                <div id="admin-subview-exercises" class="admin-subview" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>🏋️ Global Exercise Catalog</h2>
+                        </div>
+                        <p class="info-text">Master exercise database powering daily quest generation.</p>
+                        <div id="admin-exercises-list" style="margin-top: 15px;">
+                            <p class="no-data">Loading exercise database...</p>
+                        </div>
                     </div>
-                    <div id="admin-activity-feed" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
-                        <p class="no-data">Loading system activity...</p>
+                </div>
+
+                <!-- Subview 4: System Diagnostics -->
+                <div id="admin-subview-system" class="admin-subview" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>🛡️ System Architecture & Diagnostics</h2>
+                        </div>
+                        <div class="system-diag-grid">
+                            <div class="diag-item">
+                                <div class="diag-label">DATABASE ENGINE</div>
+                                <div class="diag-value">SQLite 3 • Local Storage</div>
+                            </div>
+                            <div class="diag-item">
+                                <div class="diag-label">SECURITY PROTECTION</div>
+                                <div class="diag-value">@admin_required Session Validation</div>
+                            </div>
+                            <div class="diag-item">
+                                <div class="diag-label">AI GAMEMASTER INTEGRATION</div>
+                                <div class="diag-value">Google Gemini API • Physique Analyzer</div>
+                            </div>
+                            <div class="diag-item">
+                                <div class="diag-label">AUTHENTICATION PROTOCOL</div>
+                                <div class="diag-value">PBKDF2 HMAC SHA-256 Hashing</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
