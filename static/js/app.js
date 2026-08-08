@@ -2178,13 +2178,10 @@ async function loadWeeklyActivity() {
                 const todayClass = isToday ? 'today-active-ring' : '';
                 
                 return `
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1;">
-                        <div class="day-bubble ${activeClass} ${todayClass}" title="${day.date}: ${count} workout(s)">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
+                        <div class="day-bubble ${activeClass} ${todayClass}" title="${day.date}: ${count} workout(s) ${count > 0 ? '(Completed)' : '(Rest Day)'}">
                             ${day.day_code}
                         </div>
-                        <span style="font-size: 0.82rem; font-weight: 700; color: ${count > 0 ? '#38bdf8' : '#64748b'}; font-family: 'Orbitron', sans-serif;">
-                            ${count}
-                        </span>
                     </div>
                 `;
             }).join('');
