@@ -202,6 +202,67 @@ def login():
 
 
 
+@app.route('/api/weekly-activity', methods=['GET'])
+def get_weekly_activity():
+    """Get 7-day weekly workout activity calendar data for Sunday to Saturday"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    user_id = session['user_id']
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    today = datetime.now().date()
+    days_since_sunday = (today.weekday() + 1) % 7
+    sunday = today - timedelta(days=days_since_sunday)
+    
+    day_codes = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+    week_days = []
+    
+    for i in range(7):
+        current_date = sunday + timedelta(days=i)
+        date_str = current_date.strftime('%Y-%m-%d')
+        
+        cursor.execute('''
+            SELECT COUNT(*) FROM quest_completions 
+            WHERE user_id = ? AND DATE(completed_at) = ?
+        ''', (user_id, date_str))
+        count = cursor.fetchone()[0] or 0
+        
+        if count == 0:
+            cursor.execute('''
+                SELECT total_exercises FROM workout_history 
+                WHERE user_id = ? AND workout_date = ?
+            ''', (user_id, date_str))
+            row = cursor.fetchone()
+            if row and row[0]:
+                count = row[0]
+                
+        week_days.append({
+            'day_code': day_codes[i],
+            'date': date_str,
+            'count': count,
+            'is_today': current_date == today
+        })
+        
+    stats = stats_manager.get_player_stats(user_id)
+    current_level = stats['level'] if stats else 1
+    
+    cursor.execute('''
+        SELECT COUNT(DISTINCT DATE(completed_at)) FROM quest_completions WHERE user_id = ?
+    ''', (user_id,))
+    total_completed_days = cursor.fetchone()[0] or 0
+    
+    rank_ups = (current_level - 1) + total_completed_days
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'rank_ups': rank_ups,
+        'week_days': week_days
+    })
+
+
 @app.route('/api/logout', methods=['POST'])
 def logout():
     """Logout user"""

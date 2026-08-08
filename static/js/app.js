@@ -331,6 +331,7 @@ async function loadDashboard() {
         // Update UI
         updatePlayerCard(currentStats);
         updateQuickStats();
+        await loadWeeklyActivity();
         
         // Load today's quest preview
         await loadTodaysQuest();
@@ -2154,6 +2155,43 @@ function getRankTitleFromLevel(level) {
     return `${getRankLetterFromLevel(level)}-Rank Hunter`;
 }
 
+async function loadWeeklyActivity() {
+    const grid = document.getElementById('weekly-bubbles-grid');
+    const rankUpsCountEl = document.getElementById('rank-ups-count');
+    if (!grid) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/weekly-activity`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            if (rankUpsCountEl) {
+                rankUpsCountEl.textContent = data.rank_ups || 0;
+            }
+            
+            grid.innerHTML = (data.week_days || []).map(day => {
+                const count = day.count || 0;
+                const isToday = day.is_today;
+                const activeClass = count > 0 ? 'workout-active-fill' : 'rest-hollow-circle';
+                const todayClass = isToday ? 'today-active-ring' : '';
+                
+                return `
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1;">
+                        <span style="font-size: 0.92rem; font-weight: 700; color: #94a3b8; font-family: 'Roboto', sans-serif;">${day.day_code}</span>
+                        <div class="day-bubble ${activeClass} ${todayClass}" title="${day.date}: ${count} workout(s)">
+                            ${count}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.error('Failed to load weekly activity:', error);
+    }
+}
+
 function updateStatusTabCard() {
     if (!currentStats) return;
     
@@ -2182,6 +2220,8 @@ function updateStatusTabCard() {
     }
     if (title) title.textContent = rankTitle;
     if (levelExp) levelExp.textContent = `Level ${level} • ${exp} / ${maxExp} EXP`;
+    
+    loadWeeklyActivity();
 }
 
 function openAllRanksModal() {

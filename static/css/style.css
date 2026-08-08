@@ -208,6 +208,36 @@ h4 {
     color: #38bdf8;
 }
 
+/* Weekly Activity Bubbles (Matching User Image Reference) */
+.day-bubble {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: 'Orbitron', sans-serif;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.day-bubble.workout-active-fill {
+    background: linear-gradient(135deg, #6366f1 0%, #38bdf8 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
+}
+
+.day-bubble.rest-hollow-circle {
+    background: transparent;
+    border: 2px solid #334155;
+    color: #94a3b8;
+}
+
+.day-bubble.today-active-ring {
+    box-shadow: 0 0 0 3px #0f172a, 0 0 0 6px #38bdf8, 0 0 16px rgba(56, 189, 248, 0.6) !important;
+}
+
 .form-switch {
     text-align: center;
     margin-top: 20px;
