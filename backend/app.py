@@ -204,22 +204,40 @@ def login():
 
 import random
 
-# Optional SMTP Email Configuration
-SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
-SMTP_USER = os.environ.get('SMTP_USER', '')
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+# SMTP Email Configuration Loader (reads Environment Variables or email_config.json)
+def get_smtp_config():
+    server = os.environ.get('SMTP_SERVER', '')
+    port = int(os.environ.get('SMTP_PORT', 587))
+    user = os.environ.get('SMTP_USER', '')
+    password = os.environ.get('SMTP_PASSWORD', '')
+    
+    config_path = os.path.join(os.path.dirname(__file__), 'email_config.json')
+    if (not user or not password) and os.path.exists(config_path):
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+                server = server or cfg.get('SMTP_SERVER', 'smtp.gmail.com')
+                port = int(cfg.get('SMTP_PORT', 587))
+                user = user or cfg.get('SMTP_USER', '')
+                password = password or cfg.get('SMTP_PASSWORD', '')
+        except Exception as e:
+            print(f"⚠️ Warning loading email_config.json: {e}")
+            
+    return server or 'smtp.gmail.com', port, user, password
+
 
 def send_email_otp(target_email: str, code: str) -> bool:
     """Send 6-digit OTP code via SMTP to target user email"""
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"ℹ️ SMTP credentials not set. Security OTP code for {target_email}: {code}")
+    smtp_server, smtp_port, smtp_user, smtp_password = get_smtp_config()
+    
+    if not smtp_user or not smtp_password:
+        print(f"ℹ️ SMTP credentials not set in environment or email_config.json. Security OTP code for {target_email}: {code}")
         return False
         
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = '⚔️ Body Sync Fitness - Password Reset Security Code'
-        msg['From'] = f"Body Sync System <{SMTP_USER}>"
+        msg['From'] = f"Body Sync System <{smtp_user}>"
         msg['To'] = target_email
         
         html_body = f"""
@@ -236,10 +254,10 @@ def send_email_otp(target_email: str, code: str) -> bool:
         
         msg.attach(MIMEText(html_body, 'html'))
         
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_USER, target_email, msg.as_string())
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_user, target_email, msg.as_string())
         server.quit()
         print(f"📧 Security OTP email successfully sent to: {target_email}")
         return True
