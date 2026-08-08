@@ -75,6 +75,27 @@ def allowed_image(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
 
+def get_rank_from_level(level) -> str:
+    try:
+        lvl = int(level) if level is not None else 1
+    except (TypeError, ValueError):
+        lvl = 1
+        
+    if lvl >= 100:
+        return 'SS-Rank Hunter'
+    elif lvl >= 80:
+        return 'S-Rank Hunter'
+    elif lvl >= 60:
+        return 'A-Rank Hunter'
+    elif lvl >= 40:
+        return 'B-Rank Hunter'
+    elif lvl >= 25:
+        return 'C-Rank Hunter'
+    elif lvl >= 10:
+        return 'D-Rank Hunter'
+    return 'E-Rank Hunter'
+
+
 # Authentication decorator
 def login_required(f):
     @wraps(f)
@@ -1000,7 +1021,7 @@ def get_friends():
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT u.id, u.username, ps.level, ps.exp, f.status
+        SELECT DISTINCT u.id, u.username, ps.level, ps.exp, f.status
         FROM friends f
         JOIN users u ON (f.friend_id = u.id)
         LEFT JOIN player_stats ps ON (u.id = ps.user_id)
@@ -1017,8 +1038,8 @@ def get_friends():
 @app.route('/api/friends/search', methods=['GET'])
 @login_required
 def search_users():
-    """Search for users to add as friends"""
-    query = request.args.get('q', '')
+    """Search for users to add as friends with current relationship status"""
+    query = request.args.get('q', '').strip()
     user_id = session['user_id']
     
     if len(query) < 2:
@@ -1028,12 +1049,18 @@ def search_users():
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT u.id, u.username, ps.level
+        SELECT u.id, u.username, ps.level,
+               f.status as friendship_status,
+               f.user_id as request_sender_id
         FROM users u
         LEFT JOIN player_stats ps ON (u.id = ps.user_id)
+        LEFT JOIN friends f ON (
+            (f.user_id = ? AND f.friend_id = u.id) OR 
+            (f.user_id = u.id AND f.friend_id = ?)
+        )
         WHERE u.username LIKE ? AND u.id != ?
         LIMIT 20
-    ''', (f'%{query}%', user_id))
+    ''', (user_id, user_id, f'%{query}%', user_id))
     
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
@@ -1045,38 +1072,74 @@ def search_users():
 @login_required
 def add_friend():
     """Send friend request"""
-    data = request.json
+    data = request.json or {}
     user_id = session['user_id']
     friend_id = data.get('friend_id')
+    
+    if not friend_id or int(friend_id) == user_id:
+        return jsonify({'error': 'Cannot add yourself as a friend'}), 400
+        
+    friend_id = int(friend_id)
     
     conn = db.get_connection()
     cursor = conn.cursor()
     
-    try:
-        cursor.execute('''
-            INSERT INTO friends (user_id, friend_id, status)
-            VALUES (?, ?, 'pending')
-        ''', (user_id, friend_id))
-        conn.commit()
+    # Check if target user exists
+    cursor.execute('SELECT id FROM users WHERE id = ?', (friend_id,))
+    if not cursor.fetchone():
         conn.close()
+        return jsonify({'error': 'User not found'}), 404
         
-        return jsonify({'success': True, 'message': 'Friend request sent!'})
-    except sqlite3.IntegrityError:
-        conn.close()
-        return jsonify({'error': 'Friend request already exists'}), 409
-    except Exception as e:
-        conn.close()
-        return jsonify({'error': f'Failed to send friend request: {str(e)}'}), 500
+    # Check existing friendship or pending request
+    cursor.execute('''
+        SELECT status, user_id FROM friends
+        WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+    ''', (user_id, friend_id, friend_id, user_id))
+    existing = cursor.fetchone()
+    
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    if existing:
+        if existing['status'] == 'accepted':
+            conn.close()
+            return jsonify({'error': 'You are already friends!'}), 400
+        elif existing['user_id'] == user_id:
+            conn.close()
+            return jsonify({'error': 'Friend request already sent!'}), 400
+        else:
+            # The other user sent a request to us -> Auto Accept!
+            cursor.execute('''
+                UPDATE friends SET status = 'accepted', accepted_at = ?
+                WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+            ''', (now_str, friend_id, user_id, user_id, friend_id))
+            cursor.execute('''
+                INSERT OR IGNORE INTO friends (user_id, friend_id, status, accepted_at)
+                VALUES (?, ?, 'accepted', ?)
+            ''', (user_id, friend_id, now_str))
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True, 'message': 'Mutual request! You are now friends!'})
+    
+    cursor.execute('''
+        INSERT INTO friends (user_id, friend_id, status)
+        VALUES (?, ?, 'pending')
+    ''', (user_id, friend_id))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'message': 'Friend request sent!'})
 
 
 @app.route('/api/friends/pending', methods=['GET'])
 @login_required
 def get_pending_friends():
-    """Get incoming pending friend requests"""
+    """Get incoming and outgoing pending friend requests"""
     user_id = session['user_id']
     
     conn = db.get_connection()
     cursor = conn.cursor()
+    
+    # Incoming requests sent TO this user
     cursor.execute('''
         SELECT u.id, u.username, ps.level
         FROM friends f
@@ -1084,47 +1147,107 @@ def get_pending_friends():
         LEFT JOIN player_stats ps ON (u.id = ps.user_id)
         WHERE f.friend_id = ? AND f.status = 'pending'
     ''', (user_id,))
+    incoming = [dict(row) for row in cursor.fetchall()]
     
-    pending = [dict(row) for row in cursor.fetchall()]
+    # Outgoing requests sent BY this user
+    cursor.execute('''
+        SELECT u.id, u.username, ps.level
+        FROM friends f
+        JOIN users u ON (f.friend_id = u.id)
+        LEFT JOIN player_stats ps ON (u.id = ps.user_id)
+        WHERE f.user_id = ? AND f.status = 'pending'
+    ''', (user_id,))
+    outgoing = [dict(row) for row in cursor.fetchall()]
+    
     conn.close()
     
-    return jsonify({'pending': pending})
+    return jsonify({
+        'incoming': incoming,
+        'outgoing': outgoing,
+        'pending': incoming
+    })
 
 
 @app.route('/api/friends/accept', methods=['POST'])
 @login_required
 def accept_friend():
     """Accept friend request"""
-    data = request.json
+    data = request.json or {}
     user_id = session['user_id']
     friend_id = data.get('friend_id')
+    
+    if not friend_id:
+        return jsonify({'error': 'Missing friend_id'}), 400
+        
+    friend_id = int(friend_id)
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     conn = db.get_connection()
     cursor = conn.cursor()
     
+    # Update existing request status to accepted for both directions
     cursor.execute('''
         UPDATE friends
         SET status = 'accepted', accepted_at = ?
-        WHERE user_id = ? AND friend_id = ?
-    ''', (now_str, friend_id, user_id))
+        WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+    ''', (now_str, friend_id, user_id, user_id, friend_id))
     
-    # Create reciprocal friendship
-    cursor.execute('''
-        INSERT OR IGNORE INTO friends (user_id, friend_id, status, accepted_at)
-        VALUES (?, ?, 'accepted', ?)
-    ''', (user_id, friend_id, now_str))
+    # Check if reciprocal entry for (user_id, friend_id) exists, insert if missing
+    cursor.execute('SELECT id FROM friends WHERE user_id = ? AND friend_id = ?', (user_id, friend_id))
+    if not cursor.fetchone():
+        cursor.execute('''
+            INSERT INTO friends (user_id, friend_id, status, accepted_at)
+            VALUES (?, ?, 'accepted', ?)
+        ''', (user_id, friend_id, now_str))
+        
+    # Check if reciprocal entry for (friend_id, user_id) exists, insert if missing
+    cursor.execute('SELECT id FROM friends WHERE user_id = ? AND friend_id = ?', (friend_id, user_id))
+    if not cursor.fetchone():
+        cursor.execute('''
+            INSERT INTO friends (user_id, friend_id, status, accepted_at)
+            VALUES (?, ?, 'accepted', ?)
+        ''', (friend_id, user_id, now_str))
     
     conn.commit()
     conn.close()
     
-    return jsonify({'success': True, 'message': 'Friend added!'})
+    return jsonify({'success': True, 'message': 'Friend request accepted!'})
+    conn.close()
+    
+    return jsonify({'success': True, 'message': 'Friend request accepted!'})
+
+
+@app.route('/api/friends/decline', methods=['POST'])
+@login_required
+def decline_friend():
+    """Decline / cancel a friend request or remove an active friend"""
+    data = request.json or {}
+    user_id = session['user_id']
+    friend_id = data.get('friend_id')
+    
+    if not friend_id:
+        return jsonify({'error': 'Missing friend_id'}), 400
+        
+    friend_id = int(friend_id)
+    
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        DELETE FROM friends 
+        WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+    ''', (user_id, friend_id, friend_id, user_id))
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'message': 'Friend relationship updated'})
 
 
 @app.route('/api/leaderboard', methods=['GET'])
 @login_required
 def get_leaderboard():
-    """Get global or friends leaderboard"""
+    """Get global or friends leaderboard with friendship status"""
     user_id = session['user_id']
     scope = request.args.get('scope', 'global')
     
@@ -1134,30 +1257,114 @@ def get_leaderboard():
     if scope == 'friends':
         cursor.execute('''
             SELECT u.id, u.username, ps.level, ps.exp, ps.strength, 
-                   ps.endurance, ps.agility, ps.vitality
+                   ps.endurance, ps.agility, ps.vitality,
+                   f_sub.status as friendship_status,
+                   f_sub.user_id as request_sender_id
             FROM player_stats ps
             JOIN users u ON (ps.user_id = u.id)
+            LEFT JOIN friends f_sub ON (
+                (f_sub.user_id = ? AND f_sub.friend_id = u.id) OR 
+                (f_sub.user_id = u.id AND f_sub.friend_id = ?)
+            )
             WHERE ps.user_id IN (
                 SELECT friend_id FROM friends 
                 WHERE user_id = ? AND status = 'accepted'
             ) OR ps.user_id = ?
             ORDER BY ps.level DESC, ps.exp DESC
             LIMIT 50
-        ''', (user_id, user_id))
+        ''', (user_id, user_id, user_id, user_id))
     else:
         cursor.execute('''
             SELECT u.id, u.username, ps.level, ps.exp, ps.strength,
-                   ps.endurance, ps.agility, ps.vitality
+                   ps.endurance, ps.agility, ps.vitality,
+                   f_sub.status as friendship_status,
+                   f_sub.user_id as request_sender_id
             FROM player_stats ps
             JOIN users u ON (ps.user_id = u.id)
+            LEFT JOIN friends f_sub ON (
+                (f_sub.user_id = ? AND f_sub.friend_id = u.id) OR 
+                (f_sub.user_id = u.id AND f_sub.friend_id = ?)
+            )
             ORDER BY ps.level DESC, ps.exp DESC
             LIMIT 100
-        ''', ())
+        ''', (user_id, user_id))
     
     leaderboard = [dict(row) for row in cursor.fetchall()]
     conn.close()
     
     return jsonify({'leaderboard': leaderboard})
+
+
+@app.route('/api/user/<int:user_id>/profile', methods=['GET'])
+@login_required
+def get_user_profile(user_id):
+    """Get read-only profile data for a specific user (Friend/Hunter inspection)"""
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        
+        # 1. Fetch user basic info
+        cursor.execute('SELECT id, username, created_at FROM users WHERE id = ?', (user_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            conn.close()
+            return jsonify({'error': 'Hunter not found'}), 404
+            
+        user_data = dict(user_row)
+        
+        # 2. Fetch player stats
+        cursor.execute('''
+            SELECT level, exp, exp_to_next_level, strength, endurance, agility, vitality,
+                   primary_focus_areas, experience_level, days_per_week
+            FROM player_stats WHERE user_id = ?
+        ''', (user_id,))
+        stats_row = cursor.fetchone()
+        raw_stats = dict(stats_row) if stats_row else {}
+        
+        stats_data = {
+            'level': raw_stats.get('level') if raw_stats.get('level') is not None else 1,
+            'exp': raw_stats.get('exp') if raw_stats.get('exp') is not None else 0,
+            'exp_to_next_level': raw_stats.get('exp_to_next_level') if raw_stats.get('exp_to_next_level') is not None else 100,
+            'strength': raw_stats.get('strength') if raw_stats.get('strength') is not None else 10,
+            'endurance': raw_stats.get('endurance') if raw_stats.get('endurance') is not None else 10,
+            'agility': raw_stats.get('agility') if raw_stats.get('agility') is not None else 10,
+            'vitality': raw_stats.get('vitality') if raw_stats.get('vitality') is not None else 10,
+            'primary_focus_areas': raw_stats.get('primary_focus_areas') or 'General Fitness',
+            'experience_level': raw_stats.get('experience_level') or 'beginner',
+            'days_per_week': raw_stats.get('days_per_week') or 5
+        }
+        
+        # 3. Active Physique Quest Goal
+        cursor.execute('''
+            SELECT target_name, source_type FROM physique_quests 
+            WHERE user_id = ? AND is_active = 1 LIMIT 1
+        ''', (user_id,))
+        physique_row = cursor.fetchone()
+        physique_goal = dict(physique_row) if physique_row else None
+        
+        conn.close()
+        
+        # 4. Fetch Weekly Training Plan
+        weekly_days = []
+        try:
+            weekly_plan_mgr = WeeklyPlanManager(db)
+            weekly_days = weekly_plan_mgr.get_all_days(user_id)
+        except Exception as wp_err:
+            print(f"Error fetching weekly plan for user {user_id}: {wp_err}")
+        
+        # 5. Determine Rank
+        rank_title = get_rank_from_level(stats_data['level'])
+        
+        return jsonify({
+            'user': user_data,
+            'stats': stats_data,
+            'physique_goal': physique_goal,
+            'weekly_plan': weekly_days,
+            'rank': rank_title
+        })
+    except Exception as e:
+        print(f"Error loading profile for user {user_id}: {e}")
+        return jsonify({'error': f'Failed to load profile: {str(e)}'}), 500
 
 
 # ============================================================================

@@ -74,13 +74,30 @@ async function register() {
     }
 }
 
+async function quickLoginDemo() {
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    if (usernameInput) usernameInput.value = 'me';
+    if (passwordInput) passwordInput.value = '123456';
+    await login();
+}
+
 async function login() {
-    const username = document.getElementById('login-username').value;
-    const password = document.getElementById('login-password').value;
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    const loginBtn = document.getElementById('login-submit-btn') || document.querySelector('#login-form button[type="submit"]');
+    
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
     
     if (!username || !password) {
-        showError('login-error', 'All fields are required');
+        showError('login-error', 'Please enter your username/email and password.');
         return;
+    }
+    
+    if (loginBtn) {
+        loginBtn.disabled = true;
+        loginBtn.innerText = 'Accessing System...';
     }
     
     try {
@@ -91,23 +108,41 @@ async function login() {
             credentials: 'include'
         });
         
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         
         if (response.ok) {
             currentUser = data.user;
+            showToast(`Welcome back, ${data.user.username}!`);
             
             if (data.user.has_stats) {
-                await loadDashboard();
                 showScreen('dashboard-screen');
+                loadDashboard();
             } else {
                 showScreen('setup-screen');
             }
         } else {
-            showError('login-error', data.error);
+            showError('login-error', data.error || 'Invalid credentials. Try demo login or register a new account.');
         }
     } catch (error) {
-        showError('login-error', 'Login failed. Please try again.');
+        console.error('Login error:', error);
+        showError('login-error', 'Connection failed. Please try again.');
+    } finally {
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.innerText = 'Enter the System';
+        }
     }
+}
+
+// Utility to safely escape text for HTML insertion
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 async function logout() {
@@ -116,6 +151,11 @@ async function logout() {
             method: 'POST',
             credentials: 'include'
         });
+        
+        if (window._socialNotificationInterval) {
+            clearInterval(window._socialNotificationInterval);
+            window._socialNotificationInterval = null;
+        }
         
         currentUser = null;
         currentStats = null;
@@ -272,8 +312,29 @@ async function loadDashboard() {
         if (document.getElementById('nav-username')) document.getElementById('nav-username').textContent = currentUser.username;
         if (document.getElementById('nav-username-mobile')) document.getElementById('nav-username-mobile').textContent = currentUser.username;
         if (document.getElementById('player-name')) document.getElementById('player-name').textContent = currentUser.username;
+        
+        // Check for pending friend requests & notification badge
+        checkPendingBadgeNotification();
+        if (!window._socialNotificationInterval) {
+            window._socialNotificationInterval = setInterval(checkPendingBadgeNotification, 15000);
+        }
     } catch (error) {
         console.error('Failed to load dashboard:', error);
+    }
+}
+
+async function checkPendingBadgeNotification() {
+    if (!currentUser) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/friends/pending`, {
+            credentials: 'include'
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const incoming = data.incoming || data.pending || [];
+        updatePendingBadge(incoming.length);
+    } catch (e) {
+        // ignore background fetch error
     }
 }
 
@@ -1074,7 +1135,8 @@ async function addGoal() {
 // ============================================================================
 
 async function loadLeaderboard() {
-    const scope = document.getElementById('leaderboard-scope').value;
+    const scopeEl = document.getElementById('leaderboard-scope');
+    const scope = scopeEl ? scopeEl.value : 'global';
     
     try {
         const response = await fetch(`${API_BASE}/api/leaderboard?scope=${scope}`, {
@@ -1083,49 +1145,126 @@ async function loadLeaderboard() {
         const data = await response.json();
         
         const leaderboard = document.getElementById('leaderboard');
+        if (!leaderboard) return;
         
-        leaderboard.innerHTML = data.leaderboard.map((player, index) => `
-            <div class="leaderboard-item ${player.id === currentUser.id ? 'highlight' : ''}">
-                <div class="leaderboard-rank">${index + 1}</div>
-                <div class="leaderboard-info">
-                    <div class="leaderboard-name">${player.username}</div>
-                    <div class="leaderboard-stats">
-                        Level ${player.level} • ${player.exp} EXP
+        leaderboard.innerHTML = data.leaderboard.map((player, index) => {
+            let actionBtn = '';
+            if (currentUser && player.id === currentUser.id) {
+                actionBtn = `<span class="status-badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc;">You</span>`;
+            } else if (player.friendship_status === 'accepted') {
+                actionBtn = `<span class="status-badge status-active">Friends</span>`;
+            } else if (player.friendship_status === 'pending') {
+                if (player.request_sender_id === currentUser.id) {
+                    // User 1 (Sender) sees ONLY Cancel Request button
+                    actionBtn = `<button class="btn btn-small btn-secondary" onclick="declineFriend(${player.id})">Cancel Request</button>`;
+                } else {
+                    // User 2 (Recipient) sees Accept Request and Cancel buttons
+                    actionBtn = `
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-small btn-success" onclick="acceptFriend(${player.id})">Accept Request</button>
+                            <button class="btn btn-small btn-danger" onclick="declineFriend(${player.id})">Cancel</button>
+                        </div>
+                    `;
+                }
+            } else {
+                actionBtn = `<button class="btn btn-small btn-primary" onclick="addFriend(${player.id})">+ Add Friend</button>`;
+            }
+            
+            return `
+                <div class="leaderboard-item ${currentUser && player.id === currentUser.id ? 'highlight' : ''}" style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="leaderboard-rank">${index + 1}</div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name clickable-username" onclick="viewHunterProfile(${player.id})" title="Examine Hunter Profile">${escapeHtml(player.username)}</div>
+                            <div class="leaderboard-stats">
+                                Level ${player.level || 1} • ${player.exp || 0} EXP
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        ${actionBtn}
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
         console.error('Failed to load leaderboard:', error);
     }
 }
 
+function updatePendingBadge(count) {
+    const badge = document.getElementById('social-pending-badge');
+    const mobileBadge = document.getElementById('mobile-social-pending-badge');
+    
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = ` (${count})`;
+            badge.style.display = 'inline';
+            badge.style.color = '#f59e0b';
+            badge.style.fontWeight = 'bold';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    if (mobileBadge) {
+        mobileBadge.textContent = count > 0 ? ` (${count})` : '';
+    }
+}
+
 async function searchFriends() {
-    const query = document.getElementById('friend-search').value;
+    const queryInput = document.getElementById('friend-search');
+    if (!queryInput) return;
+    const query = queryInput.value.trim();
+    const results = document.getElementById('friend-search-results');
+    if (!results) return;
     
     if (query.length < 2) {
-        document.getElementById('friend-search-results').innerHTML = '';
+        results.innerHTML = '';
         return;
     }
     
     try {
-        const response = await fetch(`${API_BASE}/api/friends/search?q=${query}`, {
+        const response = await fetch(`${API_BASE}/api/friends/search?q=${encodeURIComponent(query)}`, {
             credentials: 'include'
         });
         const data = await response.json();
         
-        const results = document.getElementById('friend-search-results');
-        results.innerHTML = data.users.map(user => `
-            <div class="leaderboard-item">
-                <div class="leaderboard-info">
-                    <div class="leaderboard-name">${user.username}</div>
-                    <div class="leaderboard-stats">Level ${user.level || 1}</div>
+        if (!data.users || data.users.length === 0) {
+            results.innerHTML = '<p class="no-data" style="margin: 10px 0;">No hunters found matching your query.</p>';
+            return;
+        }
+        
+        results.innerHTML = data.users.map(user => {
+            let actionBtn = '';
+            if (user.friendship_status === 'accepted') {
+                actionBtn = `<span class="status-badge status-active">Friends</span>`;
+            } else if (user.friendship_status === 'pending') {
+                if (user.request_sender_id === currentUser.id) {
+                    // User 1 (Sender) sees ONLY Cancel Request button
+                    actionBtn = `<button class="btn btn-small btn-secondary" onclick="declineFriend(${user.id})">Cancel Request</button>`;
+                } else {
+                    // User 2 (Recipient) sees Accept Request and Cancel buttons
+                    actionBtn = `
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-small btn-success" onclick="acceptFriend(${user.id})">Accept Request</button>
+                            <button class="btn btn-small btn-danger" onclick="declineFriend(${user.id})">Cancel</button>
+                        </div>
+                    `;
+                }
+            } else {
+                actionBtn = `<button class="btn btn-small btn-primary" onclick="addFriend(${user.id})">+ Add Friend</button>`;
+            }
+            
+            return `
+                <div class="leaderboard-item" style="margin-bottom: 8px; justify-content: space-between; align-items: center;">
+                    <div class="leaderboard-info">
+                        <div class="leaderboard-name clickable-username" onclick="viewHunterProfile(${user.id})" title="Examine Hunter Profile">${escapeHtml(user.username)}</div>
+                        <div class="leaderboard-stats">Level ${user.level || 1}</div>
+                    </div>
+                    ${actionBtn}
                 </div>
-                <button class="btn btn-small" onclick="addFriend(${user.id})">
-                    Add Friend
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
         console.error('Failed to search friends:', error);
     }
@@ -1143,14 +1282,239 @@ async function addFriend(friendId) {
         const data = await response.json();
         
         if (response.ok) {
-            showToast(data.message);
+            showToast(data.message || 'Friend request sent!');
             await loadFriends();
+            await searchFriends();
+            await loadLeaderboard();
         } else {
-            showToast(data.error || 'Failed to add friend');
+            showToast(data.error || 'Failed to send friend request');
         }
     } catch (error) {
         console.error('Failed to add friend:', error);
     }
+}
+
+async function acceptFriend(friendId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/friends/accept`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ friend_id: friendId }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast(data.message || 'Friend request accepted!');
+            await loadFriends();
+            await searchFriends();
+            await loadLeaderboard();
+        } else {
+            showToast(data.error || 'Failed to accept friend request');
+        }
+    } catch (error) {
+        console.error('Failed to accept friend:', error);
+    }
+}
+
+async function declineFriend(friendId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/friends/decline`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ friend_id: friendId }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast(data.message || 'Request updated.');
+            await loadFriends();
+            await searchFriends();
+            await loadLeaderboard();
+        } else {
+            showToast(data.error || 'Failed to update request');
+        }
+    } catch (error) {
+        console.error('Failed to decline friend:', error);
+    }
+}
+
+async function removeFriend(friendId, username) {
+    if (!confirm(`Remove ${username || 'this hunter'} from your friends list?`)) {
+        return;
+    }
+    await declineFriend(friendId);
+}
+
+// Read-Only Hunter Profile Examination
+async function viewHunterProfile(userId) {
+    if (!userId || userId === 'undefined') {
+        showToast('Invalid hunter ID');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/user/${userId}/profile`, {
+            credentials: 'include'
+        });
+        
+        const data = await response.json().catch(() => ({}));
+        
+        if (!response.ok) {
+            showToast(data.error || 'Failed to load hunter profile');
+            return;
+        }
+        const user = data.user || {};
+        const stats = data.stats || {};
+        const physique = data.physique_goal;
+        const weeklyPlan = data.weekly_plan || [];
+        const rank = data.rank || 'E-Rank Hunter';
+        const rankLetter = rank.split('-')[0] || 'E';
+        
+        // Update Modal UI
+        const modal = document.getElementById('hunter-profile-modal');
+        if (!modal) return;
+        
+        document.getElementById('hunter-modal-username').textContent = user.username || 'Hunter';
+        document.getElementById('hunter-modal-level').textContent = `Level ${stats.level || 1}`;
+        document.getElementById('hunter-modal-rank-title').textContent = rank;
+        
+        // Rank Badge & Colors
+        const rankBadge = document.getElementById('hunter-rank-badge');
+        if (rankBadge) {
+            rankBadge.textContent = rankLetter;
+            const rankStyles = {
+                'SS': 'background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); color: #fff; box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);',
+                'S':  'background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); color: #fff; box-shadow: 0 0 20px rgba(6, 182, 212, 0.6);',
+                'A':  'background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%); color: #fff; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);',
+                'B':  'background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);',
+                'C':  'background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: #fff; box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);',
+                'D':  'background: linear-gradient(135deg, #64748b 0%, #334155 100%); color: #f8fafc;',
+                'E':  'background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #0f172a; box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);'
+            };
+            rankBadge.setAttribute('style', rankStyles[rankLetter] || rankStyles['E']);
+        }
+        
+        // EXP bar
+        const exp = stats.exp || 0;
+        const maxExp = stats.exp_to_next_level || 100;
+        const expPct = Math.min(100, Math.max(0, (exp / maxExp) * 100));
+        document.getElementById('hunter-modal-exp-fill').style.width = `${expPct}%`;
+        document.getElementById('hunter-modal-exp-text').textContent = `${exp} / ${maxExp} EXP`;
+        
+        // Parse Training Focus Badges
+        const focusContainer = document.getElementById('hunter-modal-focus-tags');
+        if (focusContainer) {
+            let focusItems = [];
+            const rawFocus = stats.primary_focus_areas;
+            
+            if (typeof rawFocus === 'string') {
+                try {
+                    const parsed = JSON.parse(rawFocus);
+                    if (Array.isArray(parsed)) {
+                        focusItems = parsed;
+                    } else {
+                        focusItems = rawFocus.split(',').map(s => s.trim());
+                    }
+                } catch(e) {
+                    focusItems = rawFocus.split(',').map(s => s.trim());
+                }
+            } else if (Array.isArray(rawFocus)) {
+                focusItems = rawFocus;
+            }
+            
+            if (focusItems.length === 0) {
+                focusItems = ['General Fitness'];
+            }
+            
+            const focusIconMap = {
+                'strength': '💪',
+                'muscle_gain': '🏋️',
+                'endurance': '⚡',
+                'flexibility': '🧘',
+                'height_growth': '📏',
+                'general_fitness': '🎯',
+                'fat_loss': '🔥',
+                'cardio': '🏃'
+            };
+            
+            focusContainer.innerHTML = focusItems.map(item => {
+                const cleanKey = String(item).toLowerCase().replace(/[\s"-]/g, '_');
+                const icon = focusIconMap[cleanKey] || '📌';
+                const label = String(item)
+                    .replace(/[\[\]"_]/g, ' ')
+                    .trim()
+                    .replace(/\b\w/g, l => l.toUpperCase());
+                return `<span class="focus-pill-tag">${icon} ${escapeHtml(label)}</span>`;
+            }).join('');
+        }
+        
+        // Target Physique Goal
+        const physiqueContainer = document.getElementById('hunter-modal-physique-container');
+        if (physique && physique.target_name) {
+            const rawTarget = physique.target_name.replace(/[_-]/g, ' ').trim();
+            const formattedTarget = rawTarget.replace(/\b\w/g, l => l.toUpperCase());
+            document.getElementById('hunter-modal-physique').textContent = `✨ ${formattedTarget}`;
+            physiqueContainer.style.display = 'block';
+        } else {
+            physiqueContainer.style.display = 'none';
+        }
+        
+        // Attributes
+        document.getElementById('hunter-modal-str').textContent = stats.strength || 10;
+        document.getElementById('hunter-modal-end').textContent = stats.endurance || 10;
+        document.getElementById('hunter-modal-agi').textContent = stats.agility || 10;
+        document.getElementById('hunter-modal-vit').textContent = stats.vitality || 10;
+        
+        // Weekly Plan Schedule List
+        const scheduleList = document.getElementById('hunter-modal-schedule-list');
+        if (weeklyPlan.length === 0) {
+            scheduleList.innerHTML = '<p class="no-data" style="margin: 10px 0;">No active custom weekly plan configured.</p>';
+        } else {
+            const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            scheduleList.innerHTML = weeklyPlan.map(day => {
+                const dayName = dayNames[day.day_of_week] || `Day ${day.day_of_week + 1}`;
+                const isRest = day.is_rest === 1;
+                const badgeColor = isRest ? 'rgba(148, 163, 184, 0.2)' : 'rgba(99, 102, 241, 0.2)';
+                const textColor = isRest ? '#94a3b8' : '#a5b4fc';
+                
+                let exercises = [];
+                try {
+                    exercises = typeof day.exercises_json === 'string' ? JSON.parse(day.exercises_json) : (day.exercises || []);
+                } catch(e) {}
+                
+                const exerciseSummary = isRest 
+                    ? 'Rest & Recovery Day' 
+                    : (exercises.length > 0 ? exercises.map(ex => ex.name || ex).join(', ') : (day.focus || 'Training Day'));
+                
+                return `
+                    <div style="padding: 10px 12px; margin-bottom: 8px; background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.95rem; color: #f1f5f9;">${dayName} <span style="font-size: 0.8rem; font-weight: normal; color: #94a3b8;">(${day.focus || (isRest ? 'Rest' : 'Workout')})</span></div>
+                            <div style="font-size: 0.82rem; color: #cbd5e1; margin-top: 2px;">${exerciseSummary}</div>
+                        </div>
+                        <span class="status-badge" style="background: ${badgeColor}; color: ${textColor}; font-size: 0.75rem;">
+                            ${isRest ? '🛌 Rest' : '⚔️ Train'}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Display Modal
+        modal.style.display = 'flex';
+    } catch (error) {
+        console.error('Failed to view hunter profile:', error);
+        showToast('Error opening hunter profile');
+    }
+}
+
+function closeHunterProfileModal() {
+    const modal = document.getElementById('hunter-profile-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 async function loadFriends() {
@@ -1167,37 +1531,98 @@ async function loadFriends() {
         });
         const pendingData = await pendingResponse.json();
         
+        const incoming = pendingData.incoming || pendingData.pending || [];
+        const outgoing = pendingData.outgoing || [];
+        
+        updatePendingBadge(incoming.length);
+        
+        // Dedicated top banner card for Incoming Requests
+        const banner = document.getElementById('pending-requests-banner');
+        const bannerList = document.getElementById('pending-requests-banner-list');
+        
+        if (incoming.length > 0) {
+            if (banner) banner.style.display = 'block';
+            if (bannerList) {
+                bannerList.innerHTML = incoming.map(p => `
+                    <div class="leaderboard-item" style="margin-bottom: 10px; padding: 12px 16px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name clickable-username" onclick="viewHunterProfile(${p.id})" title="Examine Hunter Profile" style="font-size: 1.1rem; font-weight: 800; color: #f59e0b;">${escapeHtml(p.username)}</div>
+                            <div class="leaderboard-stats">Level ${p.level || 1} • Sent you a friend request</div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-small btn-success" onclick="acceptFriend(${p.id})">
+                                Accept Request
+                            </button>
+                            <button class="btn btn-small btn-danger" onclick="declineFriend(${p.id})">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } else {
+            if (banner) banner.style.display = 'none';
+        }
+        
         const friendsList = document.getElementById('friends-list');
         if (!friendsList) return;
         
         let html = '';
         
-        if (pendingData.pending && pendingData.pending.length > 0) {
-            html += `<h4 style="margin-top: 15px; color: var(--warning-color);">📩 Pending Requests</h4>`;
-            html += pendingData.pending.map(p => `
-                <div class="leaderboard-item" style="border-left: 4px solid var(--warning-color); margin-bottom: 8px;">
+        // Incoming Requests (User 2 / Recipient sees Accept Request & Cancel)
+        if (incoming.length > 0) {
+            html += `<h4 style="margin-top: 15px; color: #f59e0b; font-weight: 800; font-size: 1.05rem;">📩 Incoming Friend Requests (${incoming.length})</h4>`;
+            html += incoming.map(p => `
+                <div class="leaderboard-item" style="border-left: 4px solid #f59e0b; margin-bottom: 8px; justify-content: space-between; align-items: center;">
                     <div class="leaderboard-info">
-                        <div class="leaderboard-name">${p.username}</div>
+                        <div class="leaderboard-name clickable-username" onclick="viewHunterProfile(${p.id})" title="Examine Hunter Profile" style="font-weight: 700;">${escapeHtml(p.username)}</div>
                         <div class="leaderboard-stats">Level ${p.level || 1}</div>
                     </div>
-                    <button class="btn btn-small btn-success" onclick="acceptFriend(${p.id})">
-                        Accept
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-small btn-success" onclick="acceptFriend(${p.id})">
+                            Accept Request
+                        </button>
+                        <button class="btn btn-small btn-danger" onclick="declineFriend(${p.id})">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Outgoing Requests
+        if (outgoing.length > 0) {
+            html += `<h4 style="margin-top: 15px; color: #a5b4fc; font-weight: 700; font-size: 1.05rem;">📤 Requests Sent (${outgoing.length})</h4>`;
+            html += outgoing.map(p => `
+                <div class="leaderboard-item" style="border-left: 4px solid #a5b4fc; margin-bottom: 8px; justify-content: space-between; align-items: center;">
+                    <div class="leaderboard-info">
+                        <div class="leaderboard-name clickable-username" onclick="viewHunterProfile(${p.id})" title="Examine Hunter Profile" style="font-weight: 700;">${escapeHtml(p.username)}</div>
+                        <div class="leaderboard-stats">Level ${p.level || 1} • Waiting for their response</div>
+                    </div>
+                    <button class="btn btn-small btn-secondary" onclick="declineFriend(${p.id})">
+                        ✕ Cancel Request
                     </button>
                 </div>
             `).join('');
         }
         
-        html += `<h4 style="margin-top: 15px;">👥 Active Friends</h4>`;
+        // Active Friends
+        html += `<h4 style="margin-top: 18px; font-weight: 700;">👥 Active Friends (${(data.friends || []).length})</h4>`;
         if (!data.friends || data.friends.length === 0) {
-            html += '<p class="no-data">No friends added yet. Use the search bar above to find hunters!</p>';
+            html += '<p class="no-data">No active friends yet. Use the search bar above to find hunters!</p>';
         } else {
             html += data.friends.map(friend => `
-                <div class="leaderboard-item" style="margin-bottom: 8px;">
+                <div class="leaderboard-item" style="margin-bottom: 8px; justify-content: space-between;">
                     <div class="leaderboard-info">
-                        <div class="leaderboard-name">${friend.username}</div>
+                        <div class="leaderboard-name clickable-username" onclick="viewHunterProfile(${friend.id})" title="Examine Hunter Profile">${escapeHtml(friend.username)}</div>
                         <div class="leaderboard-stats">Level ${friend.level || 1} • ${friend.exp || 0} EXP</div>
                     </div>
-                    <span class="status-badge status-active">Accepted</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="status-badge status-active">Accepted</span>
+                        <button class="btn btn-small btn-secondary" onclick="removeFriend(${friend.id}, '${escapeHtml(friend.username)}')" style="padding: 2px 8px; font-size: 0.75rem;">
+                            Unfriend
+                        </button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -1688,6 +2113,98 @@ async function loadWeeklySchedule() {
     }
 }
 
+function getRankLetterFromLevel(level) {
+    if (level >= 100) return 'SS';
+    if (level >= 80) return 'S';
+    if (level >= 60) return 'A';
+    if (level >= 40) return 'B';
+    if (level >= 25) return 'C';
+    if (level >= 10) return 'D';
+    return 'E';
+}
+
+function getRankTitleFromLevel(level) {
+    return `${getRankLetterFromLevel(level)}-Rank Hunter`;
+}
+
+function updateStatusTabCard() {
+    if (!currentStats) return;
+    
+    const level = currentStats.level || 1;
+    const exp = currentStats.exp || 0;
+    const maxExp = currentStats.exp_to_next_level || 100;
+    const rankTitle = getRankTitleFromLevel(level);
+    const rankLetter = getRankLetterFromLevel(level);
+    
+    const badge = document.getElementById('status-rank-badge');
+    const title = document.getElementById('status-rank-title');
+    const levelExp = document.getElementById('status-level-exp');
+    
+    if (badge) {
+        badge.textContent = rankLetter;
+        const rankStyles = {
+            'SS': 'background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); color: #fff; box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);',
+            'S':  'background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); color: #fff; box-shadow: 0 0 20px rgba(6, 182, 212, 0.6);',
+            'A':  'background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%); color: #fff; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);',
+            'B':  'background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);',
+            'C':  'background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: #fff; box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);',
+            'D':  'background: linear-gradient(135deg, #64748b 0%, #334155 100%); color: #f8fafc;',
+            'E':  'background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #0f172a; box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);'
+        };
+        badge.setAttribute('style', rankStyles[rankLetter] || rankStyles['E']);
+    }
+    if (title) title.textContent = rankTitle;
+    if (levelExp) levelExp.textContent = `Level ${level} • ${exp} / ${maxExp} EXP`;
+}
+
+function openAllRanksModal() {
+    const modal = document.getElementById('all-ranks-modal');
+    const ranksList = document.getElementById('all-ranks-list');
+    if (!modal || !ranksList) return;
+    
+    const userLevel = currentStats ? (currentStats.level || 1) : 1;
+    const currentLetter = getRankLetterFromLevel(userLevel);
+    
+    const allRanks = [
+        { letter: 'SS', title: 'SS-Rank Hunter', levels: 'Level 100+', style: 'background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); color: #fff;', desc: 'Supreme Monarch Tier - Absolute Dominance' },
+        { letter: 'S', title: 'S-Rank Hunter', levels: 'Level 80 – 99', style: 'background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); color: #fff;', desc: 'National Level Hunter - Elite Powerhouse' },
+        { letter: 'A', title: 'A-Rank Hunter', levels: 'Level 60 – 79', style: 'background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%); color: #fff;', desc: 'High-Tier Raid Commander' },
+        { letter: 'B', title: 'B-Rank Hunter', levels: 'Level 40 – 59', style: 'background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;', desc: 'Advanced Striker Tier' },
+        { letter: 'C', title: 'C-Rank Hunter', levels: 'Level 25 – 39', style: 'background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: #fff;', desc: 'Intermediate Hunter Tier' },
+        { letter: 'D', title: 'D-Rank Hunter', levels: 'Level 10 – 24', style: 'background: linear-gradient(135deg, #64748b 0%, #334155 100%); color: #f8fafc;', desc: 'Novice Combatant Tier' },
+        { letter: 'E', title: 'E-Rank Hunter', levels: 'Level 1 – 9', style: 'background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #0f172a;', desc: 'Awakened Trainee Tier' }
+    ];
+    
+    ranksList.innerHTML = allRanks.map(r => {
+        const isCurrent = r.letter === currentLetter;
+        const borderStyle = isCurrent ? 'border: 2px solid #f59e0b; background: rgba(245, 158, 11, 0.12);' : 'border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(15, 23, 42, 0.6);';
+        
+        return `
+            <div style="padding: 12px 14px; border-radius: 12px; ${borderStyle} display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; ${r.style} display: flex; align-items: center; justify-content: center; font-family: 'Orbitron', sans-serif; font-size: 1.25rem; font-weight: 900;">
+                        ${r.letter}
+                    </div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 0.95rem; color: #f8fafc; font-family: 'Orbitron', sans-serif; display: flex; align-items: center;">
+                            ${r.title}
+                            ${isCurrent ? `<span class="status-badge" style="background: rgba(245, 158, 11, 0.25); color: #f59e0b; margin-left: 8px; font-size: 0.7rem; font-weight: 800;">👈 YOUR RANK</span>` : ''}
+                        </div>
+                        <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">${r.desc} • <strong style="color: #60a5fa;">${r.levels}</strong></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    modal.style.display = 'flex';
+}
+
+function closeAllRanksModal() {
+    const modal = document.getElementById('all-ranks-modal');
+    if (modal) modal.style.display = 'none';
+}
+
 let progressChartInstance = null;
 
 async function updateCharts() {
@@ -1712,27 +2229,60 @@ async function updateCharts() {
         
         if (typeof Chart !== 'undefined') {
             const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 260);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
             progressChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels.length > 0 ? labels : ['No Data'],
                     datasets: [{
-                        label: 'Daily EXP Gained',
+                        label: 'EXP Progress',
                         data: expValues.length > 0 ? expValues : [0],
                         borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                        borderWidth: 3,
+                        backgroundColor: gradient,
                         fill: true,
-                        tension: 0.3
+                        tension: 0.35,
+                        pointBackgroundColor: '#38bdf8',
+                        pointBorderColor: '#6366f1',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
                     }]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
                     plugins: {
-                        legend: { labels: { color: '#f1f5f9' } }
+                        legend: { 
+                            display: true,
+                            labels: { color: '#f1f5f9', font: { family: 'Orbitron', size: 12, weight: 'bold' } } 
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#38bdf8',
+                            bodyColor: '#f8fafc',
+                            borderColor: '#6366f1',
+                            borderWidth: 1,
+                            padding: 10
+                        }
                     },
                     scales: {
-                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                        x: { 
+                            ticks: { color: '#94a3b8', font: { size: 11 } }, 
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' } 
+                        },
+                        y: { 
+                            ticks: { color: '#94a3b8', font: { size: 11 } }, 
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
+                            beginAtZero: true 
+                        }
                     }
                 }
             });
@@ -1742,61 +2292,10 @@ async function updateCharts() {
     }
 }
 
-async function loadQuestHistory() {
-    try {
-        const response = await fetch(`${API_BASE}/api/quest/history?days=30`, {
-            credentials: 'include'
-        });
-        const data = await response.json();
-        const historyDiv = document.getElementById('quest-history');
-        if (!historyDiv) return;
-        
-        if (!data.quests || data.quests.length === 0) {
-            historyDiv.innerHTML = '<p class="no-data">No completed quest history yet</p>';
-            return;
-        }
-        
-        historyDiv.innerHTML = data.quests.map(quest => `
-            <div class="card" style="margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h4>${quest.title}</h4>
-                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Date: ${quest.date} • EXP: ${quest.exp_reward}</p>
-                    </div>
-                    <span class="status-badge ${quest.completed ? 'status-active' : 'status-none'}">
-                        ${quest.completed ? 'Completed' : 'Pending'}
-                    </span>
-                </div>
-            </div>
-        `).join('');
-    } catch (error) {
-        console.error('Failed to load quest history:', error);
-    }
-}
-
 async function loadProgressData() {
     try {
+        updateStatusTabCard();
         await updateCharts();
-        await loadQuestHistory();
-        
-        // Load exercise records
-        const exercisesResponse = await fetch(`${API_BASE}/api/exercises`, {
-            credentials: 'include'
-        });
-        const exercisesData = await exercisesResponse.json();
-        
-        const recordsDiv = document.getElementById('exercise-records');
-        if (exercisesData.exercises.length === 0) {
-            recordsDiv.innerHTML = '<p class="no-data">No exercise records yet</p>';
-        } else {
-            recordsDiv.innerHTML = exercisesData.exercises.map(ex => `
-                <div class="card" style="margin-bottom: 10px;">
-                    <h4>${ex.exercise_name}</h4>
-                    <p>Personal Record: ${ex.personal_record} ${ex.max_reps ? 'reps' : 'seconds'}</p>
-                    <p>Last performed: ${new Date(ex.last_performed).toLocaleDateString()}</p>
-                </div>
-            `).join('');
-        }
     } catch (error) {
         console.error('Failed to load progress data:', error);
     }

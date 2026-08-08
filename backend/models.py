@@ -271,6 +271,20 @@ class Database:
                 except sqlite3.OperationalError:
                     pass
         
+        # Clean up duplicate friends rows before creating unique index
+        try:
+            cursor.execute('''
+                DELETE FROM friends WHERE id NOT IN (
+                    SELECT MIN(id) FROM friends GROUP BY user_id, friend_id
+                )
+            ''')
+            cursor.execute('''
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_friends_user_friend 
+                ON friends(user_id, friend_id)
+            ''')
+        except sqlite3.OperationalError:
+            pass
+            
         conn.commit()
         conn.close()
 
@@ -322,12 +336,19 @@ class User:
             conn.close()
             return None
     
-    def authenticate(self, username: str, password: str) -> Optional[Dict]:
-        """Authenticate user and return user data"""
+    def authenticate(self, username_or_email: str, password: str) -> Optional[Dict]:
+        """Authenticate user by username or email (case-insensitive)"""
+        if not username_or_email or not password:
+            return None
+            
+        clean_input = username_or_email.strip()
         conn = self.db.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
+        cursor.execute('''
+            SELECT * FROM users 
+            WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)
+        ''', (clean_input, clean_input))
         user = cursor.fetchone()
         
         if user and self.verify_password(password, user['password_hash']):
