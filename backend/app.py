@@ -14,6 +14,9 @@ import sys
 import uuid
 import traceback
 import sqlite3
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -201,6 +204,49 @@ def login():
 
 import random
 
+# Optional SMTP Email Configuration
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+
+def send_email_otp(target_email: str, code: str) -> bool:
+    """Send 6-digit OTP code via SMTP to target user email"""
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print(f"ℹ️ SMTP credentials not set. Security OTP code for {target_email}: {code}")
+        return False
+        
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = '⚔️ Body Sync Fitness - Password Reset Security Code'
+        msg['From'] = f"Body Sync System <{SMTP_USER}>"
+        msg['To'] = target_email
+        
+        html_body = f"""
+        <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px; max-width: 500px; margin: 0 auto; border: 2px solid #6366f1;">
+            <h2 style="color: #6366f1; font-size: 1.4rem; text-align: center;">⚔️ BODY SYNC FITNESS SYSTEM</h2>
+            <p style="font-size: 1rem; color: #cbd5e1;">A password reset request was initiated for your Hunter account.</p>
+            <div style="background: rgba(99, 102, 241, 0.15); border: 2px dashed #6366f1; border-radius: 10px; padding: 20px; text-align: center; margin: 25px 0;">
+                <span style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Your 6-Digit Security OTP Code</span>
+                <div style="font-size: 2.2rem; font-weight: 800; color: #38bdf8; letter-spacing: 6px; margin-top: 8px;">{code}</div>
+            </div>
+            <p style="font-size: 0.85rem; color: #94a3b8;">This verification code is valid for 10 minutes. If you did not request this code, please ignore this message.</p>
+        </div>
+        """
+        
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_USER, target_email, msg.as_string())
+        server.quit()
+        print(f"📧 Security OTP email successfully sent to: {target_email}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send email: {e}")
+        return False
+
 
 @app.route('/api/request-reset-code', methods=['POST'])
 def request_reset_code():
@@ -218,13 +264,21 @@ def request_reset_code():
     code = str(random.randint(100000, 999999))
     user_manager.store_reset_code(email, code)
     
+    email_sent = send_email_otp(email, code)
+    
     print("=" * 60)
     print(f"🔐 SECURITY OTP VERIFICATION CODE for {email}: {code}")
     print("=" * 60)
     
+    if email_sent:
+        msg = f"Security code sent to your email ({email})!"
+    else:
+        msg = f"Security 6-digit verification code generated! Check server logs for OTP code ({code})."
+        
     return jsonify({
         'success': True,
-        'message': f'Security 6-digit verification code generated! Check server logs for OTP code ({code}).'
+        'email_sent': email_sent,
+        'message': msg
     })
 
 
