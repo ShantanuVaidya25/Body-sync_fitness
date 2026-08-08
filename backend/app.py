@@ -1572,7 +1572,7 @@ def admin_get_stats():
             'total_quests_completed': total_quests_completed,
             'active_physique_quests': active_physique_quests,
             'total_exercise_records': total_exercise_records,
-            'system_status': 'OVERLORD_OPERATIONAL'
+            'system_status': 'OPERATIONAL'
         }
     })
 
