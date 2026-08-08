@@ -126,67 +126,72 @@ h4 {
     border-color: var(--primary-color);
 }
 
-/* Integrated Custom Input Group (Lock Prefix + Input + Eye Suffix Button) */
+/* Seamless Single-Box Custom Input Group (Icon + Input + Eye Button) */
 .input-group-custom {
     display: flex;
     align-items: center;
     width: 100%;
-    background: var(--dark-bg);
-    border: 2px solid var(--card-border);
-    border-radius: 10px;
-    overflow: hidden;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    background: #0b1120;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0 12px;
+    height: 48px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .input-group-custom:focus-within {
-    border-color: #6366f1;
-    box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+    border-color: #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
 }
 
 .input-prefix-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 14px;
-    height: 46px;
-    background: rgba(255, 255, 255, 0.04);
     color: #94a3b8;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    margin-right: 10px;
     user-select: none;
     flex-shrink: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+    height: auto;
 }
 
 .input-group-custom input {
     flex: 1;
-    height: 46px;
-    padding: 0 14px !important;
+    height: 100%;
+    padding: 0 !important;
     background: transparent !important;
     border: none !important;
-    color: var(--text-primary);
-    font-size: 0.98rem;
+    color: #f8fafc;
+    font-size: 0.95rem;
     outline: none !important;
     box-shadow: none !important;
+}
+
+.input-group-custom input::placeholder {
+    color: #64748b;
 }
 
 .input-suffix-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 14px;
-    height: 46px;
-    background: rgba(255, 255, 255, 0.04);
+    background: transparent;
     border: none;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
     color: #94a3b8;
     cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
+    margin-left: 8px;
+    padding: 4px;
+    transition: color 0.2s ease;
     user-select: none;
     flex-shrink: 0;
+    height: auto;
 }
 
 .input-suffix-btn:hover {
-    background: rgba(99, 102, 241, 0.2);
-    color: #a5b4fc;
+    color: #38bdf8;
 }
 
 .form-switch {
