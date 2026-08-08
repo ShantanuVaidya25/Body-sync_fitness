@@ -109,6 +109,7 @@ async function quickLoginDemo() {
     await login();
 }
 
+
 async function login() {
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');

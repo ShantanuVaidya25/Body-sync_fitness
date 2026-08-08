@@ -1162,7 +1162,7 @@ def search_users():
             (f.user_id = ? AND f.friend_id = u.id) OR 
             (f.user_id = u.id AND f.friend_id = ?)
         )
-        WHERE u.username LIKE ? AND u.id != ?
+        WHERE u.username LIKE ? AND u.id != ? AND COALESCE(u.is_admin, 0) = 0
         LIMIT 20
     ''', (user_id, user_id, f'%{query}%', user_id))
     
@@ -1389,6 +1389,7 @@ def get_leaderboard():
                 (f_sub.user_id = ? AND f_sub.friend_id = u.id) OR 
                 (f_sub.user_id = u.id AND f_sub.friend_id = ?)
             )
+            WHERE COALESCE(u.is_admin, 0) = 0
             ORDER BY ps.level DESC, ps.exp DESC
             LIMIT 100
         ''', (user_id, user_id))
