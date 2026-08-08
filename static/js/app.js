@@ -203,6 +203,7 @@ async function checkAuth() {
         
         if (data.authenticated) {
             currentUser = data.user;
+            updateAdminNavVisibility();
             
             if (data.user.has_stats) {
                 await loadDashboard();
@@ -340,6 +341,9 @@ async function loadDashboard() {
         if (document.getElementById('nav-username')) document.getElementById('nav-username').textContent = currentUser.username;
         if (document.getElementById('nav-username-mobile')) document.getElementById('nav-username-mobile').textContent = currentUser.username;
         if (document.getElementById('player-name')) document.getElementById('player-name').textContent = currentUser.username;
+        
+        // Update admin panel navigation link visibility
+        updateAdminNavVisibility();
         
         // Check for pending friend requests & notification badge
         checkPendingBadgeNotification();
@@ -503,6 +507,336 @@ function calculateStreak(quests) {
     }
     
     return streak;
+}
+
+
+// ============================================================================
+// ADMINISTRATOR & OVERLORD DASHBOARD FUNCTIONS
+// ============================================================================
+
+let adminUsersCache = [];
+
+function updateAdminNavVisibility() {
+    const isAdmin = currentUser && currentUser.is_admin;
+    document.querySelectorAll('.admin-only-link').forEach(el => {
+        el.style.display = isAdmin ? 'inline-flex' : 'none';
+    });
+}
+
+async function loadAdminTab() {
+    if (!currentUser || !currentUser.is_admin) {
+        showToast('Administrator access required');
+        showTab('dashboard');
+        return;
+    }
+
+    await Promise.all([
+        loadAdminStats(),
+        loadAdminUsers(),
+        loadAdminActivityFeed()
+    ]);
+}
+
+async function loadAdminStats() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/stats`, { credentials: 'include' });
+        const data = await response.json();
+        if (response.ok && data.success) {
+            const s = data.stats;
+            const u = document.getElementById('admin-metric-users');
+            if (u) u.textContent = s.total_users || 0;
+            const a = document.getElementById('admin-metric-admins');
+            if (a) a.textContent = `${s.total_admins || 0} Admin(s)`;
+            const w = document.getElementById('admin-metric-workouts');
+            if (w) w.textContent = s.total_workouts || 0;
+            const q = document.getElementById('admin-metric-quests');
+            if (q) q.textContent = s.total_quests_completed || 0;
+            const st = document.getElementById('admin-metric-status');
+            if (st) st.textContent = s.system_status || 'ONLINE';
+        }
+    } catch (e) {
+        console.error('Failed to load admin stats:', e);
+    }
+}
+
+async function loadAdminUsers() {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading hunters database...</td></tr>';
+
+    try {
+        const searchInput = document.getElementById('admin-user-search');
+        const query = searchInput ? searchInput.value.trim() : '';
+        const url = query ? `${API_BASE}/api/admin/users?search=${encodeURIComponent(query)}` : `${API_BASE}/api/admin/users`;
+
+        const response = await fetch(url, { credentials: 'include' });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            adminUsersCache = data.users || [];
+            renderAdminUsers(adminUsersCache);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="7" class="error-message">${data.error || 'Failed to load user list'}</td></tr>`;
+        }
+    } catch (e) {
+        console.error('Failed to load admin users:', e);
+        tbody.innerHTML = '<tr><td colspan="7" class="error-message">Connection error loading users</td></tr>';
+    }
+}
+
+function renderAdminUsers(users) {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No hunters found matching query</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+        const isSelf = currentUser && currentUser.id === u.id;
+        const isAdmin = Boolean(u.is_admin);
+        const roleBadge = isAdmin
+            ? '<span class="status-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-weight: 800;">👑 ADMIN</span>'
+            : '<span class="status-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">🏹 HUNTER</span>';
+
+        const statsText = u.level
+            ? `STR: ${u.strength || 10} • END: ${u.endurance || 10} • AGI: ${u.agility || 10} • VIT: ${u.vitality || 10}`
+            : 'No Stats Initialized';
+
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); transition: background 0.2s ease;">
+                <td style="padding: 12px 10px; font-weight: 700; color: #94a3b8;">#${u.id}</td>
+                <td style="padding: 12px 10px;">
+                    <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                        ${escapeHtml(u.username)}
+                        ${isSelf ? '<span style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 6px; border-radius: 4px; font-weight: 800;">YOU</span>' : ''}
+                    </div>
+                </td>
+                <td style="padding: 12px 10px; color: #cbd5e1; font-size: 0.85rem;">${escapeHtml(u.email || '')}</td>
+                <td style="padding: 12px 10px;">
+                    <div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; font-family: 'Orbitron', sans-serif;">${u.rank || 'E-Rank'}</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8;">Level ${u.level || 1} • ${u.exp || 0} EXP</div>
+                </td>
+                <td style="padding: 12px 10px; font-size: 0.78rem; color: #94a3b8;">${statsText}</td>
+                <td style="padding: 12px 10px;">${roleBadge}</td>
+                <td style="padding: 12px 10px; text-align: right;">
+                    <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+                        <button class="btn btn-small btn-secondary" onclick="openAdminEditModal(${u.id})" title="Edit user stats and permissions">✏️ Edit</button>
+                        <button class="btn btn-small" onclick="activateGodMode(${u.id})" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);" title="Grant Max Stats & Level 100">⚡ God Mode</button>
+                        <button class="btn btn-small btn-secondary" onclick="openAdminResetPasswordModal(${u.id}, '${escapeHtml(u.username)}')" title="Reset Password">🔑 Password</button>
+                        ${!isSelf ? `<button class="btn btn-small btn-danger" onclick="adminDeleteUser(${u.id}, '${escapeHtml(u.username)}')" title="Delete Account">🗑️ Delete</button>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+let adminFilterTimeout = null;
+function filterAdminUsers() {
+    if (adminFilterTimeout) clearTimeout(adminFilterTimeout);
+    adminFilterTimeout = setTimeout(() => {
+        loadAdminUsers();
+    }, 300);
+}
+
+function openAdminEditModal(userId) {
+    const user = adminUsersCache.find(u => u.id === userId);
+    if (!user) return;
+
+    document.getElementById('admin-edit-user-id').value = user.id;
+    document.getElementById('admin-edit-username').value = user.username || '';
+    document.getElementById('admin-edit-email').value = user.email || '';
+    document.getElementById('admin-edit-is-admin').checked = Boolean(user.is_admin);
+
+    document.getElementById('admin-edit-level').value = user.level || 1;
+    document.getElementById('admin-edit-exp').value = user.exp || 0;
+    document.getElementById('admin-edit-stat-points').value = user.stat_points || 0;
+
+    document.getElementById('admin-edit-strength').value = user.strength || 10;
+    document.getElementById('admin-edit-endurance').value = user.endurance || 10;
+    document.getElementById('admin-edit-agility').value = user.agility || 10;
+    document.getElementById('admin-edit-vitality').value = user.vitality || 10;
+
+    const modal = document.getElementById('admin-edit-user-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAdminEditModal() {
+    const modal = document.getElementById('admin-edit-user-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function saveAdminUserStats() {
+    const userId = parseInt(document.getElementById('admin-edit-user-id').value);
+    if (!userId) return;
+
+    const payload = {
+        username: document.getElementById('admin-edit-username').value.trim(),
+        email: document.getElementById('admin-edit-email').value.trim(),
+        is_admin: document.getElementById('admin-edit-is-admin').checked,
+        level: parseInt(document.getElementById('admin-edit-level').value) || 1,
+        exp: parseInt(document.getElementById('admin-edit-exp').value) || 0,
+        stat_points: parseInt(document.getElementById('admin-edit-stat-points').value) || 0,
+        strength: parseInt(document.getElementById('admin-edit-strength').value) || 10,
+        endurance: parseInt(document.getElementById('admin-edit-endurance').value) || 10,
+        agility: parseInt(document.getElementById('admin-edit-agility').value) || 10,
+        vitality: parseInt(document.getElementById('admin-edit-vitality').value) || 10
+    };
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/users/${userId}/update-stats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(data.message || 'User stats updated successfully');
+            closeAdminEditModal();
+            await loadAdminTab();
+            if (currentUser && currentUser.id === userId) {
+                await loadDashboard();
+            }
+        } else {
+            showToast(data.error || 'Failed to update user stats');
+        }
+    } catch (e) {
+        console.error('Failed to save admin user stats:', e);
+        showToast('Error updating user stats');
+    }
+}
+
+function openAdminResetPasswordModal(userId, username) {
+    document.getElementById('admin-reset-pwd-user-id').value = userId;
+    document.getElementById('admin-reset-pwd-target-info').textContent = `Resetting password for Hunter '${username}' (ID: ${userId})`;
+    document.getElementById('admin-reset-new-password').value = '';
+
+    const modal = document.getElementById('admin-reset-password-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAdminResetPasswordModal() {
+    const modal = document.getElementById('admin-reset-password-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitAdminPasswordReset() {
+    const userId = parseInt(document.getElementById('admin-reset-pwd-user-id').value);
+    const newPassword = document.getElementById('admin-reset-new-password').value;
+
+    if (!newPassword || newPassword.length < 4) {
+        showToast('Password must be at least 4 characters long');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_password: newPassword }),
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(data.message || 'Password reset successfully');
+            closeAdminResetPasswordModal();
+        } else {
+            showToast(data.error || 'Failed to reset password');
+        }
+    } catch (e) {
+        console.error('Failed to reset password:', e);
+        showToast('Error resetting password');
+    }
+}
+
+async function adminDeleteUser(userId, username) {
+    if (!confirm(`⚠️ Are you SURE you want to delete hunter '${username}' (ID: ${userId})?\n\nThis will permanently delete their account, workout logs, stats, and all associated data.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/users/${userId}/delete`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(data.message || 'User deleted');
+            await loadAdminTab();
+        } else {
+            showToast(data.error || 'Failed to delete user');
+        }
+    } catch (e) {
+        console.error('Failed to delete user:', e);
+        showToast('Error deleting user');
+    }
+}
+
+async function activateGodMode(targetUserId = null) {
+    const uid = targetUserId || (currentUser ? currentUser.id : null);
+    if (!uid) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/god-mode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_user_id: uid }),
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(data.message || '⚡ God Mode activated!');
+            await loadAdminTab();
+            if (!targetUserId || (currentUser && targetUserId === currentUser.id)) {
+                await loadDashboard();
+            }
+        } else {
+            showToast(data.error || 'Failed to activate God Mode');
+        }
+    } catch (e) {
+        console.error('God mode error:', e);
+        showToast('Error activating God Mode');
+    }
+}
+
+async function loadAdminActivityFeed() {
+    const feed = document.getElementById('admin-activity-feed');
+    if (!feed) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/activity`, { credentials: 'include' });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            const workouts = data.workouts || [];
+            if (workouts.length === 0) {
+                feed.innerHTML = '<p class="no-data">No system workouts recorded yet.</p>';
+                return;
+            }
+
+            feed.innerHTML = workouts.map(w => `
+                <div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="font-weight: 700; color: #60a5fa;">${escapeHtml(w.username)}</span>
+                        <span style="color: #94a3b8; font-size: 0.85rem; margin-left: 8px;">completed <strong>${w.total_exercises} exercise(s)</strong> (${w.total_reps} total reps)</span>
+                    </div>
+                    <div style="text-align: right; font-size: 0.78rem; color: #94a3b8;">
+                        <div style="color: #f59e0b; font-weight: 700;">+${w.exp_gained} EXP</div>
+                        <div>${new Date(w.created_at || w.workout_date).toLocaleDateString()}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        console.error('Failed to load admin activity feed:', e);
+    }
 }
 
 // ============================================================================
@@ -2005,6 +2339,8 @@ function showTab(tabName) {
     } else if (tabName === 'social') {
         loadLeaderboard();
         loadFriends();
+    } else if (tabName === 'admin') {
+        loadAdminTab();
     }
 }
 

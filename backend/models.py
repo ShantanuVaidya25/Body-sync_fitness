@@ -43,7 +43,8 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP,
                 reset_code TEXT,
-                reset_code_expires TIMESTAMP
+                reset_code_expires TIMESTAMP,
+                is_admin INTEGER DEFAULT 0
             )
         ''')
         
@@ -53,6 +54,8 @@ class Database:
             cursor.execute("ALTER TABLE users ADD COLUMN reset_code TEXT")
         if 'reset_code_expires' not in cols:
             cursor.execute("ALTER TABLE users ADD COLUMN reset_code_expires TIMESTAMP")
+        if 'is_admin' not in cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
         
         # Player stats table
         cursor.execute('''
@@ -264,6 +267,14 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         
+        cursor.execute("PRAGMA table_info(users)")
+        existing_user_cols = {row['name'] for row in cursor.fetchall()}
+        if 'is_admin' not in existing_user_cols:
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+
         cursor.execute("PRAGMA table_info(player_stats)")
         existing_cols = {row['name'] for row in cursor.fetchall()}
         
@@ -418,6 +429,127 @@ class User:
         conn.close()
         return dict(user) if user else None
 
+    def ensure_admin_user(self) -> int:
+        """Ensure default admin user exists with full privileges & max stats"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM users WHERE is_admin = 1 OR LOWER(username) = 'admin'")
+        admin = cursor.fetchone()
+        
+        stats_mgr = PlayerStats(self.db)
+        if admin:
+            user_id = admin['id']
+            if not admin['is_admin']:
+                cursor.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (user_id,))
+                conn.commit()
+            conn.close()
+            
+            if not stats_mgr.get_player_stats(user_id):
+                stats_mgr.create_player_stats(user_id, age=25, height_cm=185.0, weight_kg=80.0)
+            stats_mgr.grant_god_mode(user_id)
+            return user_id
+        
+        # Create default admin user
+        password_hash = self.hash_password("adminpassword123")
+        cursor.execute(
+            'INSERT INTO users (username, email, password_hash, is_admin) VALUES (?, ?, ?, 1)',
+            ("admin", "admin@bodysync.com", password_hash)
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        conn.close()
+        
+        stats_mgr.create_player_stats(user_id, age=25, height_cm=185.0, weight_kg=80.0)
+        stats_mgr.grant_god_mode(user_id)
+        try:
+            print(f"👑 Admin user created and granted God Mode stats (ID: {user_id}, Username: admin)")
+        except UnicodeEncodeError:
+            print(f"Admin user created and granted God Mode stats (ID: {user_id}, Username: admin)")
+        return user_id
+
+    def get_all_users(self, search_query: Optional[str] = None) -> List[Dict]:
+        """Get all users with stats, rank, and admin status"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        if search_query:
+            q = f"%{search_query.strip().lower()}%"
+            cursor.execute('''
+                SELECT u.id, u.username, u.email, u.created_at, u.last_login, COALESCE(u.is_admin, 0) as is_admin,
+                       ps.level, ps.exp, ps.exp_to_next_level, ps.stat_points,
+                       ps.strength, ps.endurance, ps.agility, ps.vitality
+                FROM users u
+                LEFT JOIN player_stats ps ON u.id = ps.user_id
+                WHERE LOWER(u.username) LIKE ? OR LOWER(u.email) LIKE ?
+                ORDER BY u.id ASC
+            ''', (q, q))
+        else:
+            cursor.execute('''
+                SELECT u.id, u.username, u.email, u.created_at, u.last_login, COALESCE(u.is_admin, 0) as is_admin,
+                       ps.level, ps.exp, ps.exp_to_next_level, ps.stat_points,
+                       ps.strength, ps.endurance, ps.agility, ps.vitality
+                FROM users u
+                LEFT JOIN player_stats ps ON u.id = ps.user_id
+                ORDER BY u.id ASC
+            ''')
+            
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+    def update_user_admin(self, user_id: int, username: str, email: str, is_admin: int) -> bool:
+        """Update basic user profile details & admin role"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE users
+                SET username = ?, email = ?, is_admin = ?
+                WHERE id = ?
+            ''', (username.strip(), email.strip().lower(), 1 if is_admin else 0, user_id))
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.IntegrityError:
+            conn.close()
+            return False
+
+    def reset_password_admin(self, user_id: int, new_password: str) -> bool:
+        """Admin force password reset for any user"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        new_hash = self.hash_password(new_password)
+        cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, user_id))
+        conn.commit()
+        conn.close()
+        return True
+
+    def delete_user_cascade(self, user_id: int) -> bool:
+        """Completely delete user and clean up all related database tables"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        tables = [
+            'player_stats', 'exercise_records', 'daily_quests', 'quest_completions',
+            'workout_history', 'goals', 'friends', 'achievements', 'rest_schedule',
+            'physique_quests', 'weekly_training_plan', 'user_settings'
+        ]
+        for tbl in tables:
+            try:
+                cursor.execute(f'DELETE FROM {tbl} WHERE user_id = ?', (user_id,))
+            except sqlite3.OperationalError:
+                pass
+        
+        try:
+            cursor.execute('DELETE FROM friends WHERE friend_id = ?', (user_id,))
+        except sqlite3.OperationalError:
+            pass
+
+        cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+        conn.commit()
+        conn.close()
+        return True
+
 
 class PlayerStats:
     """Player statistics and progression management"""
@@ -474,18 +606,70 @@ class PlayerStats:
             WHERE user_id = ?
         ''', (json.dumps(focus_areas), datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id))
         
-        conn.commit()
-        conn.close()
         return True
     
     def get_player_stats(self, user_id: int) -> Optional[Dict]:
-        """Get player stats"""
+        """Get player stats by user_id"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM player_stats WHERE user_id = ?', (user_id,))
         stats = cursor.fetchone()
         conn.close()
         return dict(stats) if stats else None
+
+    def update_player_stats_admin(self, user_id: int, level: Optional[int] = None, exp: Optional[int] = None,
+                                  exp_to_next_level: Optional[int] = None, stat_points: Optional[int] = None,
+                                  strength: Optional[int] = None, endurance: Optional[int] = None,
+                                  agility: Optional[int] = None, vitality: Optional[int] = None) -> bool:
+        """Directly update player stats values (Admin control)"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM player_stats WHERE user_id = ?', (user_id,))
+        stats = cursor.fetchone()
+        
+        if not stats:
+            conn.close()
+            self.create_player_stats(user_id, age=25, height_cm=180.0, weight_kg=75.0)
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM player_stats WHERE user_id = ?', (user_id,))
+            stats = cursor.fetchone()
+            
+        new_level = level if level is not None else stats['level']
+        new_exp = exp if exp is not None else stats['exp']
+        new_exp_next = exp_to_next_level if exp_to_next_level is not None else (new_level * 100)
+        new_pts = stat_points if stat_points is not None else stats['stat_points']
+        new_str = strength if strength is not None else stats['strength']
+        new_end = endurance if endurance is not None else stats['endurance']
+        new_agi = agility if agility is not None else stats['agility']
+        new_vit = vitality if vitality is not None else stats['vitality']
+        
+        cursor.execute('''
+            UPDATE player_stats
+            SET level = ?, exp = ?, exp_to_next_level = ?, stat_points = ?,
+                strength = ?, endurance = ?, agility = ?, vitality = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+        ''', (new_level, new_exp, new_exp_next, new_pts, new_str, new_end, new_agi, new_vit, user_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+
+    def grant_god_mode(self, user_id: int) -> bool:
+        """Grant God Mode / Max stats to user: Level 100, 500 stat points, 100 all stats"""
+        return self.update_player_stats_admin(
+            user_id=user_id,
+            level=100,
+            exp=99999,
+            exp_to_next_level=10000,
+            stat_points=500,
+            strength=100,
+            endurance=100,
+            agility=100,
+            vitality=100
+        )
     
     def add_exp(self, user_id: int, exp_amount: int) -> Dict:
         """Add experience and handle leveling up"""

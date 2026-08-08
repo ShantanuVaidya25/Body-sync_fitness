@@ -46,6 +46,12 @@ quest_generator = AIQuestGenerator(db)
 weekly_plan_manager = WeeklyPlanManager(db)
 user_settings = UserSettings(db)
 
+# Auto-seed default admin account on server startup
+try:
+    user_manager.ensure_admin_user()
+except Exception as e:
+    print(f"⚠️ Admin account initialization error: {e}")
+
 # A server-wide fallback key is OPTIONAL. If the site owner sets
 # GEMINI_API_KEY, users without their own key can still use the feature
 # (owner absorbs the cost). If not set, each user MUST provide their own
@@ -149,11 +155,18 @@ def register():
         # Establish session automatically for seamless onboarding
         session['user_id'] = user_id
         session['username'] = username
+        session['is_admin'] = False
         print(f"✅ New user registered and logged in: {username} (ID: {user_id})")
         return jsonify({
             'success': True,
             'message': 'Account created successfully!',
-            'user_id': user_id
+            'user_id': user_id,
+            'user': {
+                'id': user_id,
+                'username': username,
+                'is_admin': False,
+                'has_stats': False
+            }
         }), 201
     else:
         return jsonify({'error': 'Username or email already exists'}), 409
@@ -180,13 +193,15 @@ def login():
     if not user:
         return jsonify({'error': 'Incorrect password'}), 401
         
+    is_admin = bool(user.get('is_admin'))
     session['user_id'] = user['id']
     session['username'] = user['username']
+    session['is_admin'] = is_admin
     
     # Get player stats
     stats = stats_manager.get_player_stats(user['id'])
     
-    print(f"✅ User logged in: {username} (Has stats: {stats is not None})")
+    print(f"✅ User logged in: {username} (Admin: {is_admin}, Has stats: {stats is not None})")
     
     return jsonify({
         'success': True,
@@ -194,6 +209,8 @@ def login():
         'user': {
             'id': user['id'],
             'username': user['username'],
+            'email': user.get('email', ''),
+            'is_admin': is_admin,
             'has_stats': stats is not None
         }
     })
@@ -277,13 +294,21 @@ def check_auth():
     """Check if user is authenticated"""
     if 'user_id' in session:
         user = user_manager.get_user_by_id(session['user_id'])
+        if not user:
+            session.clear()
+            return jsonify({'authenticated': False})
+            
         stats = stats_manager.get_player_stats(session['user_id'])
+        is_admin = bool(user.get('is_admin'))
+        session['is_admin'] = is_admin
         
         return jsonify({
             'authenticated': True,
             'user': {
                 'id': user['id'],
                 'username': user['username'],
+                'email': user.get('email', ''),
+                'is_admin': is_admin,
                 'has_stats': stats is not None
             }
         })
@@ -1494,6 +1519,247 @@ def get_progress_data():
     })
 
 
+# ============================================================================
+# ADMINISTRATOR & OVERLORD ENDPOINTS
+# ============================================================================
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'error': 'Authentication required'}), 401
+        user = user_manager.get_user_by_id(session['user_id'])
+        if not user or not user.get('is_admin'):
+            return jsonify({'error': 'Administrator access required'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/api/admin/stats', methods=['GET'])
+@admin_required
+def admin_get_stats():
+    """Get system-wide overview statistics"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT COUNT(*) FROM users')
+    total_users = cursor.fetchone()[0] or 0
+    
+    cursor.execute('SELECT COUNT(*) FROM users WHERE is_admin = 1')
+    total_admins = cursor.fetchone()[0] or 0
+    
+    cursor.execute('SELECT COUNT(*) FROM workout_history')
+    total_workouts = cursor.fetchone()[0] or 0
+    
+    cursor.execute('SELECT COUNT(*) FROM quest_completions')
+    total_quests_completed = cursor.fetchone()[0] or 0
+    
+    cursor.execute('SELECT COUNT(*) FROM physique_quests WHERE is_active = 1')
+    active_physique_quests = cursor.fetchone()[0] or 0
+    
+    cursor.execute('SELECT COUNT(*) FROM exercise_records')
+    total_exercise_records = cursor.fetchone()[0] or 0
+
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'stats': {
+            'total_users': total_users,
+            'total_admins': total_admins,
+            'total_workouts': total_workouts,
+            'total_quests_completed': total_quests_completed,
+            'active_physique_quests': active_physique_quests,
+            'total_exercise_records': total_exercise_records,
+            'system_status': 'OVERLORD_OPERATIONAL'
+        }
+    })
+
+
+@app.route('/api/admin/users', methods=['GET'])
+@admin_required
+def admin_get_users():
+    """Get all users with stats & ranks"""
+    query = request.args.get('search', '').strip()
+    users = user_manager.get_all_users(search_query=query if query else None)
+    
+    for u in users:
+        u['rank'] = get_rank_from_level(u.get('level') or 1)
+        u['is_admin'] = bool(u.get('is_admin'))
+        
+    return jsonify({
+        'success': True,
+        'count': len(users),
+        'users': users
+    })
+
+
+@app.route('/api/admin/users/<int:target_id>/update-stats', methods=['POST'])
+@admin_required
+def admin_update_user_stats(target_id: int):
+    """Update stats, level, EXP, or role of any user"""
+    data = request.json or {}
+    
+    user = user_manager.get_user_by_id(target_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+        
+    username = (data.get('username') or user['username']).strip()
+    email = (data.get('email') or user['email']).strip().lower()
+    is_admin = 1 if data.get('is_admin') else 0
+    
+    if not user_manager.update_user_admin(target_id, username, email, is_admin):
+        return jsonify({'error': 'Username or email already taken'}), 409
+        
+    level = data.get('level')
+    exp = data.get('exp')
+    exp_next = data.get('exp_to_next_level')
+    stat_pts = data.get('stat_points')
+    str_val = data.get('strength')
+    end_val = data.get('endurance')
+    agi_val = data.get('agility')
+    vit_val = data.get('vitality')
+    
+    try:
+        level = int(level) if level is not None else None
+        exp = int(exp) if exp is not None else None
+        exp_next = int(exp_next) if exp_next is not None else None
+        stat_pts = int(stat_pts) if stat_pts is not None else None
+        str_val = int(str_val) if str_val is not None else None
+        end_val = int(end_val) if end_val is not None else None
+        agi_val = int(agi_val) if agi_val is not None else None
+        vit_val = int(vit_val) if vit_val is not None else None
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid numerical value provided'}), 400
+        
+    stats_manager.update_player_stats_admin(
+        user_id=target_id,
+        level=level,
+        exp=exp,
+        exp_to_next_level=exp_next,
+        stat_points=stat_pts,
+        strength=str_val,
+        endurance=end_val,
+        agility=agi_val,
+        vitality=vit_val
+    )
+    
+    print(f"👑 Admin updated user #{target_id} ({username}): Level {level}, Admin={is_admin}")
+    
+    return jsonify({
+        'success': True,
+        'message': f"Updated stats for user '{username}' successfully."
+    })
+
+
+@app.route('/api/admin/users/<int:target_id>/reset-password', methods=['POST'])
+@admin_required
+def admin_reset_password(target_id: int):
+    """Force password reset for any user"""
+    data = request.json or {}
+    new_password = data.get('new_password') or ''
+    
+    if not new_password or len(new_password) < 4:
+        return jsonify({'error': 'Password must be at least 4 characters long'}), 400
+        
+    user = user_manager.get_user_by_id(target_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+        
+    user_manager.reset_password_admin(target_id, new_password)
+    print(f"👑 Admin reset password for user #{target_id} ({user['username']})")
+    
+    return jsonify({
+        'success': True,
+        'message': f"Password for '{user['username']}' has been updated."
+    })
+
+
+@app.route('/api/admin/users/<int:target_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_user(target_id: int):
+    """Delete a user account and all associated records"""
+    current_admin_id = session['user_id']
+    if target_id == current_admin_id:
+        return jsonify({'error': 'You cannot delete your own admin account while logged in.'}), 400
+        
+    user = user_manager.get_user_by_id(target_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+        
+    user_manager.delete_user_cascade(target_id)
+    print(f"👑 Admin deleted user #{target_id} ({user['username']})")
+    
+    return jsonify({
+        'success': True,
+        'message': f"User '{user['username']}' and all associated data deleted."
+    })
+
+
+@app.route('/api/admin/god-mode', methods=['POST'])
+@admin_required
+def admin_activate_god_mode():
+    """Grant God Mode (Level 100, Rank SS, Max Attributes, 500 Stat Points)"""
+    data = request.json or {}
+    target_id = data.get('target_user_id') or session['user_id']
+    
+    user = user_manager.get_user_by_id(target_id)
+    if not user:
+        return jsonify({'error': 'Target user not found'}), 404
+        
+    stats_manager.grant_god_mode(target_id)
+    print(f"⚡ God Mode activated for user #{target_id} ({user['username']})!")
+    
+    return jsonify({
+        'success': True,
+        'message': f"⚡ God Mode activated for '{user['username']}'! Level 100 & max attributes granted."
+    })
+
+
+@app.route('/api/admin/activity', methods=['GET'])
+@admin_required
+def admin_get_activity():
+    """Get system-wide activity feed across all users"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT wh.id, wh.user_id, u.username, wh.workout_date, wh.total_exercises,
+               wh.total_reps, wh.total_duration_minutes, wh.exp_gained, wh.created_at
+        FROM workout_history wh
+        JOIN users u ON wh.user_id = u.id
+        ORDER BY wh.created_at DESC
+        LIMIT 50
+    ''')
+    workouts = [dict(r) for r in cursor.fetchall()]
+    
+    cursor.execute('''
+        SELECT qc.id, qc.user_id, u.username, qc.exercise_name, qc.reps_completed,
+               qc.sets_completed, qc.weight_used, qc.completed_at
+        FROM quest_completions qc
+        JOIN users u ON qc.user_id = u.id
+        ORDER BY qc.completed_at DESC
+        LIMIT 50
+    ''')
+    completions = [dict(r) for r in cursor.fetchall()]
+    
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'workouts': workouts,
+        'completions': completions
+    })
+
+
+@app.route('/api/admin/exercises', methods=['GET'])
+@admin_required
+def admin_get_exercises():
+    """Get exercise catalog"""
+    exercises = exercise_manager.get_all_exercises()
+    return jsonify({'success': True, 'exercises': exercises})
+
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("⚔️  BODY SYNC FITNESS SYSTEM")
@@ -1505,3 +1771,4 @@ if __name__ == '__main__':
     print("\n" + "="*60 + "\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
+

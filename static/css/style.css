@@ -1799,3 +1799,17 @@ h4 {
     color: #60a5fa !important;
     text-decoration: underline;
 }
+
+/* Admin Panel Styles */
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.admin-table tbody tr:hover {
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.admin-only-link {
+    display: none;
+}

@@ -260,6 +260,9 @@
                 <a href="#" onclick="showTab('social')" class="nav-link" data-tab="social">
                     👥 Social<span id="social-pending-badge" style="display: none; color: #f59e0b; font-weight: bold; margin-left: 4px;"></span>
                 </a>
+                <a href="#" onclick="showTab('admin')" class="nav-link admin-only-link" data-tab="admin" id="nav-admin-link" style="display: none; color: #f59e0b; font-weight: 700;">
+                    👑 Admin Panel
+                </a>
                 <div class="nav-user-mobile">
                     <span id="nav-username-mobile" class="mobile-username">Hunter</span>
                     <button class="btn btn-small btn-secondary" onclick="logout()">Logout</button>
@@ -769,6 +772,93 @@
             </div>
         </div>
 
+        <!-- Admin Panel Tab -->
+        <div id="tab-admin" class="tab-content">
+            <div class="admin-container">
+                <!-- Admin Header Banner -->
+                <div class="card admin-header-card" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(245, 158, 11, 0.4);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div>
+                            <div style="font-size: 0.8rem; font-weight: 800; color: #f59e0b; letter-spacing: 1px; text-transform: uppercase;">👑 SYSTEM OVERLORD CONTROL</div>
+                            <h1 style="margin: 4px 0 0 0; font-family: 'Orbitron', sans-serif; font-size: 1.6rem; color: #f8fafc;">System Administrator Dashboard</h1>
+                            <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #94a3b8;">Full administrative privileges over all hunters, stats, quests, database records, and system settings.</p>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-primary" onclick="activateGodMode(null)" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; font-weight: 700; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);">
+                                ⚡ Activate God Mode (Self)
+                            </button>
+                            <button class="btn btn-secondary" onclick="loadAdminTab()" style="font-weight: 600;">
+                                🔄 Refresh System Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Metrics Cards -->
+                <div class="admin-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #60a5fa;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">TOTAL HUNTERS</div>
+                        <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #f8fafc; margin-top: 4px;" id="admin-metric-users">0</div>
+                        <div style="font-size: 0.75rem; color: #60a5fa; margin-top: 2px;" id="admin-metric-admins">0 Admins</div>
+                    </div>
+                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #10b981;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">WORKOUTS LOGGED</div>
+                        <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #f8fafc; margin-top: 4px;" id="admin-metric-workouts">0</div>
+                        <div style="font-size: 0.75rem; color: #10b981; margin-top: 2px;">System-wide Total</div>
+                    </div>
+                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #f59e0b;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">QUESTS COMPLETED</div>
+                        <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #f8fafc; margin-top: 4px;" id="admin-metric-quests">0</div>
+                        <div style="font-size: 0.75rem; color: #f59e0b; margin-top: 2px;">Verified Completions</div>
+                    </div>
+                    <div class="card metric-card" style="padding: 16px; border-left: 4px solid #a855f7;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">SYSTEM STATUS</div>
+                        <div style="font-size: 1.2rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: #a855f7; margin-top: 8px;" id="admin-metric-status">ONLINE</div>
+                        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Full Overlord Access</div>
+                    </div>
+                </div>
+
+                <!-- User Management Section -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <h2>👥 Hunter User Management</h2>
+                        <div style="display: flex; gap: 10px; align-items: center; max-width: 320px; width: 100%;">
+                            <input type="text" id="admin-user-search" placeholder="Search by username or email..." oninput="filterAdminUsers()" style="padding: 8px 12px; font-size: 0.88rem; width: 100%; border-radius: 8px; background: var(--dark-bg); color: var(--text-primary); border: 1px solid var(--card-border);">
+                        </div>
+                    </div>
+
+                    <div style="overflow-x: auto; margin-top: 15px;">
+                        <table class="admin-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <th style="padding: 12px 10px;">ID</th>
+                                    <th style="padding: 12px 10px;">Hunter Name</th>
+                                    <th style="padding: 12px 10px;">Email</th>
+                                    <th style="padding: 12px 10px;">Rank & Level</th>
+                                    <th style="padding: 12px 10px;">Attributes</th>
+                                    <th style="padding: 12px 10px;">Role</th>
+                                    <th style="padding: 12px 10px; text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-tbody">
+                                <!-- Dynamic user rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- System Activity Feed -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>⚡ System-Wide Live Activity Monitor</h2>
+                    </div>
+                    <div id="admin-activity-feed" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
+                        <p class="no-data">Loading system activity...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Mobile Bottom Navigation Bar -->
         <nav class="mobile-bottom-bar">
             <a href="#" onclick="showTab('dashboard')" class="bottom-nav-link active" data-tab="dashboard">
@@ -794,6 +884,10 @@
             <a href="#" onclick="showTab('social')" class="bottom-nav-link" data-tab="social">
                 <span class="bottom-nav-icon">👥</span>
                 <span class="bottom-nav-label">Social <span id="mobile-social-pending-badge" style="color: #f59e0b; font-weight: bold;"></span></span>
+            </a>
+            <a href="#" onclick="showTab('admin')" class="bottom-nav-link admin-only-link" data-tab="admin" id="mobile-nav-admin-link" style="display: none; color: #f59e0b;">
+                <span class="bottom-nav-icon">👑</span>
+                <span class="bottom-nav-label">Admin</span>
             </a>
         </nav>
     </div>
@@ -887,6 +981,106 @@
             <div class="modal-body custom-scrollbar" style="max-height: 70vh; overflow-y: auto;">
                 <div id="all-ranks-list" style="display: flex; flex-direction: column; gap: 10px;">
                     <!-- Dynamic Rank Hierarchy Cards -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Edit User Modal -->
+    <div id="admin-edit-user-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeAdminEditModal()">
+        <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 1.25rem;">✏️ Edit Hunter & Overlord Controls</h2>
+                <button class="modal-close-btn" onclick="closeAdminEditModal()">✕</button>
+            </div>
+            <div class="modal-body custom-scrollbar" style="max-height: 75vh; overflow-y: auto; margin-top: 15px;">
+                <input type="hidden" id="admin-edit-user-id">
+                
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="admin-edit-username" placeholder="Username">
+                </div>
+                
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="admin-edit-email" placeholder="Email address">
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f59e0b; font-weight: 700;">
+                        <input type="checkbox" id="admin-edit-is-admin" style="width: 18px; height: 18px; accent-color: #f59e0b;">
+                        <span>👑 Grant System Administrator / Overlord Privileges</span>
+                    </label>
+                </div>
+                
+                <hr style="border-color: rgba(255,255,255,0.1); margin: 15px 0;">
+                <h4 style="color: #60a5fa; font-family: 'Orbitron', sans-serif; margin-bottom: 10px;">📊 Level & EXP Override</h4>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Level</label>
+                        <input type="number" id="admin-edit-level" min="1" max="999">
+                    </div>
+                    <div class="form-group">
+                        <label>EXP</label>
+                        <input type="number" id="admin-edit-exp" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Available Stat Points</label>
+                        <input type="number" id="admin-edit-stat-points" min="0">
+                    </div>
+                </div>
+                
+                <h4 style="color: #60a5fa; font-family: 'Orbitron', sans-serif; margin-top: 10px; margin-bottom: 10px;">💪 Attribute Values</h4>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Strength (STR)</label>
+                        <input type="number" id="admin-edit-strength" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Endurance (END)</label>
+                        <input type="number" id="admin-edit-endurance" min="1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Agility (AGI)</label>
+                        <input type="number" id="admin-edit-agility" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Vitality (VIT)</label>
+                        <input type="number" id="admin-edit-vitality" min="1">
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-primary" onclick="saveAdminUserStats()">💾 Save Changes</button>
+                    <button class="btn btn-secondary" onclick="closeAdminEditModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Reset Password Modal -->
+    <div id="admin-reset-password-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeAdminResetPasswordModal()">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 1.25rem;">🔑 Admin Password Reset</h2>
+                <button class="modal-close-btn" onclick="closeAdminResetPasswordModal()">✕</button>
+            </div>
+            <div class="modal-body" style="margin-top: 15px;">
+                <input type="hidden" id="admin-reset-pwd-user-id">
+                <p id="admin-reset-pwd-target-info" style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;"></p>
+                
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" id="admin-reset-new-password" placeholder="Enter new password (min 4 chars)">
+                </div>
+
+                <div class="modal-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-primary" onclick="submitAdminPasswordReset()">Reset Password</button>
+                    <button class="btn btn-secondary" onclick="closeAdminResetPasswordModal()">Cancel</button>
                 </div>
             </div>
         </div>
