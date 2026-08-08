@@ -12,11 +12,7 @@ import json
 import os
 import sys
 import uuid
-import traceback
 import sqlite3
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -202,124 +198,7 @@ def login():
     })
 
 
-import random
 
-# SMTP Email Configuration Loader (reads Environment Variables or email_config.json)
-def get_smtp_config():
-    server = os.environ.get('SMTP_SERVER', '')
-    port = int(os.environ.get('SMTP_PORT', 587))
-    user = os.environ.get('SMTP_USER', '')
-    password = os.environ.get('SMTP_PASSWORD', '')
-    
-    config_path = os.path.join(os.path.dirname(__file__), 'email_config.json')
-    if (not user or not password) and os.path.exists(config_path):
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                cfg = json.load(f)
-                server = server or cfg.get('SMTP_SERVER', 'smtp.gmail.com')
-                port = int(cfg.get('SMTP_PORT', 587))
-                user = user or cfg.get('SMTP_USER', '')
-                password = password or cfg.get('SMTP_PASSWORD', '')
-        except Exception as e:
-            print(f"⚠️ Warning loading email_config.json: {e}")
-            
-    return server or 'smtp.gmail.com', port, user, password
-
-
-def send_email_otp(target_email: str, code: str) -> bool:
-    """Send 6-digit OTP code via SMTP to target user email"""
-    smtp_server, smtp_port, smtp_user, smtp_password = get_smtp_config()
-    
-    if not smtp_user or not smtp_password:
-        print(f"ℹ️ SMTP credentials not set in environment or email_config.json. Security OTP code for {target_email}: {code}")
-        return False
-        
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = '⚔️ Body Sync Fitness - Password Reset Security Code'
-        msg['From'] = f"Body Sync System <{smtp_user}>"
-        msg['To'] = target_email
-        
-        html_body = f"""
-        <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px; max-width: 500px; margin: 0 auto; border: 2px solid #6366f1;">
-            <h2 style="color: #6366f1; font-size: 1.4rem; text-align: center;">⚔️ BODY SYNC FITNESS SYSTEM</h2>
-            <p style="font-size: 1rem; color: #cbd5e1;">A password reset request was initiated for your Hunter account.</p>
-            <div style="background: rgba(99, 102, 241, 0.15); border: 2px dashed #6366f1; border-radius: 10px; padding: 20px; text-align: center; margin: 25px 0;">
-                <span style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Your 6-Digit Security OTP Code</span>
-                <div style="font-size: 2.2rem; font-weight: 800; color: #38bdf8; letter-spacing: 6px; margin-top: 8px;">{code}</div>
-            </div>
-            <p style="font-size: 0.85rem; color: #94a3b8;">This verification code is valid for 10 minutes. If you did not request this code, please ignore this message.</p>
-        </div>
-        """
-        
-        msg.attach(MIMEText(html_body, 'html'))
-        
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, target_email, msg.as_string())
-        server.quit()
-        print(f"📧 Security OTP email successfully sent to: {target_email}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-        return False
-
-
-@app.route('/api/request-reset-code', methods=['POST'])
-def request_reset_code():
-    """Generate and send 6-digit security OTP reset code for email"""
-    data = request.json or {}
-    email = (data.get('email') or '').strip().lower()
-    
-    if not email:
-        return jsonify({'error': 'Please enter your registered email address'}), 400
-        
-    user = user_manager.get_user_by_email(email)
-    if not user:
-        return jsonify({'error': 'No Hunter account registered with this email address'}), 404
-        
-    code = str(random.randint(100000, 999999))
-    user_manager.store_reset_code(email, code)
-    
-    email_sent = send_email_otp(email, code)
-    
-    print("=" * 60)
-    print(f"🔐 SECURITY OTP VERIFICATION CODE for {email}: {code}")
-    print("=" * 60)
-    
-    if email_sent:
-        msg = f"Security code sent to your email ({email})!"
-    else:
-        msg = f"Security 6-digit verification code generated! Check server logs for OTP code ({code})."
-        
-    return jsonify({
-        'success': True,
-        'email_sent': email_sent,
-        'message': msg
-    })
-
-
-@app.route('/api/confirm-reset-password', methods=['POST'])
-def confirm_reset_password():
-    """Verify 6-digit OTP code and set new password"""
-    data = request.json or {}
-    
-    email = (data.get('email') or '').strip().lower()
-    code = (data.get('code') or '').strip()
-    new_password = data.get('new_password')
-    
-    if not email or not code or not new_password:
-        return jsonify({'error': 'Email, verification code, and new password are required'}), 400
-        
-    if len(new_password) < 3:
-        return jsonify({'error': 'Password must be at least 3 characters long'}), 400
-        
-    success, message = user_manager.verify_and_reset_password(email, code, new_password)
-    if success:
-        return jsonify({'success': True, 'message': message})
-    else:
-        return jsonify({'error': message}), 400
 
 
 @app.route('/api/logout', methods=['POST'])

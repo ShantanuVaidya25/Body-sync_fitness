@@ -409,56 +409,6 @@ class User:
         conn.close()
         return dict(user) if user else None
 
-    def store_reset_code(self, email: str, code: str) -> bool:
-        """Store a 6-digit reset OTP code for email with 10 min expiration"""
-        conn = self.db.get_connection()
-        cursor = conn.cursor()
-        expiry = (datetime.now() + timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute('''
-            UPDATE users 
-            SET reset_code = ?, reset_code_expires = ? 
-            WHERE LOWER(email) = LOWER(?)
-        ''', (code, expiry, email.strip()))
-        conn.commit()
-        conn.close()
-        return True
-
-    def verify_and_reset_password(self, email: str, code: str, new_password: str) -> Tuple[bool, str]:
-        """Verify 6-digit OTP code and update password if valid and not expired"""
-        conn = self.db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT reset_code, reset_code_expires FROM users WHERE LOWER(email) = LOWER(?)
-        ''', (email.strip(),))
-        user = cursor.fetchone()
-        
-        if not user or not user['reset_code']:
-            conn.close()
-            return False, "No active password reset request found for this email."
-            
-        if user['reset_code'] != code.strip():
-            conn.close()
-            return False, "Incorrect 6-digit verification code."
-            
-        if not user['reset_code_expires']:
-            conn.close()
-            return False, "Verification code has expired."
-            
-        expires_at = datetime.strptime(user['reset_code_expires'], '%Y-%m-%d %H:%M:%S')
-        if datetime.now() > expires_at:
-            conn.close()
-            return False, "Verification code has expired. Please request a new code."
-            
-        new_hash = self.hash_password(new_password)
-        cursor.execute('''
-            UPDATE users 
-            SET password_hash = ?, reset_code = NULL, reset_code_expires = NULL 
-            WHERE LOWER(email) = LOWER(?)
-        ''', (new_hash, email.strip()))
-        conn.commit()
-        conn.close()
-        return True, "Password reset successfully! You can now log in."
-
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Get user by ID"""
         conn = self.db.get_connection()
