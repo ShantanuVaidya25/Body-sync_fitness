@@ -1,20 +1,19 @@
 /* Body Sync Fitness - Main Stylesheet */
 
 :root {
-    --primary-color: #00f0ff;
+    --primary-color: #38bdf8;
     --primary-dark: #0284c7;
     --secondary-color: #10b981;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
-    --purple-glow: #a855f7;
-    --dark-bg: #090d16;
-    --card-bg: rgba(17, 24, 39, 0.85);
-    --card-border: rgba(255, 255, 255, 0.1);
+    --dark-bg: #0f172a;
+    --card-bg: rgba(30, 41, 59, 0.85);
+    --card-border: rgba(255, 255, 255, 0.08);
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --exp-bar: linear-gradient(90deg, #00f0ff 0%, #3b82f6 50%, #a855f7 100%);
-    --success-gradient: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
-    --danger-gradient: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%);
+    --exp-bar: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%);
+    --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
 * {
@@ -557,11 +556,10 @@ h4 {
     font-size: 1.3rem;
 }
 
-/* Player Card Color Grading */
+/* Player Card - Clean Fitness Theme */
 .player-card {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(15, 23, 42, 0.95) 50%, rgba(0, 240, 255, 0.12) 100%) !important;
-    border: 1px solid rgba(168, 85, 247, 0.35) !important;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(168, 85, 247, 0.15) !important;
+    background: rgba(30, 41, 59, 0.85) !important;
+    border: 1px solid rgba(56, 189, 248, 0.25) !important;
 }
 
 .player-info {
@@ -570,34 +568,35 @@ h4 {
 }
 
 .player-avatar {
-    width: 104px;
-    height: 104px;
+    width: 96px;
+    height: 96px;
     margin: 0 auto 15px;
-    background: linear-gradient(135deg, #a855f7 0%, #3b82f6 50%, #00f0ff 100%);
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 3px solid rgba(0, 240, 255, 0.5);
+    border: 3px solid rgba(56, 189, 248, 0.5);
     position: relative;
-    box-shadow: 0 0 30px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
 }
 
 .level-badge {
     font-size: 2rem;
     font-weight: 900;
     font-family: 'Orbitron', sans-serif;
+    color: #ffffff;
 }
 
 .rank-badge {
     display: inline-block;
-    padding: 6px 16px;
-    background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+    padding: 5px 14px;
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
     border-radius: 20px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
     font-family: 'Orbitron', sans-serif;
-    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+    color: #ffffff;
 }
 
 .exp-section {
@@ -682,7 +681,7 @@ h4 {
     margin-top: 15px;
 }
 
-/* Quick Stats Color Grading */
+/* Quick Stats - Clean Fitness Style */
 .quick-stats {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -691,44 +690,23 @@ h4 {
 
 .quick-stat {
     padding: 16px;
-    border-radius: 14px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-left: 4px solid #38bdf8;
+    transition: border-color 0.2s ease;
 }
 
 .quick-stat:hover {
-    transform: translateY(-2px);
+    border-color: rgba(56, 189, 248, 0.4);
 }
 
-.quick-stat:nth-child(1) { /* Streak */
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-left: 4px solid #ef4444;
+.quick-stat-value {
+    color: #38bdf8;
 }
-.quick-stat:nth-child(1) .quick-stat-value { color: #f87171; }
-
-.quick-stat:nth-child(2) { /* Quests */
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-left: 4px solid #10b981;
-}
-.quick-stat:nth-child(2) .quick-stat-value { color: #34d399; }
-
-.quick-stat:nth-child(3) { /* Height */
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.14) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(168, 85, 247, 0.3);
-    border-left: 4px solid #a855f7;
-}
-.quick-stat:nth-child(3) .quick-stat-value { color: #c084fc; }
-
-.quick-stat:nth-child(4) { /* Weight */
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-left: 4px solid #f59e0b;
-}
-.quick-stat:nth-child(4) .quick-stat-value { color: #fbbf24; }
 
 .quick-stat-icon {
     font-size: 1.8rem;
@@ -739,13 +717,7 @@ h4 {
     color: var(--text-secondary);
 }
 
-.quick-stat-value {
-    font-size: 1.2rem;
-    font-weight: 700;
-    font-family: 'Orbitron', sans-serif;
-}
-
-/* Quest Header Color Grading */
+/* Quest Header - Clean Fitness Style */
 .quest-container {
     max-width: 1000px;
     margin: 0 auto;
@@ -754,11 +726,10 @@ h4 {
 .quest-header {
     text-align: center;
     margin-bottom: 30px;
-    padding: 32px;
-    background: linear-gradient(135deg, rgba(0, 240, 255, 0.14) 0%, rgba(15, 23, 42, 0.95) 50%, rgba(168, 85, 247, 0.14) 100%);
-    border: 1px solid rgba(0, 240, 255, 0.35);
-    border-radius: 20px;
-    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4), 0 0 25px rgba(0, 240, 255, 0.15);
+    padding: 28px;
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 18px;
 }
 
 .quest-header h1 {
