@@ -152,38 +152,52 @@ h4 {
     margin-right: 10px;
     user-select: none;
     flex-shrink: 0;
-    background: transparent;
-    border: none;
-    padding: 0;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
     height: auto;
 }
 
-.input-group-custom input {
+.form-group .input-group-custom input {
     flex: 1;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
     padding: 0 !important;
+    margin: 0 !important;
     background: transparent !important;
+    background-color: transparent !important;
     border: none !important;
-    color: #f8fafc;
-    font-size: 0.95rem;
+    border-radius: 0 !important;
+    color: #f8fafc !important;
+    font-size: 0.95rem !important;
     outline: none !important;
     box-shadow: none !important;
 }
 
-.input-group-custom input::placeholder {
+.form-group .input-group-custom input::placeholder {
     color: #64748b;
+}
+
+/* Fix WebKit Autofill background override */
+.form-group .input-group-custom input:-webkit-autofill,
+.form-group .input-group-custom input:-webkit-autofill:hover, 
+.form-group .input-group-custom input:-webkit-autofill:focus, 
+.form-group .input-group-custom input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #0b1120 inset !important;
+    -webkit-text-fill-color: #f8fafc !important;
+    transition: background-color 5000s ease-in-out 0s;
 }
 
 .input-suffix-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: none;
+    background: transparent !important;
+    border: none !important;
     color: #94a3b8;
     cursor: pointer;
     margin-left: 8px;
-    padding: 4px;
+    padding: 4px !important;
     transition: color 0.2s ease;
     user-select: none;
     flex-shrink: 0;
