@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import uuid
+import traceback
 import sqlite3
 
 if hasattr(sys.stdout, 'reconfigure'):
