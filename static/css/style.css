@@ -25,10 +25,7 @@
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.12) 0%, transparent 45%),
-                radial-gradient(circle at 85% 25%, rgba(168, 85, 247, 0.14) 0%, transparent 50%),
-                radial-gradient(circle at 50% 85%, rgba(245, 158, 11, 0.08) 0%, transparent 60%),
-                linear-gradient(180deg, #090d16 0%, #05070c 100%);
+    background: radial-gradient(circle at 50% 0%, #111827 0%, #090d16 70%, #05070c 100%);
     background-attachment: fixed;
     color: var(--text-primary);
     min-height: 100vh;
@@ -528,21 +525,23 @@ h4 {
     gap: 25px;
 }
 
-/* Glassmorphic Cards with Color Graded Duo-Tones */
+/* Minimal Glassmorphic Cards */
 .card {
-    background: linear-gradient(145deg, rgba(20, 27, 45, 0.92) 0%, rgba(11, 16, 28, 0.96) 60%, rgba(7, 10, 18, 0.98) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 26px;
-    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     position: relative;
     overflow: hidden;
 }
 
 .card:hover {
-    border-color: rgba(0, 240, 255, 0.35);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 25px rgba(0, 240, 255, 0.12);
+    border-color: rgba(56, 189, 248, 0.3);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
 }
 
 .card-header {
@@ -635,41 +634,24 @@ h4 {
 }
 
 .stat-item {
-    padding: 16px;
-    border-radius: 14px;
+    background: rgba(11, 17, 32, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 14px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .stat-item:hover {
-    transform: translateY(-2px);
+    border-color: rgba(56, 189, 248, 0.3);
 }
 
-.stat-item:nth-child(1) { /* Strength */
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(239, 68, 68, 0.35);
-}
-.stat-item:nth-child(1) .stat-value { color: #f87171; text-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
-
-.stat-item:nth-child(2) { /* Endurance */
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.35);
-}
-.stat-item:nth-child(2) .stat-value { color: #34d399; text-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
-
-.stat-item:nth-child(3) { /* Agility */
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(245, 158, 11, 0.35);
-}
-.stat-item:nth-child(3) .stat-value { color: #fbbf24; text-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
-
-.stat-item:nth-child(4) { /* Vitality */
-    background: linear-gradient(135deg, rgba(0, 240, 255, 0.16) 0%, rgba(15, 23, 42, 0.9) 100%);
-    border: 1px solid rgba(0, 240, 255, 0.35);
-}
-.stat-item:nth-child(4) .stat-value { color: #38bdf8; text-shadow: 0 0 10px rgba(0, 240, 255, 0.4); }
+.stat-item:nth-child(1) .stat-value { color: #f87171; }
+.stat-item:nth-child(2) .stat-value { color: #34d399; }
+.stat-item:nth-child(3) .stat-value { color: #fbbf24; }
+.stat-item:nth-child(4) .stat-value { color: #38bdf8; }
 
 .stat-icon {
     font-size: 1.8rem;
