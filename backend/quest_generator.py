@@ -751,3 +751,58 @@ class AIQuestGenerator:
             'level_result': level_result,
             'message': 'Quest completed! You are growing stronger, Hunter!'
         }
+
+    def generate_penalty_quest(self, user_id: int) -> Dict:
+        """Generate a Solo Leveling Penalty Zone survival circuit quest"""
+        from models import PlayerStats
+        stats_mgr = PlayerStats(self.db)
+        stats = stats_mgr.get_player_stats(user_id) or {}
+        lvl = stats.get('level', 1)
+
+        # Scale pushups, situps, squats, and running based on level
+        pushups = min(20 + (lvl * 2), 100)
+        situps = min(20 + (lvl * 2), 100)
+        squats = min(20 + (lvl * 2), 100)
+        run_km = min(2 + (lvl // 10), 10)
+
+        exercises = [
+            {
+                'name': 'Push-Ups (Penalty Protocol)',
+                'target_reps': pushups,
+                'target_sets': 4,
+                'reps_per_set': max(5, pushups // 4),
+                'category': 'strength'
+            },
+            {
+                'name': 'Sit-Ups (Penalty Protocol)',
+                'target_reps': situps,
+                'target_sets': 4,
+                'reps_per_set': max(5, situps // 4),
+                'category': 'core'
+            },
+            {
+                'name': 'Bodyweight Squats (Penalty Protocol)',
+                'target_reps': squats,
+                'target_sets': 4,
+                'reps_per_set': max(5, squats // 4),
+                'category': 'lower_body'
+            },
+            {
+                'name': f'Survival Run ({run_km} KM / High-Intensity Cardio)',
+                'target_reps': run_km * 1000,
+                'target_sets': 1,
+                'reps_per_set': run_km * 1000,
+                'category': 'cardio'
+            }
+        ]
+
+        return {
+            'title': 'WARNING: PENALTY QUEST INITIATED',
+            'subtitle': 'SURVIVAL QUEST: SURVIVE THE DESERT OF THE DAMNED',
+            'description': 'Failure to complete the daily system protocol has triggered the Penalty Quest. You must complete all survival exercises before the timer expires.',
+            'exercises': exercises,
+            'exp_reward': 500 + (lvl * 20),
+            'penalty_duration_hours': 4,
+            'warning': 'If you fail to survive within 4 hours, temporary stat penalties will be enforced by the System.'
+        }
+

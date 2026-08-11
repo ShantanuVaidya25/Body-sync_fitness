@@ -123,6 +123,61 @@
                     </div>
                 </div>
 
+                <h3>🖼️ Select Your Starting Body Type</h3>
+                <p class="info-text">Choose your starting physique build. The System will adapt your workout volume, target sets/reps, and "Become Like..." character transformation plans around your body type.</p>
+
+                <div class="body-type-grid">
+                    <label class="body-type-card">
+                        <input type="radio" name="setup-body-type" value="ectomorph">
+                        <div class="body-type-card-inner">
+                            <img src="/static/images/body_type_ectomorph.png" alt="Ectomorph Build" class="body-type-img">
+                            <div class="body-type-name">ECTOMORPH</div>
+                            <div class="body-type-tag">Slim / Lean Frame</div>
+                            <div class="body-type-desc">Fast metabolism, low body fat, struggles to build mass. High caloric surplus focus.</div>
+                        </div>
+                    </label>
+
+                    <label class="body-type-card">
+                        <input type="radio" name="setup-body-type" value="mesomorph" checked>
+                        <div class="body-type-card-inner">
+                            <img src="/static/images/body_type_mesomorph.png" alt="Mesomorph Build" class="body-type-img">
+                            <div class="body-type-name">MESOMORPH</div>
+                            <div class="body-type-tag">Athletic V-Taper</div>
+                            <div class="body-type-desc">Naturally balanced frame, builds muscle easily. Hypertrophy & progressive strength focus.</div>
+                        </div>
+                    </label>
+
+                    <label class="body-type-card">
+                        <input type="radio" name="setup-body-type" value="endomorph">
+                        <div class="body-type-card-inner">
+                            <img src="/static/images/body_type_endomorph.png" alt="Endomorph Build" class="body-type-img">
+                            <div class="body-type-name">ENDOMORPH</div>
+                            <div class="body-type-tag">Stocky / Heavy Build</div>
+                            <div class="body-type-desc">Solid frame, gains mass quickly, higher body fat storage. High volume & circuit focus.</div>
+                        </div>
+                    </label>
+
+                    <label class="body-type-card">
+                        <input type="radio" name="setup-body-type" value="skinny_fat">
+                        <div class="body-type-card-inner">
+                            <img src="/static/images/body_type_skinnyfat.png" alt="Skinny-Fat Build" class="body-type-img">
+                            <div class="body-type-name">SKINNY-FAT</div>
+                            <div class="body-type-tag">Body Recomposition</div>
+                            <div class="body-type-desc">Lean upper body carrying midsection fat. Recomposition & high protein focus.</div>
+                        </div>
+                    </label>
+
+                    <label class="body-type-card">
+                        <input type="radio" name="setup-body-type" value="muscular">
+                        <div class="body-type-card-inner">
+                            <img src="/static/images/body_type_muscular.png" alt="Muscular Build" class="body-type-img">
+                            <div class="body-type-name">MUSCULAR</div>
+                            <div class="body-type-tag">Heavy Lifter</div>
+                            <div class="body-type-desc">Dense muscle base & high strength. Advanced periodization & power split focus.</div>
+                        </div>
+                    </label>
+                </div>
+
                 <h3>🎯 Primary Objective Path</h3>
                 <p class="info-text">Select everything you want to focus on — you can pick more than one. Your daily quests will be built around this combination.</p>
 
@@ -258,8 +313,20 @@
                 <a href="#" onclick="showTab('physique')" class="nav-link" data-tab="physique">
                     🎭 Become Like...
                 </a>
+                <a href="#" onclick="showTab('calculator')" class="nav-link" data-tab="calculator">
+                    💪 1RM Calc
+                </a>
+                <a href="#" onclick="showTab('routines')" class="nav-link" data-tab="routines">
+                    📝 Workout Splits
+                </a>
                 <a href="#" onclick="showTab('social')" class="nav-link" data-tab="social">
                     👥 Social<span id="social-pending-badge" style="display: none; color: #f59e0b; font-weight: bold; margin-left: 4px;"></span>
+                </a>
+                <a href="#" onclick="openHunterCardModal()" class="nav-link" style="color: #c084fc; font-weight: 700;">
+                    🪪 Hunter License
+                </a>
+                <a href="#" onclick="triggerPenaltyZoneDemo()" class="nav-link" style="color: #ef4444; font-weight: 700;">
+                    🚨 Penalty Zone
                 </a>
                 <a href="#" onclick="showTab('admin')" class="nav-link admin-only-link" data-tab="admin" id="nav-admin-link" style="display: none; color: #f59e0b; font-weight: 700;">
                     👑 Admin Panel
@@ -277,11 +344,24 @@
 
         <!-- Dashboard Tab -->
         <div id="tab-dashboard" class="tab-content active">
+            <!-- Penalty Zone Banner -->
+            <div id="penalty-banner" class="penalty-banner" style="display: none;">
+                <div class="penalty-banner-content">
+                    <span class="penalty-pulsing-icon">🚨</span>
+                    <div class="penalty-banner-text">
+                        <strong>WARNING: PENALTY QUEST INITIATED!</strong>
+                        <span>You missed daily system protocols. Survive the desert of the damned before time runs out!</span>
+                    </div>
+                    <button class="btn btn-small" style="background: #ef4444; color: white; font-weight: 800;" onclick="openPenaltyModal()">ENTER PENALTY ZONE</button>
+                </div>
+            </div>
+
             <div class="dashboard-grid">
                 <!-- Player Card -->
                 <div class="card player-card">
-                    <div class="card-header">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                         <h2>🏆 Hunter Profile</h2>
+                        <button class="btn btn-small" onclick="openHunterCardModal()" style="background: rgba(192, 132, 252, 0.15); border: 1px solid #c084fc; color: #c084fc; font-weight: 700; font-size: 0.8rem;">🪪 License Card</button>
                     </div>
                     <div class="player-info">
                         <div class="player-avatar">
@@ -948,6 +1028,113 @@
             </div>
         </div>
 
+        <!-- 1RM Strength Calculator Tab -->
+        <div id="tab-calculator" class="tab-content">
+            <div class="calculator-container" style="max-width: 900px; margin: 0 auto;">
+                <div class="card">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>💪 1-Rep Max & Strength Benchmark Calculator</h2>
+                        <span style="font-size: 0.85rem; color: #60a5fa; font-weight: 700;">Exercise Science Formulas</span>
+                    </div>
+                    <p class="info-text">Enter your heaviest weight and reps performed to estimate your 1-Rep Max (1RM), view target working weight percentages, and check your strength benchmark rank.</p>
+                    
+                    <form id="form-1rm-calc" onsubmit="event.preventDefault(); calculate1RM();" style="margin-top: 20px;">
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 2;">
+                                <label>Target Exercise</label>
+                                <select id="calc-exercise" class="exercise-select" onchange="calculate1RM()">
+                                    <option value="Bench Press" selected>Barbell Bench Press</option>
+                                    <option value="Barbell Squat">Barbell Back Squat</option>
+                                    <option value="Deadlift">Barbell Conventional Deadlift</option>
+                                    <option value="Overhead Press">Overhead Shoulder Press</option>
+                                    <option value="Incline Bench Press">Incline Bench Press</option>
+                                    <option value="Barbell Row">Barbell Bent-Over Row</option>
+                                    <option value="Dumbbell Press">Dumbbell Chest Press</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Weight Lifted (KG)</label>
+                                <input type="number" id="calc-weight" step="0.5" min="1" placeholder="e.g. 100" value="80" oninput="calculate1RM()" required>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Reps Completed</label>
+                                <input type="number" id="calc-reps" min="1" max="30" placeholder="e.g. 5" value="5" oninput="calculate1RM()" required>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- 1RM Results Output Grid -->
+                    <div id="calc-results-section" style="margin-top: 25px; display: none;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+                            <!-- Estimated 1RM Summary Box -->
+                            <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.25)); border: 1px solid #3b82f6; border-radius: 14px; padding: 20px; text-align: center;">
+                                <div style="font-size: 0.75rem; font-weight: 800; color: #93c5fd; text-transform: uppercase; letter-spacing: 1px;">ESTIMATED 1-REP MAX (1RM)</div>
+                                <div id="calc-output-1rm" style="font-family: 'Orbitron', sans-serif; font-size: 3rem; font-weight: 900; color: #ffffff; margin: 10px 0; text-shadow: 0 0 20px rgba(59, 130, 246, 0.6);">
+                                    93.3 <span style="font-size: 1.5rem; color: #60a5fa;">KG</span>
+                                </div>
+                                <div style="font-size: 0.8rem; color: #bfdbfe;" id="calc-output-formulas">
+                                    Epley: 93.3kg • Brzycki: 93.3kg
+                                </div>
+                            </div>
+
+                            <!-- Strength Benchmark Status Box -->
+                            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                                <div style="font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">STRENGTH BENCHMARK STANDARDS</div>
+                                <div id="calc-output-tier-pill" style="display: inline-block; margin: 12px auto; padding: 6px 18px; border-radius: 20px; font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 1rem; color: white; background: #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);">
+                                    INTERMEDIATE
+                                </div>
+                                <div id="calc-output-ratio" style="font-size: 0.88rem; color: #cbd5e1; font-weight: 600;">
+                                    Ratio: 1.24x Bodyweight
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Working Weights Table -->
+                        <div style="margin-top: 25px;">
+                            <h3 style="font-family: 'Orbitron', sans-serif; font-size: 1.1rem; color: #60a5fa; margin-bottom: 12px;">📊 Working Weight Target Percentages</h3>
+                            <div style="overflow-x: auto;">
+                                <table class="admin-table" style="width: 100%; text-align: center;">
+                                    <thead>
+                                        <tr>
+                                            <th>Percentage</th>
+                                            <th>Target Weight</th>
+                                            <th>Rep Range</th>
+                                            <th>Training Purpose</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="calc-percentages-tbody">
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Workout Split Routine Builder Tab -->
+        <div id="tab-routines" class="tab-content">
+            <div class="routines-container">
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h2>📝 Custom Workout Split Builder</h2>
+                            <p class="info-text" style="margin: 0;">Create custom training splits (Push/Pull/Legs, Upper/Lower) and launch any routine as today's active workout.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="openCreateRoutineModal()" style="font-weight: 700;">
+                            ➕ Create New Routine
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Saved Routines Grid -->
+                <div id="routines-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </div>
+
         <!-- Mobile Bottom Navigation Bar -->
         <nav class="mobile-bottom-bar">
             <a href="#" onclick="showTab('dashboard')" class="bottom-nav-link active" data-tab="dashboard">
@@ -1175,12 +1362,175 @@
         </div>
     </div>
 
+    <!-- Holographic Hunter ID Card Modal -->
+    <div id="hunter-card-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeHunterCardModal()">
+        <div class="modal-content hunter-card-modal-content" style="max-width: 520px; background: rgba(13, 17, 23, 0.95); border: 1px solid rgba(192, 132, 252, 0.3); box-shadow: 0 0 30px rgba(168, 85, 247, 0.25);">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+                <h2 style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: #c084fc; display: flex; align-items: center; gap: 8px;">
+                    🪪 Hunter License Card
+                </h2>
+                <button class="modal-close-btn" onclick="closeHunterCardModal()">✕</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding-top: 15px;">
+                <!-- Holographic Card Shell -->
+                <div id="hunter-id-card-capture" class="hunter-card-shell">
+                    <div class="hunter-card-shine"></div>
+                    <div class="hunter-card-header">
+                        <div class="hunter-card-assoc">⚡ KOREAN HUNTER ASSOCIATION</div>
+                        <div class="hunter-card-sys">SYSTEM OVERLORD LICENSE</div>
+                    </div>
+                    <div class="hunter-card-body">
+                        <div class="hunter-card-avatar-wrap">
+                            <div id="card-avatar-ring" class="card-avatar-ring">
+                                <div class="card-avatar-inner">⚔️</div>
+                            </div>
+                            <div id="card-rank-badge" class="card-rank-pill">S-RANK</div>
+                        </div>
+                        <div class="hunter-card-details">
+                            <h3 id="card-username" class="card-hunter-name">HUNTER</h3>
+                            <div id="card-title" class="card-hunter-title">National Level Hunter</div>
+                            <div class="card-level-row">
+                                <span class="card-lbl">LEVEL</span>
+                                <span id="card-level-val" class="card-val-gold">100</span>
+                                <span class="card-lbl" style="margin-left: 12px;">EXP</span>
+                                <span id="card-exp-val" class="card-val-blue">9999/10000</span>
+                            </div>
+                            <div class="card-stats-mini-grid">
+                                <div class="card-stat-box">
+                                    <span class="card-stat-lbl">STR</span>
+                                    <span id="card-str-val" class="card-stat-num">100</span>
+                                </div>
+                                <div class="card-stat-box">
+                                    <span class="card-stat-lbl">END</span>
+                                    <span id="card-end-val" class="card-stat-num">100</span>
+                                </div>
+                                <div class="card-stat-box">
+                                    <span class="card-stat-lbl">AGI</span>
+                                    <span id="card-agi-val" class="card-stat-num">100</span>
+                                </div>
+                                <div class="card-stat-box">
+                                    <span class="card-stat-lbl">VIT</span>
+                                    <span id="card-vit-val" class="card-stat-num">100</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hunter-card-footer">
+                        <div class="card-footer-item">
+                            <span class="card-lbl">QUESTS CLEARED</span>
+                            <span id="card-quests-val" class="card-footer-val">0</span>
+                        </div>
+                        <div class="card-footer-item">
+                            <span class="card-lbl">ACHIEVEMENTS</span>
+                            <span id="card-achieve-val" class="card-footer-val">0</span>
+                        </div>
+                        <div class="card-footer-item">
+                            <span class="card-lbl">LICENSE ID</span>
+                            <span id="card-license-id" class="card-footer-val">SL-77890</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="downloadHunterCardPNG()" style="background: linear-gradient(135deg, #a855f7, #6366f1); border: none; font-weight: 700;">
+                        📸 Download Hunter Card (PNG)
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeHunterCardModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Penalty Zone Emergency Overlay Modal -->
+    <div id="penalty-zone-modal" class="modal-overlay penalty-theme-overlay" style="display: none;">
+        <div class="modal-content penalty-modal-content">
+            <div class="penalty-header">
+                <div class="penalty-warning-pill">🚨 SYSTEM EMERGENCY OVERRIDE</div>
+                <h1 class="penalty-title">WARNING: PENALTY QUEST INITIATED</h1>
+                <p class="penalty-subtitle">SURVIVAL PROTOCOL: DESERT OF THE DAMNED</p>
+            </div>
+            <div class="penalty-timer-card">
+                <div class="penalty-timer-lbl">TIME REMAINING BEFORE STAT PENALTY</div>
+                <div id="penalty-countdown" class="penalty-countdown-display">04:00:00</div>
+            </div>
+            <div class="penalty-body">
+                <p id="penalty-description" class="penalty-desc">
+                    Failure to complete the daily system protocol has triggered the Penalty Quest. You have been transported to the Penalty Zone. Complete all survival exercises before time runs out!
+                </p>
+                <div class="penalty-exercises-list" id="penalty-exercises-container">
+                    <!-- Exercise survival items dynamically populated -->
+                </div>
+            </div>
+            <div class="penalty-actions">
+                <button class="btn btn-danger btn-large" onclick="submitPenaltyCompletion()" style="width: 100%; font-size: 1.1rem; padding: 14px; font-weight: 800; text-transform: uppercase; background: linear-gradient(135deg, #dc2626, #991b1b); box-shadow: 0 0 20px rgba(220, 38, 38, 0.6); border: none;">
+                    ⚔️ CLEAR PENALTY & SURVIVE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Custom Routine Modal -->
+    <div id="create-routine-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeCreateRoutineModal()">
+        <div class="modal-content" style="max-width: 680px; background: rgba(13, 17, 23, 0.96); border: 1px solid rgba(59, 130, 246, 0.3);">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+                <h2 style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 1.25rem; color: #60a5fa;">
+                    📝 Create Custom Workout Routine
+                </h2>
+                <button class="modal-close-btn" onclick="closeCreateRoutineModal()">✕</button>
+            </div>
+            <div class="modal-body custom-scrollbar" style="margin-top: 15px;">
+                <form id="routine-form" onsubmit="event.preventDefault(); saveCustomRoutine();">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Routine Name</label>
+                            <input type="text" id="routine-name" placeholder="e.g. Heavy Push Day A" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Split Type</label>
+                            <select id="routine-split-type">
+                                <option value="Push">Push Day</option>
+                                <option value="Pull">Pull Day</option>
+                                <option value="Legs">Legs Day</option>
+                                <option value="Upper">Upper Body</option>
+                                <option value="Lower">Lower Body</option>
+                                <option value="Full Body">Full Body</option>
+                                <option value="Custom" selected>Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description / Focus Notes</label>
+                        <input type="text" id="routine-description" placeholder="e.g. Hypertrophy focus with 3-minute rest on main compounds">
+                    </div>
+
+                    <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h3 style="font-family: 'Orbitron', sans-serif; font-size: 1rem; color: #60a5fa; margin: 0;">🏋️ Exercise List</h3>
+                            <button type="button" class="btn btn-small btn-secondary" onclick="addRoutineExerciseRow()">+ Add Exercise</button>
+                        </div>
+
+                        <div id="routine-exercises-container" style="display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Exercise Rows dynamically appended -->
+                        </div>
+                    </div>
+
+                    <div class="modal-actions" style="margin-top: 24px; display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="submit" class="btn btn-primary" style="font-weight: 700;">💾 Save Custom Routine</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateRoutineModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="/static/js/app.js?v=20260808_26"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="/static/js/app.js?v=20260811_01"></script>
 </body>
 </html>

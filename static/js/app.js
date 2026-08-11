@@ -291,6 +291,9 @@ async function setupProfile() {
         }
     });
     
+    const bodyTypeRadio = document.querySelector('input[name="setup-body-type"]:checked');
+    const body_type = bodyTypeRadio ? bodyTypeRadio.value : 'mesomorph';
+    
     try {
         const response = await fetch(`${API_BASE}/api/setup-profile`, {
             method: 'POST',
@@ -298,7 +301,7 @@ async function setupProfile() {
             body: JSON.stringify({
                 age, height_cm, weight_kg, target_height, target_weight,
                 primary_focus_areas, experience_level, days_per_week,
-                initial_exercises
+                body_type, initial_exercises
             }),
             credentials: 'include'
         });
@@ -337,6 +340,9 @@ async function loadDashboard() {
         
         // Load today's quest preview
         await loadTodaysQuest();
+        
+        // Check for active Penalty Zone status
+        await checkPenaltyStatus();
         
         // Set username
         if (document.getElementById('nav-username')) document.getElementById('nav-username').textContent = currentUser.username;
@@ -396,6 +402,12 @@ function updatePlayerCard(stats) {
     
     const dashRank = document.getElementById('player-rank');
     if (dashRank) dashRank.textContent = rank;
+
+    const bodyTypePill = document.getElementById('player-body-type');
+    if (bodyTypePill) {
+        const bType = (stats.body_type || 'mesomorph').toUpperCase().replace('_', '-');
+        bodyTypePill.textContent = `${bType} BUILD`;
+    }
     
     // Quest Tab Mini Profile Bar
     const questLevel = document.getElementById('quest-player-level');
@@ -2439,6 +2451,10 @@ function showTab(tabName) {
         loadFriends();
     } else if (tabName === 'admin') {
         loadAdminTab();
+    } else if (tabName === 'calculator') {
+        calculate1RM();
+    } else if (tabName === 'routines') {
+        loadRoutines();
     }
 }
 
@@ -2831,3 +2847,499 @@ document.addEventListener('click', (e) => {
         closeModal();
     }
 });
+
+
+// ============================================================================
+// 🚨 PENALTY ZONE & 🪪 HOLOGRAPHIC HUNTER ID CARD FUNCTIONS
+// ============================================================================
+
+let currentPenaltyTimer = null;
+let currentPenaltyData = null;
+
+async function checkPenaltyStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/api/penalty/status`, { credentials: 'include' });
+        const data = await res.json();
+        const banner = document.getElementById('penalty-banner');
+        if (data.has_penalty && data.penalty) {
+            currentPenaltyData = data.penalty;
+            if (banner) banner.style.display = 'block';
+            startPenaltyTimer(data.penalty.expires_at);
+        } else {
+            if (banner) banner.style.display = 'none';
+            if (currentPenaltyTimer) clearInterval(currentPenaltyTimer);
+        }
+    } catch (e) {
+        console.error("Error checking penalty status:", e);
+    }
+}
+
+function startPenaltyTimer(expiresAtStr) {
+    if (currentPenaltyTimer) clearInterval(currentPenaltyTimer);
+    if (!expiresAtStr) return;
+    const expiresAt = new Date(expiresAtStr.replace(' ', 'T')).getTime();
+
+    function update() {
+        const now = new Date().getTime();
+        const diff = expiresAt - now;
+        const display = document.getElementById('penalty-countdown');
+
+        if (diff <= 0) {
+            if (display) display.textContent = "00:00:00 - EXPIRED!";
+            clearInterval(currentPenaltyTimer);
+            return;
+        }
+
+        const hrs = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, '0');
+        const mins = String(Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
+        const secs = String(Math.floor((diff % (1000 * 60)) / 1000)).padStart(2, '0');
+
+        if (display) display.textContent = `${hrs}:${mins}:${secs}`;
+    }
+
+    update();
+    currentPenaltyTimer = setInterval(update, 1000);
+}
+
+function openPenaltyModal() {
+    const modal = document.getElementById('penalty-zone-modal');
+    if (!modal) return;
+
+    if (currentPenaltyData && currentPenaltyData.quest_data) {
+        const qData = typeof currentPenaltyData.quest_data === 'string'
+            ? JSON.parse(currentPenaltyData.quest_data)
+            : currentPenaltyData.quest_data;
+
+        const desc = document.getElementById('penalty-description');
+        if (desc && qData.description) desc.textContent = qData.description;
+
+        const container = document.getElementById('penalty-exercises-container');
+        if (container && qData.exercises) {
+            container.innerHTML = qData.exercises.map(ex => `
+                <div class="penalty-ex-item">
+                    <span class="penalty-ex-name">⚔️ ${escapeHtml(ex.name)}</span>
+                    <span class="penalty-ex-target">${ex.target_reps} REPS (${ex.target_sets} SETS)</span>
+                </div>
+            `).join('');
+        }
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closePenaltyModal() {
+    const modal = document.getElementById('penalty-zone-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function triggerPenaltyZoneDemo() {
+    try {
+        const res = await fetch(`${API_BASE}/api/penalty/trigger`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (data.success) {
+            currentPenaltyData = data.penalty;
+            showToast('🚨 WARNING: PENALTY QUEST INITIATED!');
+            const banner = document.getElementById('penalty-banner');
+            if (banner) banner.style.display = 'block';
+            startPenaltyTimer(data.penalty.expires_at);
+            openPenaltyModal();
+        } else {
+            showToast(data.message || 'Failed to trigger Penalty Zone');
+        }
+    } catch (e) {
+        console.error('Trigger penalty error:', e);
+        showToast('Error triggering Penalty Zone');
+    }
+}
+
+async function submitPenaltyCompletion() {
+    try {
+        const res = await fetch(`${API_BASE}/api/penalty/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ penalty_id: currentPenaltyData ? currentPenaltyData.id : null }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (data.success) {
+            closePenaltyModal();
+            const banner = document.getElementById('penalty-banner');
+            if (banner) banner.style.display = 'none';
+            if (currentPenaltyTimer) clearInterval(currentPenaltyTimer);
+
+            showToast(`🎉 SURVIVED! ${data.message} (+${data.exp_gained} EXP)`);
+            await loadDashboard();
+        } else {
+            showToast(data.message || 'Failed to submit penalty completion');
+        }
+    } catch (e) {
+        console.error('Submit penalty error:', e);
+        showToast('Error submitting penalty completion');
+    }
+}
+
+// 🪪 HUNTER LICENSE CARD LOGIC
+async function openHunterCardModal() {
+    try {
+        const res = await fetch(`${API_BASE}/api/hunter-card/data`, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.success || !data.hunter) {
+            showToast('Could not load Hunter License data');
+            return;
+        }
+
+        const h = data.hunter;
+
+        if (document.getElementById('card-username')) document.getElementById('card-username').textContent = h.username.toUpperCase();
+        if (document.getElementById('card-title')) document.getElementById('card-title').textContent = h.title;
+        if (document.getElementById('card-level-val')) document.getElementById('card-level-val').textContent = h.level;
+        if (document.getElementById('card-exp-val')) document.getElementById('card-exp-val').textContent = `${h.exp} / ${h.exp_to_next}`;
+
+        if (document.getElementById('card-str-val')) document.getElementById('card-str-val').textContent = h.stats.strength;
+        if (document.getElementById('card-end-val')) document.getElementById('card-end-val').textContent = h.stats.endurance;
+        if (document.getElementById('card-agi-val')) document.getElementById('card-agi-val').textContent = h.stats.agility;
+        if (document.getElementById('card-vit-val')) document.getElementById('card-vit-val').textContent = h.stats.vitality;
+
+        if (document.getElementById('card-quests-val')) document.getElementById('card-quests-val').textContent = h.quests_completed;
+        if (document.getElementById('card-achieve-val')) document.getElementById('card-achieve-val').textContent = h.achievements_count;
+
+        const rankBadge = document.getElementById('card-rank-badge');
+        if (rankBadge) {
+            rankBadge.textContent = h.rank.toUpperCase();
+            rankBadge.style.background = h.badge_color;
+            rankBadge.style.boxShadow = h.glow;
+        }
+
+        const ring = document.getElementById('card-avatar-ring');
+        if (ring) {
+            ring.style.background = `linear-gradient(135deg, ${h.badge_color}, #3b82f6)`;
+            ring.style.boxShadow = h.glow;
+        }
+
+        const cardShell = document.getElementById('hunter-id-card-capture');
+        if (cardShell) {
+            cardShell.style.borderColor = h.border_color || h.badge_color;
+        }
+
+        const modal = document.getElementById('hunter-card-modal');
+        if (modal) modal.style.display = 'flex';
+    } catch (e) {
+        console.error('Error loading hunter card:', e);
+        showToast('Error opening Hunter Card');
+    }
+}
+
+function closeHunterCardModal() {
+    const modal = document.getElementById('hunter-card-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function downloadHunterCardPNG() {
+    const target = document.getElementById('hunter-id-card-capture');
+    if (!target || typeof html2canvas === 'undefined') {
+        showToast('PNG Exporter library loading... Please try again in a moment');
+        return;
+    }
+
+    showToast('📸 Generating S-Rank Hunter License Image...');
+    html2canvas(target, {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true
+    }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `Solo_Leveling_Hunter_License_${(currentUser ? currentUser.username : 'Hunter')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showToast('✅ Hunter License downloaded successfully!');
+    }).catch(err => {
+        console.error('Canvas export error:', err);
+        showToast('Failed to export card image');
+    });
+}
+
+
+// ============================================================================
+// 💪 1RM CALCULATOR & 📝 CUSTOM ROUTINE BUILDER FUNCTIONS
+// ============================================================================
+
+async function calculate1RM() {
+    const exerciseInput = document.getElementById('calc-exercise');
+    const weightInput = document.getElementById('calc-weight');
+    const repsInput = document.getElementById('calc-reps');
+    if (!weightInput || !repsInput) return;
+
+    const exercise_name = exerciseInput ? exerciseInput.value : 'Bench Press';
+    const weight_kg = parseFloat(weightInput.value) || 0;
+    const reps = parseInt(repsInput.value) || 0;
+
+    if (weight_kg <= 0 || reps <= 0) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/tools/1rm-calculate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exercise_name, weight_kg, reps }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (!data.success) return;
+
+        const resultsSec = document.getElementById('calc-results-section');
+        if (resultsSec) resultsSec.style.display = 'block';
+
+        // 1RM Output
+        const output1RM = document.getElementById('calc-output-1rm');
+        if (output1RM) output1RM.innerHTML = `${data.estimated_1rm} <span style="font-size: 1.5rem; color: #60a5fa;">KG</span>`;
+
+        const outputFormulas = document.getElementById('calc-output-formulas');
+        if (outputFormulas && data.formulas) {
+            outputFormulas.textContent = `Epley: ${data.formulas.epley}kg • Brzycki: ${data.formulas.brzycki}kg • Lander: ${data.formulas.lander}kg`;
+        }
+
+        // Benchmark Pill
+        const tierPill = document.getElementById('calc-output-tier-pill');
+        if (tierPill && data.benchmark) {
+            tierPill.textContent = data.benchmark.tier.toUpperCase();
+            tierPill.style.background = data.benchmark.color || '#10b981';
+            tierPill.style.boxShadow = `0 0 15px ${data.benchmark.color || '#10b981'}`;
+        }
+
+        const ratioEl = document.getElementById('calc-output-ratio');
+        if (ratioEl && data.benchmark) {
+            ratioEl.textContent = `Ratio: ${data.benchmark.ratio}x Bodyweight (${exercise_name})`;
+        }
+
+        // Percentages Table
+        const tbody = document.getElementById('calc-percentages-tbody');
+        if (tbody && data.working_percentages) {
+            tbody.innerHTML = data.working_percentages.map(p => `
+                <tr>
+                    <td style="font-family: 'Orbitron', sans-serif; font-weight: 800; color: #60a5fa;">${p.percentage}%</td>
+                    <td style="font-family: 'Orbitron', sans-serif; font-weight: 900; color: #ffffff; font-size: 1.05rem;">${p.weight} KG</td>
+                    <td style="font-weight: 700; color: #cbd5e1;">${escapeHtml(p.reps)}</td>
+                    <td style="font-size: 0.85rem; color: #94a3b8;">${escapeHtml(p.intensity)}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) {
+        console.error('1RM calculation error:', e);
+    }
+}
+
+
+// 📝 CUSTOM ROUTINE BUILDER FUNCTIONS
+let customRoutinesCache = [];
+
+async function loadRoutines() {
+    const grid = document.getElementById('routines-grid');
+    if (!grid) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/routines`, { credentials: 'include' });
+        const data = await res.json();
+        if (data.success) {
+            customRoutinesCache = data.routines || [];
+            renderRoutinesGrid(customRoutinesCache);
+        }
+    } catch (e) {
+        console.error('Failed to load routines:', e);
+    }
+}
+
+function renderRoutinesGrid(routines) {
+    const grid = document.getElementById('routines-grid');
+    if (!grid) return;
+
+    if (!routines || routines.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: rgba(15, 23, 42, 0.6); border: 1px dashed rgba(255,255,255,0.1); border-radius: 16px;">
+                <p style="font-size: 1.1rem; color: #94a3b8;">No custom workout splits saved yet!</p>
+                <button class="btn btn-primary" onclick="openCreateRoutineModal()" style="margin-top: 10px;">➕ Create Your First Split</button>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = routines.map(r => `
+        <div class="card" style="position: relative; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <h3 style="font-family: 'Orbitron', sans-serif; font-size: 1.15rem; color: #f8fafc; margin: 0;">${escapeHtml(r.routine_name)}</h3>
+                    <span style="font-family: 'Orbitron', sans-serif; font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 12px; background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; color: #60a5fa;">
+                        ${escapeHtml(r.split_type).toUpperCase()}
+                    </span>
+                </div>
+                ${r.description ? `<p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 14px;">${escapeHtml(r.description)}</p>` : ''}
+                
+                <div style="margin: 14px 0;">
+                    <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">EXERCISES (${(r.exercises || []).length})</div>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        ${(r.exercises || []).slice(0, 4).map(ex => `
+                            <div style="font-size: 0.85rem; color: #cbd5e1; display: flex; justify-content: space-between;">
+                                <span>🏋️ ${escapeHtml(ex.name || ex.exercise_name)}</span>
+                                <span style="font-weight: 700; color: #60a5fa;">${ex.target_sets || ex.sets || 3}x${ex.target_reps || ex.reps || 10}</span>
+                            </div>
+                        `).join('')}
+                        ${(r.exercises || []).length > 4 ? `<span style="font-size: 0.75rem; color: #64748b;">+${r.exercises.length - 4} more exercises...</span>` : ''}
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <button class="btn btn-primary btn-small" onclick="launchRoutineWorkout(${r.id})" style="flex: 2; font-weight: 800;">
+                    🚀 Launch Workout
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="deleteCustomRoutine(${r.id})" style="flex: 1; border-color: #ef4444; color: #ef4444;">
+                    🗑️ Delete
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openCreateRoutineModal() {
+    const modal = document.getElementById('create-routine-modal');
+    if (!modal) return;
+
+    document.getElementById('routine-form').reset();
+    const container = document.getElementById('routine-exercises-container');
+    if (container) {
+        container.innerHTML = '';
+        addRoutineExerciseRow('Barbell Bench Press', 4, 8, 80);
+        addRoutineExerciseRow('Overhead Shoulder Press', 3, 10, 50);
+        addRoutineExerciseRow('Incline Dumbbell Press', 3, 12, 24);
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeCreateRoutineModal() {
+    const modal = document.getElementById('create-routine-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function addRoutineExerciseRow(defaultName = '', defaultSets = 3, defaultReps = 10, defaultWeight = 0) {
+    const container = document.getElementById('routine-exercises-container');
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'routine-ex-row';
+    row.style.cssText = 'display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 10px; border-radius: 10px; flex-wrap: wrap;';
+
+    row.innerHTML = `
+        <div style="flex: 2; min-width: 160px;">
+            <input type="text" class="routine-ex-name" placeholder="Exercise Name" value="${escapeHtml(defaultName)}" required style="width: 100%;">
+        </div>
+        <div style="flex: 1; min-width: 80px;">
+            <input type="number" class="routine-ex-sets" placeholder="Sets" value="${defaultSets}" min="1" required style="width: 100%;">
+        </div>
+        <div style="flex: 1; min-width: 80px;">
+            <input type="number" class="routine-ex-reps" placeholder="Reps" value="${defaultReps}" min="1" required style="width: 100%;">
+        </div>
+        <div style="flex: 1; min-width: 90px;">
+            <input type="number" class="routine-ex-weight" placeholder="Weight (KG)" value="${defaultWeight}" min="0" step="0.5" style="width: 100%;">
+        </div>
+        <button type="button" class="btn-small" onclick="this.parentElement.remove()" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444;">✕</button>
+    `;
+
+    container.appendChild(row);
+}
+
+async function saveCustomRoutine() {
+    const name = document.getElementById('routine-name').value.trim();
+    const split = document.getElementById('routine-split-type').value;
+    const desc = document.getElementById('routine-description').value.trim();
+
+    const rows = document.querySelectorAll('#routine-exercises-container .routine-ex-row');
+    const exercises = [];
+
+    rows.forEach(row => {
+        const exName = row.querySelector('.routine-ex-name').value.trim();
+        const sets = parseInt(row.querySelector('.routine-ex-sets').value) || 3;
+        const reps = parseInt(row.querySelector('.routine-ex-reps').value) || 10;
+        const weight = parseFloat(row.querySelector('.routine-ex-weight').value) || 0;
+
+        if (exName) {
+            exercises.push({
+                name: exName,
+                target_sets: sets,
+                target_reps: reps,
+                reps_per_set: reps,
+                weight: weight,
+                category: 'strength'
+            });
+        }
+    });
+
+    if (!name || exercises.length === 0) {
+        showToast('Please enter a routine name and at least 1 exercise');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/api/routines`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ routine_name: name, split_type: split, description: desc, exercises }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ Custom Workout Routine saved successfully!');
+            closeCreateRoutineModal();
+            await loadRoutines();
+        } else {
+            showToast(data.message || 'Failed to save custom routine');
+        }
+    } catch (e) {
+        console.error('Error saving routine:', e);
+        showToast('Error saving routine');
+    }
+}
+
+async function deleteCustomRoutine(routineId) {
+    if (!confirm('Are you sure you want to delete this custom workout split?')) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/routines/${routineId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Routine deleted');
+            await loadRoutines();
+        } else {
+            showToast(data.message || 'Failed to delete routine');
+        }
+    } catch (e) {
+        console.error('Delete routine error:', e);
+    }
+}
+
+async function launchRoutineWorkout(routineId) {
+    try {
+        const res = await fetch(`${API_BASE}/api/routines/${routineId}/launch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            showTab('quest');
+        } else {
+            showToast(data.message || 'Failed to launch routine');
+        }
+    } catch (e) {
+        console.error('Launch routine error:', e);
+        showToast('Error launching workout');
+    }
+}
+
+

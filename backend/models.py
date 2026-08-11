@@ -79,6 +79,7 @@ class Database:
                 primary_focus_areas TEXT,
                 experience_level TEXT DEFAULT 'beginner',
                 days_per_week INTEGER DEFAULT 5,
+                body_type TEXT DEFAULT 'mesomorph',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
@@ -255,6 +256,51 @@ class Database:
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         ''')
+
+        # Penalty Quests table for Penalty Zone survival mode
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS penalty_quests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'active',
+                title TEXT DEFAULT 'WARNING: PENALTY QUEST INITIATED',
+                reason TEXT DEFAULT 'Missed Daily System Protocol',
+                quest_data TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                cleared_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+
+        # Custom Workout Routines Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS custom_routines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                routine_name TEXT NOT NULL,
+                split_type TEXT DEFAULT 'Custom',
+                description TEXT,
+                exercises_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+
+        # Strength 1RM Calculation Logs Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS strength_calc_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                exercise_name TEXT NOT NULL,
+                weight_kg REAL NOT NULL,
+                reps INTEGER NOT NULL,
+                estimated_1rm REAL NOT NULL,
+                benchmark_level TEXT,
+                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
         
         conn.commit()
         conn.close()
@@ -281,7 +327,8 @@ class Database:
         migrations = {
             'primary_focus_areas': "ALTER TABLE player_stats ADD COLUMN primary_focus_areas TEXT",
             'experience_level': "ALTER TABLE player_stats ADD COLUMN experience_level TEXT DEFAULT 'beginner'",
-            'days_per_week': "ALTER TABLE player_stats ADD COLUMN days_per_week INTEGER DEFAULT 5"
+            'days_per_week': "ALTER TABLE player_stats ADD COLUMN days_per_week INTEGER DEFAULT 5",
+            'body_type': "ALTER TABLE player_stats ADD COLUMN body_type TEXT DEFAULT 'mesomorph'"
         }
         
         for col, sql in migrations.items():
@@ -562,7 +609,8 @@ class PlayerStats:
                            target_weight: float = None,
                            primary_focus_areas: List[str] = None,
                            experience_level: str = 'beginner',
-                           days_per_week: int = 5) -> bool:
+                           days_per_week: int = 5,
+                           body_type: str = 'mesomorph') -> bool:
         """Create initial player stats"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
@@ -572,12 +620,12 @@ class PlayerStats:
                 INSERT INTO player_stats 
                 (user_id, age, height_cm, weight_kg, initial_height, initial_weight,
                  target_height, target_weight, primary_focus_areas, experience_level,
-                 days_per_week)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 days_per_week, body_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (user_id, age, height_cm, weight_kg, height_cm, weight_kg,
                   target_height or height_cm, target_weight or weight_kg,
                   json.dumps(primary_focus_areas or []), experience_level,
-                  days_per_week))
+                  days_per_week, body_type))
             conn.commit()
             conn.close()
             return True
@@ -1025,3 +1073,328 @@ class UserSettings:
         conn.commit()
         conn.close()
         return True
+
+
+def get_hunter_rank(level: int) -> Dict[str, str]:
+    """Calculate Solo Leveling Hunter Rank details based on user level"""
+    if level >= 100:
+        return {
+            'rank': 'S-Rank',
+            'title': 'National Level Hunter (Shadow Monarch)',
+            'badge_color': '#a855f7',
+            'glow': '0 0 20px rgba(168, 85, 247, 0.8)',
+            'border_color': '#c084fc'
+        }
+    elif level >= 90:
+        return {
+            'rank': 'S-Rank',
+            'title': 'S-Rank High Hunter',
+            'badge_color': '#eab308',
+            'glow': '0 0 15px rgba(234, 179, 8, 0.8)',
+            'border_color': '#fde047'
+        }
+    elif level >= 70:
+        return {
+            'rank': 'A-Rank',
+            'title': 'A-Rank Elite Hunter',
+            'badge_color': '#3b82f6',
+            'glow': '0 0 15px rgba(59, 130, 246, 0.7)',
+            'border_color': '#60a5fa'
+        }
+    elif level >= 45:
+        return {
+            'rank': 'B-Rank',
+            'title': 'B-Rank Veteran Hunter',
+            'badge_color': '#10b981',
+            'glow': '0 0 12px rgba(16, 185, 129, 0.6)',
+            'border_color': '#34d399'
+        }
+    elif level >= 25:
+        return {
+            'rank': 'C-Rank',
+            'title': 'C-Rank Skilled Hunter',
+            'badge_color': '#06b6d4',
+            'glow': '0 0 10px rgba(6, 182, 212, 0.5)',
+            'border_color': '#22d3ee'
+        }
+    elif level >= 10:
+        return {
+            'rank': 'D-Rank',
+            'title': 'D-Rank Novice Hunter',
+            'badge_color': '#f97316',
+            'glow': '0 0 8px rgba(249, 115, 22, 0.5)',
+            'border_color': '#fb923c'
+        }
+    else:
+        return {
+            'rank': 'E-Rank',
+            'title': 'E-Rank Weakest Hunter',
+            'badge_color': '#94a3b8',
+            'glow': '0 0 5px rgba(148, 163, 184, 0.4)',
+            'border_color': '#cbd5e1'
+        }
+
+
+class PenaltyManager:
+    """Manages Solo Leveling Penalty Zone quests triggered by missed daily protocols"""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def get_active_penalty(self, user_id: int) -> Optional[Dict]:
+        """Check if user currently has an active Penalty Zone quest"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM penalty_quests
+            WHERE user_id = ? AND status = 'active'
+            ORDER BY id DESC LIMIT 1
+        ''', (user_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return None
+
+        penalty = dict(row)
+        try:
+            expires_at = datetime.strptime(penalty['expires_at'], '%Y-%m-%d %H:%M:%S')
+            if datetime.now() > expires_at:
+                cursor.execute("UPDATE penalty_quests SET status = 'failed' WHERE id = ?", (penalty['id'],))
+                conn.commit()
+                conn.close()
+                penalty['status'] = 'failed'
+                return penalty
+        except Exception:
+            pass
+
+        conn.close()
+        if isinstance(penalty.get('quest_data'), str):
+            try:
+                penalty['quest_data'] = json.loads(penalty['quest_data'])
+            except Exception:
+                pass
+        return penalty
+
+    def create_penalty(self, user_id: int, quest_data: Dict, duration_hours: int = 4, reason: str = "Missed Daily Workout Protocol") -> Dict:
+        """Create a new Penalty Zone quest for the user"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("UPDATE penalty_quests SET status = 'failed' WHERE user_id = ? AND status = 'active'", (user_id,))
+
+        expires_at = (datetime.now() + timedelta(hours=duration_hours)).strftime('%Y-%m-%d %H:%M:%S')
+        quest_data_json = json.dumps(quest_data)
+
+        cursor.execute('''
+            INSERT INTO penalty_quests (user_id, status, title, reason, quest_data, expires_at)
+            VALUES (?, 'active', 'WARNING: PENALTY QUEST INITIATED', ?, ?, ?)
+        ''', (user_id, reason, quest_data_json, expires_at))
+
+        penalty_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return {
+            'id': penalty_id,
+            'user_id': user_id,
+            'status': 'active',
+            'title': 'WARNING: PENALTY QUEST INITIATED',
+            'reason': reason,
+            'quest_data': quest_data,
+            'expires_at': expires_at
+        }
+
+    def clear_penalty(self, penalty_id: int, user_id: int) -> bool:
+        """Mark penalty as successfully completed and cleared"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE penalty_quests
+            SET status = 'cleared', cleared_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+        ''', (penalty_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+
+
+class StrengthCalculator:
+    """Calculator for 1-Rep Max (1RM), working weight percentages, and strength benchmarks"""
+
+    @staticmethod
+    def calculate_1rm(weight: float, reps: int) -> Dict[str, float]:
+        """Calculate estimated 1-Rep Max using standard exercise science formulas"""
+        if reps <= 0 or weight <= 0:
+            return {'epley': 0.0, 'brzycki': 0.0, 'lander': 0.0, 'mayhew': 0.0, 'average': 0.0}
+
+        if reps == 1:
+            return {'epley': weight, 'brzycki': weight, 'lander': weight, 'mayhew': weight, 'average': weight}
+
+        epley = weight * (1 + reps / 30.0)
+        brzycki = weight * (36.0 / (37.0 - reps)) if reps < 37 else weight * 1.5
+        lander = (100.0 * weight) / (101.3 - 2.67123 * reps) if (101.3 - 2.67123 * reps) > 0 else epley
+
+        import math
+        mayhew = (100.0 * weight) / (52.2 + (41.9 * math.exp(-0.055 * reps)))
+
+        avg = (epley + brzycki + lander + mayhew) / 4.0
+
+        return {
+            'epley': round(epley, 1),
+            'brzycki': round(brzycki, 1),
+            'lander': round(lander, 1),
+            'mayhew': round(mayhew, 1),
+            'average': round(avg, 1)
+        }
+
+    @staticmethod
+    def get_working_percentages(one_rep_max: float) -> List[Dict]:
+        """Get working weight percentages for training programs"""
+        return [
+            {'percentage': 100, 'reps': '1 Rep (Max)', 'weight': round(one_rep_max, 1), 'intensity': 'Maximal'},
+            {'percentage': 95, 'reps': '2 Reps', 'weight': round(one_rep_max * 0.95, 1), 'intensity': 'Heavy Power'},
+            {'percentage': 90, 'reps': '3-4 Reps', 'weight': round(one_rep_max * 0.90, 1), 'intensity': 'Heavy Strength'},
+            {'percentage': 85, 'reps': '5-6 Reps', 'weight': round(one_rep_max * 0.85, 1), 'intensity': 'Strength / Hypertrophy'},
+            {'percentage': 80, 'reps': '7-8 Reps', 'weight': round(one_rep_max * 0.80, 1), 'intensity': 'Hypertrophy Focus'},
+            {'percentage': 75, 'reps': '9-10 Reps', 'weight': round(one_rep_max * 0.75, 1), 'intensity': 'Moderate / Hypertrophy'},
+            {'percentage': 70, 'reps': '12-15 Reps', 'weight': round(one_rep_max * 0.70, 1), 'intensity': 'Endurance / Volume'},
+            {'percentage': 60, 'reps': '15-20 Reps', 'weight': round(one_rep_max * 0.60, 1), 'intensity': 'Light / Speed Work'}
+        ]
+
+    @staticmethod
+    def get_strength_benchmark(exercise_name: str, bodyweight_kg: float, estimated_1rm: float) -> Dict[str, str]:
+        """Determine strength tier (Untrained, Novice, Intermediate, Advanced, Elite) relative to bodyweight"""
+        if bodyweight_kg <= 0 or estimated_1rm <= 0:
+            return {'tier': 'Untrained', 'ratio': 0.0, 'color': '#94a3b8'}
+
+        ratio = estimated_1rm / bodyweight_kg
+        ex = (exercise_name or '').lower()
+
+        if 'squat' in ex:
+            benchmarks = [(0.75, 'Untrained', '#94a3b8'), (1.2, 'Novice', '#3b82f6'), (1.5, 'Intermediate', '#10b981'), (2.0, 'Advanced', '#f59e0b'), (2.5, 'Elite', '#a855f7')]
+        elif 'deadlift' in ex:
+            benchmarks = [(1.0, 'Untrained', '#94a3b8'), (1.5, 'Novice', '#3b82f6'), (1.8, 'Intermediate', '#10b981'), (2.4, 'Advanced', '#f59e0b'), (3.0, 'Elite', '#a855f7')]
+        elif ('press' in ex and 'overhead' in ex) or 'shoulder' in ex:
+            benchmarks = [(0.35, 'Untrained', '#94a3b8'), (0.55, 'Novice', '#3b82f6'), (0.75, 'Intermediate', '#10b981'), (1.0, 'Advanced', '#f59e0b'), (1.25, 'Elite', '#a855f7')]
+        else:
+            benchmarks = [(0.5, 'Untrained', '#94a3b8'), (0.8, 'Novice', '#3b82f6'), (1.1, 'Intermediate', '#10b981'), (1.5, 'Advanced', '#f59e0b'), (1.9, 'Elite', '#a855f7')]
+
+        tier = 'Untrained'
+        color = '#94a3b8'
+        for min_ratio, tier_label, tier_color in benchmarks:
+            if ratio >= min_ratio:
+                tier = tier_label
+                color = tier_color
+
+        return {
+            'tier': tier,
+            'ratio': round(ratio, 2),
+            'color': color
+        }
+
+
+class RoutineManager:
+    """Manages custom workout split routines created by users"""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def create_routine(self, user_id: int, routine_name: str, split_type: str, exercises: List[Dict], description: str = "") -> Dict:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        exercises_json = json.dumps(exercises)
+        cursor.execute('''
+            INSERT INTO custom_routines (user_id, routine_name, split_type, description, exercises_json)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, routine_name, split_type, description, exercises_json))
+        routine_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return {
+            'id': routine_id,
+            'user_id': user_id,
+            'routine_name': routine_name,
+            'split_type': split_type,
+            'description': description,
+            'exercises': exercises
+        }
+
+    def get_user_routines(self, user_id: int) -> List[Dict]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM custom_routines
+            WHERE user_id = ?
+            ORDER BY id DESC
+        ''', (user_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+
+        for r in rows:
+            if isinstance(r.get('exercises_json'), str):
+                try:
+                    r['exercises'] = json.loads(r['exercises_json'])
+                except Exception:
+                    r['exercises'] = []
+        return rows
+
+    def get_routine_by_id(self, routine_id: int, user_id: int) -> Optional[Dict]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM custom_routines
+            WHERE id = ? AND user_id = ?
+        ''', (routine_id, user_id))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        r = dict(row)
+        if isinstance(r.get('exercises_json'), str):
+            try:
+                r['exercises'] = json.loads(r['exercises_json'])
+            except Exception:
+                r['exercises'] = []
+        return r
+
+    def delete_routine(self, routine_id: int, user_id: int) -> bool:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            DELETE FROM custom_routines
+            WHERE id = ? AND user_id = ?
+        ''', (routine_id, user_id))
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return affected > 0
+
+    def log_1rm_test(self, user_id: int, exercise_name: str, weight_kg: float, reps: int, estimated_1rm: float, benchmark_level: str) -> bool:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO strength_calc_history (user_id, exercise_name, weight_kg, reps, estimated_1rm, benchmark_level)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, exercise_name, weight_kg, reps, estimated_1rm, benchmark_level))
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_1rm_history(self, user_id: int) -> List[Dict]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM strength_calc_history
+            WHERE user_id = ?
+            ORDER BY calculated_at DESC
+            LIMIT 20
+        ''', (user_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+

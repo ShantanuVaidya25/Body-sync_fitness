@@ -64,7 +64,8 @@ class PhysiqueAnalyzer:
         return self.client is not None
 
     def _build_contents(self, target_name: Optional[str],
-                         image_path: Optional[str]) -> list:
+                         image_path: Optional[str],
+                         current_body_type: Optional[str] = None) -> list:
         """Build the multimodal contents list: optional image + text prompt"""
         if target_name:
             target_desc = target_name
@@ -72,6 +73,9 @@ class PhysiqueAnalyzer:
             target_desc = "the person shown in the attached image"
 
         prompt_text = MASTER_PROMPT_TEMPLATE.format(target=target_desc)
+
+        if current_body_type:
+            prompt_text += f"\n\nCRITICAL ADAPTIVE CONTEXT: The user's current starting body type is **{current_body_type.upper()}**. Please adapt the workout volume, set/rep targets, rest times, and nutrition recommendations specifically for an **{current_body_type}** to transform into the target physique of **{target_desc}**."
 
         contents = []
 
@@ -89,7 +93,8 @@ class PhysiqueAnalyzer:
         return contents
 
     def generate_quest_log(self, target_name: Optional[str] = None,
-                          image_path: Optional[str] = None) -> Dict:
+                          image_path: Optional[str] = None,
+                          current_body_type: Optional[str] = None) -> Dict:
         """
         Generate a Quest Log by analyzing a named character/person or an
         uploaded photo. Exactly one of target_name / image_path should be
@@ -98,18 +103,13 @@ class PhysiqueAnalyzer:
         if not target_name and not image_path:
             return {
                 'success': False,
-                'error': 'Provide either a character/person name or upload a photo.'
+                'error': 'Provide either a target character/person name OR upload a reference image.'
             }
 
         if not self.is_configured():
             return {
                 'success': False,
-                'error': (
-                    'AI analysis is not configured. Set the GEMINI_API_KEY '
-                    'environment variable and install the "google-genai" package '
-                    '(pip install google-genai) to enable this feature.'
-                ),
-                'setup_required': True
+                'error': 'Gemini API key is not configured. Go to Settings to add your key.'
             }
 
         try:

@@ -23,7 +23,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from models import Database, User, PlayerStats, ExerciseManager, WeeklyPlanManager, UserSettings
+from models import Database, User, PlayerStats, ExerciseManager, WeeklyPlanManager, UserSettings, PenaltyManager, get_hunter_rank, StrengthCalculator, RoutineManager
 from quest_generator import AIQuestGenerator
 from physique_analyzer import PhysiqueAnalyzer
 
@@ -45,6 +45,8 @@ exercise_manager = ExerciseManager(db)
 quest_generator = AIQuestGenerator(db)
 weekly_plan_manager = WeeklyPlanManager(db)
 user_settings = UserSettings(db)
+penalty_manager = PenaltyManager(db)
+routine_manager = RoutineManager(db)
 
 # Auto-seed default admin account on server startup
 try:
@@ -338,6 +340,7 @@ def setup_profile():
     primary_focus_areas = data.get('primary_focus_areas', [])
     experience_level = data.get('experience_level', 'beginner')
     days_per_week = data.get('days_per_week', 5)
+    body_type = data.get('body_type', 'mesomorph')
     
     if not all([age, height_cm, weight_kg]):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -349,7 +352,8 @@ def setup_profile():
     success = stats_manager.create_player_stats(
         user_id, age, height_cm, weight_kg,
         target_height, target_weight,
-        primary_focus_areas, experience_level, days_per_week
+        primary_focus_areas, experience_level, days_per_week,
+        body_type
     )
     
     if not success:
@@ -884,10 +888,14 @@ def analyze_physique():
     if not target_name and not image_path:
         return jsonify({'error': 'Provide a character/person name or upload a photo.'}), 400
     
+    user_stats = stats_manager.get_player_stats(user_id) or {}
+    user_body_type = user_stats.get('body_type', 'mesomorph')
+
     try:
         result = analyzer.generate_quest_log(
             target_name=target_name,
-            image_path=image_path
+            image_path=image_path,
+            current_body_type=user_body_type
         )
         
         if not result.get('success'):
@@ -1759,6 +1767,245 @@ def admin_get_exercises():
     """Get exercise catalog"""
     exercises = exercise_manager.get_all_exercises()
     return jsonify({'success': True, 'exercises': exercises})
+
+
+# ==========================================
+# 🛑 PENALTY ZONE & HUNTER CARD API ENDPOINTS
+# ==========================================
+
+@app.route('/api/penalty/status', methods=['GET'])
+@login_required
+def get_penalty_status():
+    """Check if user currently has an active Penalty Zone quest"""
+    user_id = session.get('user_id')
+    penalty = penalty_manager.get_active_penalty(user_id)
+    return jsonify({
+        'success': True,
+        'has_penalty': penalty is not None and penalty.get('status') == 'active',
+        'penalty': penalty
+    })
+
+
+@app.route('/api/penalty/trigger', methods=['POST'])
+@login_required
+def trigger_penalty_zone():
+    """Trigger a Penalty Zone survival quest for the current user"""
+    user_id = session.get('user_id')
+    quest_data = quest_generator.generate_penalty_quest(user_id)
+    penalty = penalty_manager.create_penalty(
+        user_id=user_id,
+        quest_data=quest_data,
+        duration_hours=4,
+        reason="Missed Daily System Workout Protocol"
+    )
+    return jsonify({
+        'success': True,
+        'message': 'WARNING: PENALTY QUEST INITIATED!',
+        'penalty': penalty
+    })
+
+
+@app.route('/api/penalty/complete', methods=['POST'])
+@login_required
+def complete_penalty_zone():
+    """Submit completion for an active Penalty Zone quest"""
+    user_id = session.get('user_id')
+    data = request.get_json() or {}
+    penalty_id = data.get('penalty_id')
+
+    penalty = penalty_manager.get_active_penalty(user_id)
+    if not penalty or penalty.get('status') != 'active':
+        return jsonify({'success': False, 'message': 'No active Penalty Quest found'}), 400
+
+    penalty_manager.clear_penalty(penalty['id'], user_id)
+
+    # Award survival bonus EXP (500 EXP)
+    exp_gained = 500
+    level_result = stats_manager.add_exp(user_id, exp_gained)
+
+    return jsonify({
+        'success': True,
+        'message': 'PENALTY QUEST CLEARED! You survived the desert of the damned.',
+        'exp_gained': exp_gained,
+        'level_result': level_result
+    })
+
+
+@app.route('/api/hunter-card/data', methods=['GET'])
+@login_required
+def get_hunter_card_data():
+    """Return structured profile data formatted for the Holographic S-Rank Hunter ID Card"""
+    user_id = session.get('user_id')
+    user = user_manager.get_user_by_id(user_id)
+    stats = stats_manager.get_player_stats(user_id) or {}
+
+    lvl = stats.get('level', 1)
+    rank_info = get_hunter_rank(lvl)
+
+    # Get achievement count
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) as cnt FROM achievements WHERE user_id = ?', (user_id,))
+    achievements_cnt = cursor.fetchone()['cnt']
+
+    # Get total workouts count
+    cursor.execute('SELECT COUNT(*) as cnt FROM daily_quests WHERE user_id = ? AND completed = 1', (user_id,))
+    quests_completed = cursor.fetchone()['cnt']
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'hunter': {
+            'username': user.get('username', 'Hunter') if user else 'Hunter',
+            'created_at': user.get('created_at', '') if user else '',
+            'level': lvl,
+            'exp': stats.get('exp', 0),
+            'exp_to_next': stats.get('exp_to_next_level', 100),
+            'rank': rank_info['rank'],
+            'title': rank_info['title'],
+            'badge_color': rank_info['badge_color'],
+            'glow': rank_info['glow'],
+            'border_color': rank_info['border_color'],
+            'stats': {
+                'strength': stats.get('strength', 10),
+                'endurance': stats.get('endurance', 10),
+                'agility': stats.get('agility', 10),
+                'vitality': stats.get('vitality', 10),
+            },
+            'measurements': {
+                'height_cm': stats.get('height_cm', 175),
+                'weight_kg': stats.get('weight_kg', 70),
+            },
+            'achievements_count': achievements_cnt,
+            'quests_completed': quests_completed,
+            'days_per_week': stats.get('days_per_week', 5)
+        }
+    })
+
+
+# ==========================================
+# 💪 1RM CALCULATOR & CUSTOM ROUTINE ENDPOINTS
+# ==========================================
+
+@app.route('/api/tools/1rm-calculate', methods=['POST'])
+@login_required
+def calculate_1rm():
+    user_id = session.get('user_id')
+    data = request.get_json() or {}
+
+    exercise_name = data.get('exercise_name', 'Bench Press')
+    try:
+        weight_kg = float(data.get('weight_kg', 0))
+        reps = int(data.get('reps', 0))
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Invalid weight or reps'}), 400
+
+    if weight_kg <= 0 or reps <= 0:
+        return jsonify({'success': False, 'message': 'Weight and reps must be greater than 0'}), 400
+
+    formulas = StrengthCalculator.calculate_1rm(weight_kg, reps)
+    est_1rm = formulas['average']
+    percentages = StrengthCalculator.get_working_percentages(est_1rm)
+
+    player_stats = stats_manager.get_player_stats(user_id) or {}
+    bodyweight = player_stats.get('weight_kg', 75.0)
+    benchmark = StrengthCalculator.get_strength_benchmark(exercise_name, bodyweight, est_1rm)
+
+    routine_manager.log_1rm_test(user_id, exercise_name, weight_kg, reps, est_1rm, benchmark['tier'])
+
+    return jsonify({
+        'success': True,
+        'exercise_name': exercise_name,
+        'weight_kg': weight_kg,
+        'reps': reps,
+        'formulas': formulas,
+        'estimated_1rm': est_1rm,
+        'working_percentages': percentages,
+        'benchmark': benchmark
+    })
+
+@app.route('/api/tools/1rm-history', methods=['GET'])
+@login_required
+def get_1rm_history():
+    user_id = session.get('user_id')
+    history = routine_manager.get_1rm_history(user_id)
+    return jsonify({'success': True, 'history': history})
+
+@app.route('/api/routines', methods=['GET'])
+@login_required
+def get_routines():
+    user_id = session.get('user_id')
+    routines = routine_manager.get_user_routines(user_id)
+    return jsonify({'success': True, 'routines': routines})
+
+@app.route('/api/routines', methods=['POST'])
+@login_required
+def create_routine():
+    user_id = session.get('user_id')
+    data = request.get_json() or {}
+
+    routine_name = (data.get('routine_name') or '').strip()
+    split_type = (data.get('split_type') or 'Custom').strip()
+    description = (data.get('description') or '').strip()
+    exercises = data.get('exercises') or []
+
+    if not routine_name:
+        return jsonify({'success': False, 'message': 'Routine name is required'}), 400
+
+    if not exercises or not isinstance(exercises, list):
+        return jsonify({'success': False, 'message': 'At least one exercise is required'}), 400
+
+    routine = routine_manager.create_routine(user_id, routine_name, split_type, exercises, description)
+    return jsonify({'success': True, 'routine': routine, 'message': 'Custom routine saved successfully!'})
+
+@app.route('/api/routines/<int:routine_id>', methods=['DELETE'])
+@login_required
+def delete_routine(routine_id):
+    user_id = session.get('user_id')
+    success = routine_manager.delete_routine(routine_id, user_id)
+    if success:
+        return jsonify({'success': True, 'message': 'Routine deleted successfully'})
+    return jsonify({'success': False, 'message': 'Routine not found'}), 404
+
+@app.route('/api/routines/<int:routine_id>/launch', methods=['POST'])
+@login_required
+def launch_routine(routine_id):
+    """Launch a custom routine as today's active workout quest"""
+    user_id = session.get('user_id')
+    routine = routine_manager.get_routine_by_id(routine_id, user_id)
+    if not routine:
+        return jsonify({'success': False, 'message': 'Routine not found'}), 404
+
+    quest_data = {
+        'title': f"CUSTOM ROUTINE: {routine['routine_name'].upper()}",
+        'subtitle': f"SPLIT: {routine['split_type'].upper()}",
+        'description': routine.get('description') or "Custom user routine launched as daily workout.",
+        'exercises': routine['exercises'],
+        'exp_reward': 350 + (len(routine['exercises']) * 50),
+        'completion_bonus': 100
+    }
+
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    quest_json = json.dumps(quest_data)
+
+    cursor.execute('''
+        INSERT INTO daily_quests (user_id, quest_date, quest_data, exp_reward)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, today_str, quest_json, quest_data['exp_reward']))
+
+    new_quest_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'message': f"🚀 '{routine['routine_name']}' launched as today's active workout!",
+        'quest_id': new_quest_id,
+        'quest_data': quest_data
+    })
+
 
 
 if __name__ == '__main__':
