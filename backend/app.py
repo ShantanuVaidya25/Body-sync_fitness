@@ -1994,6 +1994,10 @@ def get_hunter_card_data():
             'badge_color': rank_info['badge_color'],
             'glow': rank_info['glow'],
             'border_color': rank_info['border_color'],
+            'card_bg': rank_info.get('card_bg'),
+            'ring_bg': rank_info.get('ring_bg'),
+            'card_shadow': rank_info.get('card_shadow'),
+            'emblem': rank_info.get('emblem', '⚔️'),
             'stats': {
                 'strength': stats.get('strength', 10),
                 'endurance': stats.get('endurance', 10),

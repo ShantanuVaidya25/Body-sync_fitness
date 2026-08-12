@@ -1127,59 +1127,87 @@ def get_hunter_rank(level: int) -> Dict[str, str]:
     """Calculate Solo Leveling Hunter Rank details based on user level"""
     if level >= 100:
         return {
-            'rank': 'S-Rank',
+            'rank': 'National S-Rank',
             'title': 'National Level Hunter (Shadow Monarch)',
-            'badge_color': '#a855f7',
-            'glow': '0 0 20px rgba(168, 85, 247, 0.8)',
-            'border_color': '#c084fc'
+            'badge_color': 'linear-gradient(135deg, #a855f7, #6366f1)',
+            'glow': '0 0 25px rgba(168, 85, 247, 0.9)',
+            'border_color': '#c084fc',
+            'card_bg': 'linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #0f172a 100%)',
+            'ring_bg': 'linear-gradient(135deg, #a855f7, #e879f9)',
+            'card_shadow': '0 0 45px rgba(168, 85, 247, 0.6), inset 0 0 30px rgba(192, 132, 252, 0.3)',
+            'emblem': '👑'
         }
     elif level >= 90:
         return {
             'rank': 'S-Rank',
             'title': 'S-Rank High Hunter',
             'badge_color': '#eab308',
-            'glow': '0 0 15px rgba(234, 179, 8, 0.8)',
-            'border_color': '#fde047'
+            'glow': '0 0 20px rgba(234, 179, 8, 0.8)',
+            'border_color': '#fde047',
+            'card_bg': 'linear-gradient(135deg, #451a03 0%, #78350f 50%, #172554 100%)',
+            'ring_bg': 'linear-gradient(135deg, #eab308, #fde047)',
+            'card_shadow': '0 0 40px rgba(234, 179, 8, 0.5), inset 0 0 25px rgba(254, 240, 138, 0.2)',
+            'emblem': '🌟'
         }
     elif level >= 70:
         return {
             'rank': 'A-Rank',
             'title': 'A-Rank Elite Hunter',
             'badge_color': '#3b82f6',
-            'glow': '0 0 15px rgba(59, 130, 246, 0.7)',
-            'border_color': '#60a5fa'
+            'glow': '0 0 18px rgba(59, 130, 246, 0.8)',
+            'border_color': '#60a5fa',
+            'card_bg': 'linear-gradient(135deg, #172554 0%, #1e40af 50%, #0f172a 100%)',
+            'ring_bg': 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+            'card_shadow': '0 0 35px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(147, 197, 253, 0.2)',
+            'emblem': '⚡'
         }
     elif level >= 45:
         return {
             'rank': 'B-Rank',
             'title': 'B-Rank Veteran Hunter',
             'badge_color': '#10b981',
-            'glow': '0 0 12px rgba(16, 185, 129, 0.6)',
-            'border_color': '#34d399'
+            'glow': '0 0 15px rgba(16, 185, 129, 0.7)',
+            'border_color': '#34d399',
+            'card_bg': 'linear-gradient(135deg, #064e3b 0%, #047857 50%, #0f172a 100%)',
+            'ring_bg': 'linear-gradient(135deg, #10b981, #34d399)',
+            'card_shadow': '0 0 30px rgba(16, 185, 129, 0.45), inset 0 0 20px rgba(110, 231, 183, 0.2)',
+            'emblem': '🌿'
         }
     elif level >= 25:
         return {
             'rank': 'C-Rank',
             'title': 'C-Rank Skilled Hunter',
             'badge_color': '#06b6d4',
-            'glow': '0 0 10px rgba(6, 182, 212, 0.5)',
-            'border_color': '#22d3ee'
+            'glow': '0 0 12px rgba(6, 182, 212, 0.6)',
+            'border_color': '#22d3ee',
+            'card_bg': 'linear-gradient(135deg, #083344 0%, #0e7490 50%, #0f172a 100%)',
+            'ring_bg': 'linear-gradient(135deg, #06b6d4, #38bdf8)',
+            'card_shadow': '0 0 25px rgba(6, 182, 212, 0.4), inset 0 0 15px rgba(103, 232, 249, 0.15)',
+            'emblem': '🧊'
         }
     elif level >= 10:
         return {
             'rank': 'D-Rank',
             'title': 'D-Rank Novice Hunter',
             'badge_color': '#f97316',
-            'glow': '0 0 8px rgba(249, 115, 22, 0.5)',
-            'border_color': '#fb923c'
+            'glow': '0 0 10px rgba(249, 115, 22, 0.6)',
+            'border_color': '#fb923c',
+            'card_bg': 'linear-gradient(135deg, #1c1917 0%, #431407 50%, #0f172a 100%)',
+            'ring_bg': 'linear-gradient(135deg, #ea580c, #f97316)',
+            'card_shadow': '0 0 20px rgba(249, 115, 22, 0.35), inset 0 0 12px rgba(253, 186, 116, 0.15)',
+            'emblem': '🛡️'
         }
     else:
         return {
             'rank': 'E-Rank',
-            'title': 'E-Rank Weakest Hunter',
-            'badge_color': '#94a3b8',
-            'glow': '0 0 5px rgba(148, 163, 184, 0.4)',
-            'border_color': '#cbd5e1'
+            'title': 'E-Rank (World\'s Weakest Hunter)',
+            'badge_color': '#64748b',
+            'glow': '0 0 8px rgba(148, 163, 184, 0.5)',
+            'border_color': '#94a3b8',
+            'card_bg': 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+            'ring_bg': 'linear-gradient(135deg, #64748b, #94a3b8)',
+            'card_shadow': '0 0 15px rgba(148, 163, 184, 0.25), inset 0 0 10px rgba(203, 213, 225, 0.1)',
+            'emblem': '⚔️'
         }
 
 

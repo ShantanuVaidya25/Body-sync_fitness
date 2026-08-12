@@ -3145,13 +3145,25 @@ async function openHunterCardModal() {
 
         const ring = document.getElementById('card-avatar-ring');
         if (ring) {
-            ring.style.background = `linear-gradient(135deg, ${h.badge_color}, #3b82f6)`;
+            ring.style.background = h.ring_bg || `linear-gradient(135deg, ${h.badge_color}, #3b82f6)`;
             ring.style.boxShadow = h.glow;
         }
 
         const cardShell = document.getElementById('hunter-id-card-capture');
         if (cardShell) {
+            cardShell.style.background = h.card_bg || 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)';
             cardShell.style.borderColor = h.border_color || h.badge_color;
+            cardShell.style.boxShadow = h.card_shadow || h.glow || '0 0 35px rgba(168, 85, 247, 0.35)';
+        }
+
+        const avatarIcon = document.querySelector('.card-avatar-inner');
+        if (avatarIcon && h.emblem) {
+            avatarIcon.textContent = h.emblem;
+        }
+
+        const cardTitle = document.getElementById('card-title');
+        if (cardTitle) {
+            cardTitle.style.color = h.border_color || '#c084fc';
         }
 
         const modal = document.getElementById('hunter-card-modal');
