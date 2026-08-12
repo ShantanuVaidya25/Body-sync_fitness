@@ -2015,6 +2015,87 @@ def get_hunter_card_data():
     })
 
 
+@app.route('/api/hunter/public/<identifier>', methods=['GET'])
+def get_public_hunter_profile(identifier):
+    """Get public hunter profile and friendship status for sharing links"""
+    current_user_id = session.get('user_id')
+    
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    # Fetch user by ID if numeric, otherwise by username
+    if identifier.isdigit():
+        cursor.execute('SELECT id, username, created_at FROM users WHERE id = ?', (int(identifier),))
+    else:
+        cursor.execute('SELECT id, username, created_at FROM users WHERE LOWER(username) = LOWER(?)', (identifier,))
+        
+    user = cursor.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'Hunter profile not found'}), 404
+        
+    target_id = user['id']
+    stats = stats_manager.get_player_stats(target_id) or {}
+    lvl = stats.get('level', 1)
+    rank_info = get_hunter_rank(lvl)
+    
+    cursor.execute('SELECT COUNT(*) as cnt FROM achievements WHERE user_id = ?', (target_id,))
+    achievements_cnt = cursor.fetchone()['cnt']
+    
+    cursor.execute('SELECT COUNT(*) as cnt FROM daily_quests WHERE user_id = ? AND completed = 1', (target_id,))
+    quests_completed = cursor.fetchone()['cnt']
+    
+    friendship_status = 'none'
+    if current_user_id:
+        if current_user_id == target_id:
+            friendship_status = 'self'
+        else:
+            cursor.execute('''
+                SELECT status, user_id FROM friends
+                WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+            ''', (current_user_id, target_id, target_id, current_user_id))
+            f = cursor.fetchone()
+            if f:
+                if f['status'] == 'accepted':
+                    friendship_status = 'accepted'
+                elif f['user_id'] == current_user_id:
+                    friendship_status = 'pending_sent'
+                else:
+                    friendship_status = 'pending_received'
+                    
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'hunter': {
+            'id': target_id,
+            'username': user['username'],
+            'created_at': user['created_at'],
+            'level': lvl,
+            'exp': stats.get('exp', 0),
+            'exp_to_next': stats.get('exp_to_next_level', 100),
+            'rank': rank_info['rank'],
+            'title': rank_info['title'],
+            'badge_color': rank_info['badge_color'],
+            'glow': rank_info['glow'],
+            'border_color': rank_info['border_color'],
+            'card_bg': rank_info.get('card_bg'),
+            'ring_bg': rank_info.get('ring_bg'),
+            'card_shadow': rank_info.get('card_shadow'),
+            'emblem': rank_info.get('emblem', '⚔️'),
+            'stats': {
+                'strength': stats.get('strength', 10),
+                'endurance': stats.get('endurance', 10),
+                'agility': stats.get('agility', 10),
+                'vitality': stats.get('vitality', 10),
+            },
+            'achievements_count': achievements_cnt,
+            'quests_completed': quests_completed,
+            'friendship_status': friendship_status
+        }
+    })
+
+
 # ==========================================
 # 💪 1RM CALCULATOR & CUSTOM ROUTINE ENDPOINTS
 # ==========================================

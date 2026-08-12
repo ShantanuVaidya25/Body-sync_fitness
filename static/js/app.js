@@ -11,6 +11,7 @@ const API_BASE = '';
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
+    checkSharedHunterUrl();
 });
 
 // ============================================================================
@@ -3201,6 +3202,145 @@ function downloadHunterCardPNG() {
         console.error('Canvas export error:', err);
         showToast('Failed to export card image');
     });
+}
+
+function copyHunterShareLink() {
+    const username = currentUser ? currentUser.username : '';
+    if (!username) {
+        showToast('Please log in to share your Hunter License link');
+        return;
+    }
+    const shareUrl = `${window.location.origin}/?hunter=${encodeURIComponent(username)}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            showToast('📋 Profile Link copied to clipboard! Share it with your friends.');
+        }).catch(() => {
+            prompt('Copy your Hunter Profile Link:', shareUrl);
+        });
+    } else {
+        prompt('Copy your Hunter Profile Link:', shareUrl);
+    }
+}
+
+async function checkSharedHunterUrl() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const hunterParam = urlParams.get('hunter') || urlParams.get('hunter_id');
+        if (!hunterParam) return;
+
+        openPublicHunterModal(hunterParam);
+    } catch (e) {
+        console.error('Error checking shared hunter URL:', e);
+    }
+}
+
+async function openPublicHunterModal(identifier) {
+    try {
+        const res = await fetch(`${API_BASE}/api/hunter/public/${encodeURIComponent(identifier)}`);
+        const data = await res.json();
+        if (!data.success || !data.hunter) {
+            showToast('Hunter profile not found');
+            return;
+        }
+
+        const h = data.hunter;
+
+        if (document.getElementById('public-card-username')) document.getElementById('public-card-username').textContent = h.username.toUpperCase();
+        if (document.getElementById('public-card-title')) document.getElementById('public-card-title').textContent = h.title;
+        if (document.getElementById('public-card-level-val')) document.getElementById('public-card-level-val').textContent = h.level;
+        if (document.getElementById('public-card-exp-val')) document.getElementById('public-card-exp-val').textContent = `${h.exp} / ${h.exp_to_next}`;
+
+        if (document.getElementById('public-card-str-val')) document.getElementById('public-card-str-val').textContent = h.stats.strength;
+        if (document.getElementById('public-card-end-val')) document.getElementById('public-card-end-val').textContent = h.stats.endurance;
+        if (document.getElementById('public-card-agi-val')) document.getElementById('public-card-agi-val').textContent = h.stats.agility;
+        if (document.getElementById('public-card-vit-val')) document.getElementById('public-card-vit-val').textContent = h.stats.vitality;
+
+        if (document.getElementById('public-card-quests-val')) document.getElementById('public-card-quests-val').textContent = h.quests_completed;
+        if (document.getElementById('public-card-achieve-val')) document.getElementById('public-card-achieve-val').textContent = h.achievements_count;
+
+        const rankBadge = document.getElementById('public-card-rank-badge');
+        if (rankBadge) {
+            rankBadge.textContent = h.rank.toUpperCase();
+            rankBadge.style.background = h.badge_color;
+            rankBadge.style.boxShadow = h.glow;
+        }
+
+        const ring = document.getElementById('public-card-avatar-ring');
+        if (ring) {
+            ring.style.background = h.ring_bg || `linear-gradient(135deg, ${h.badge_color}, #3b82f6)`;
+            ring.style.boxShadow = h.glow;
+        }
+
+        const cardShell = document.getElementById('public-hunter-card-capture');
+        if (cardShell) {
+            cardShell.style.background = h.card_bg || 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)';
+            cardShell.style.borderColor = h.border_color || h.badge_color;
+            cardShell.style.boxShadow = h.card_shadow || h.glow || '0 0 35px rgba(168, 85, 247, 0.35)';
+        }
+
+        const avatarIcon = document.getElementById('public-card-emblem');
+        if (avatarIcon && h.emblem) {
+            avatarIcon.textContent = h.emblem;
+        }
+
+        const cardTitle = document.getElementById('public-card-title');
+        if (cardTitle) {
+            cardTitle.style.color = h.border_color || '#c084fc';
+        }
+
+        // Render Action Button
+        const actionContainer = document.getElementById('public-hunter-friend-action');
+        if (actionContainer) {
+            if (h.friendship_status === 'self') {
+                actionContainer.innerHTML = `<span style="color: #94a3b8; font-weight: 700; font-size: 0.9rem;">⚔️ This is your profile</span>`;
+            } else if (h.friendship_status === 'accepted') {
+                actionContainer.innerHTML = `<button class="btn" disabled style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; font-weight: 700;">✅ Already Friends</button>`;
+            } else if (h.friendship_status === 'pending_sent') {
+                actionContainer.innerHTML = `<button class="btn" disabled style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; font-weight: 700;">⏳ Friend Request Sent</button>`;
+            } else if (!currentUser) {
+                actionContainer.innerHTML = `<button class="btn btn-primary" onclick="closePublicHunterModal(); showAuthModal('login')" style="background: linear-gradient(135deg, #3b82f6, #6366f1); font-weight: 700;">🔑 Log In to Add Friend</button>`;
+            } else {
+                actionContainer.innerHTML = `<button class="btn btn-primary" onclick="sendFriendRequestFromPublicCard(${h.id})" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 700;">➕ Send Friend Request</button>`;
+            }
+        }
+
+        const modal = document.getElementById('public-hunter-modal');
+        if (modal) modal.style.display = 'flex';
+    } catch (e) {
+        console.error('Error opening public hunter modal:', e);
+        showToast('Error opening Hunter Profile');
+    }
+}
+
+function closePublicHunterModal() {
+    const modal = document.getElementById('public-hunter-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function sendFriendRequestFromPublicCard(friendId) {
+    try {
+        const res = await fetch(`${API_BASE}/api/friends/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ friend_id: friendId }),
+            credentials: 'include'
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            showToast('📩 Friend request sent successfully!');
+            const actionContainer = document.getElementById('public-hunter-friend-action');
+            if (actionContainer) {
+                actionContainer.innerHTML = `<button class="btn" disabled style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; font-weight: 700;">⏳ Friend Request Sent</button>`;
+            }
+            if (typeof loadFriends === 'function') loadFriends();
+        } else {
+            showToast(data.error || 'Failed to send friend request');
+        }
+    } catch (e) {
+        console.error('Error sending friend request:', e);
+        showToast('Error sending friend request');
+    }
 }
 
 
