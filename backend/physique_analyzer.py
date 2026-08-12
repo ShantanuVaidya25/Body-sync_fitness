@@ -50,6 +50,33 @@ Second, generate a gamified 'Quest Log' for me to achieve this build. Break this
 Please ensure the plan is realistic, safe, and progressively overloads over time. Format your response in clean Markdown with clear headers ("## Physique Breakdown", "## Daily Dailies", "## Main Story Quests", "## Side Quests", "## Level Up Milestones") so it can be rendered directly in a fitness app. Keep training advice safe, evidence-based, and appropriate for a general audience (no extreme calorie restriction, no PED references, no unsafe training advice)."""
 
 
+def enrich_body_type(body_type: str) -> str:
+    """
+    Enrich raw front-end body type selection into detailed physical baseline for AI.
+    
+    Mapping Rules:
+    - Lean / Skinny / Ectomorph: Low muscle mass, fast metabolism, beginner recovery capacity.
+    - Skinny-Fat: Moderate body fat, low underlying muscle mass.
+    - Overweight / Endomorph / Heavy: High body fat, low joint tolerance for high-impact movements.
+    - Athletic / Mesomorph / Muscular: Existing muscle base, moderate body fat, conditioned.
+    """
+    if not body_type:
+        return "Existing muscle base, moderate body fat, conditioned."
+        
+    bt = str(body_type).lower().strip().replace(' ', '').replace('-', '_').replace('/', '_')
+    
+    if 'skinnyfat' in bt or 'skinny_fat' in bt:
+        return "Moderate body fat, low underlying muscle mass."
+    elif 'ecto' in bt or 'skinny' in bt or 'lean' in bt:
+        return "Low muscle mass, fast metabolism, beginner recovery capacity."
+    elif 'endo' in bt or 'overweight' in bt or 'heavy' in bt or 'fat' in bt:
+        return "High body fat, low joint tolerance for high-impact movements."
+    elif 'meso' in bt or 'athletic' in bt or 'muscular' in bt:
+        return "Existing muscle base, moderate body fat, conditioned."
+    
+    return "Existing muscle base, moderate body fat, conditioned."
+
+
 class PhysiqueAnalyzer:
     """Generates physique-goal based Quest Logs via Google Gemini"""
 
@@ -75,7 +102,8 @@ class PhysiqueAnalyzer:
         prompt_text = MASTER_PROMPT_TEMPLATE.format(target=target_desc)
 
         if current_body_type:
-            prompt_text += f"\n\nCRITICAL ADAPTIVE CONTEXT: The user's current starting body type is **{current_body_type.upper()}**. Please adapt the workout volume, set/rep targets, rest times, and nutrition recommendations specifically for an **{current_body_type}** to transform into the target physique of **{target_desc}**."
+            enriched_baseline = enrich_body_type(current_body_type)
+            prompt_text += f"\n\nCRITICAL ADAPTIVE CONTEXT: The client's current physical baseline is: **{enriched_baseline}** ({current_body_type.upper()}). Please tailor the exercise selection, volume, and cardio recommendations to optimize results for this specific baseline as they transform into {target_desc}."
 
         contents = []
 
@@ -204,6 +232,297 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
         # Deterministic markdown parsing fallback (guarantees a 7-day split is always built)
         fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name)
         return {'success': True, 'days': fallback_days, 'fallback_used': True}
+
+    def generate_weekly_workout_json(self, 
+                                     body_type: str, 
+                                     days_per_week: int = 5, 
+                                     equipment: str = "Full Commercial Gym", 
+                                     injuries: str = "None") -> Dict:
+        """
+        Generate a weekly workout plan strictly following the Backend Fitness Programming Engine schema.
+        
+        STRICT OUTPUT FORMATTING:
+        Valid JSON payload matching:
+        {
+          "program_overview": "A 1-sentence summary of the program focus based on the body type",
+          "weekly_schedule": [
+            {
+              "day_number": 1,
+              "muscle_focus": "e.g., Push / Pull / Legs / Full Body / Rest",
+              "routine": [
+                {
+                  "exercise_name": "Exact name of movement",
+                  "sets": 3,
+                  "reps": "8-12",
+                  "rest_seconds": 90,
+                  "form_cue": "1 short sentence on form or alternative modification"
+                }
+              ]
+            }
+          ]
+        }
+        """
+        import json
+        enriched_baseline = enrich_body_type(body_type)
+        
+        prompt = f"""You are a backend fitness programming engine acting as an elite strength and conditioning coach. Your objective is to generate a highly optimized, physiologically safe, and effective weekly workout plan for a user based on their specific physical baseline and training constraints.
+
+USER PROFILE AND INPUT VARIABLES:
+- Physical Baseline Profile: {enriched_baseline}
+- Training Frequency: {days_per_week} days per week
+- Available Equipment: {equipment}
+- Known Injuries/Limitations: {injuries}
+
+PROGRAMMING RULES:
+1. Baseline Alignment: You must tailor the exercise selection strictly to the user's physical baseline. If the profile dictates low joint tolerance (e.g., overweight), do not prescribe high-impact plyometrics or heavy spinal loading. If the profile indicates low muscle mass and fast metabolism, prioritize heavy compound lifts with adequate recovery.
+2. Volume and Intensity: Modulate the set/rep schemes to match the user's implied recovery capacity. Do not prescribe advanced split routines to absolute beginners.
+3. Realistic Progression: Every exercise must include actionable rest periods and rep ranges.
+
+STRICT OUTPUT FORMATTING:
+You are a data API. You must output the requested workout plan STRICTLY as a valid JSON object. Do not output any conversational text, introductory greetings, markdown formatting outside of the JSON block, or medical disclaimers. Any output other than raw JSON will break the application architecture.
+
+The JSON payload must follow this exact structure:
+{{
+  "program_overview": "A 1-sentence summary of the program focus based on the body type",
+  "weekly_schedule": [
+    {{
+      "day_number": 1,
+      "muscle_focus": "e.g., Push / Pull / Legs / Full Body / Rest",
+      "routine": [
+        {{
+          "exercise_name": "Exact name of movement",
+          "sets": 3,
+          "reps": "8-12",
+          "rest_seconds": 90,
+          "form_cue": "1 short sentence on form or alternative modification"
+        }}
+      ]
+    }}
+  ]
+}}"""
+
+        if not self.is_configured():
+            fallback_program = self._generate_fallback_json_routine(body_type, enriched_baseline, days_per_week, equipment, injuries)
+            return {
+                'success': True,
+                'body_type': body_type,
+                'enriched_baseline': enriched_baseline,
+                'days_per_week': days_per_week,
+                'equipment': equipment,
+                'injuries': injuries,
+                'program': fallback_program,
+                'is_fallback': True
+            }
+
+        try:
+            response = self.client.models.generate_content(
+                model=MODEL_NAME,
+                contents=[prompt]
+            )
+            raw_text = response.text or ""
+            clean_text = raw_text.strip()
+            if clean_text.startswith("```json"):
+                clean_text = clean_text[7:]
+            if clean_text.startswith("```"):
+                clean_text = clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            clean_text = clean_text.strip()
+            
+            program_json = json.loads(clean_text)
+            return {
+                'success': True,
+                'body_type': body_type,
+                'enriched_baseline': enriched_baseline,
+                'days_per_week': days_per_week,
+                'equipment': equipment,
+                'injuries': injuries,
+                'program': program_json,
+                'is_fallback': False
+            }
+        except Exception as e:
+            fallback_program = self._generate_fallback_json_routine(body_type, enriched_baseline, days_per_week, equipment, injuries)
+            return {
+                'success': True,
+                'body_type': body_type,
+                'enriched_baseline': enriched_baseline,
+                'days_per_week': days_per_week,
+                'equipment': equipment,
+                'injuries': injuries,
+                'program': fallback_program,
+                'is_fallback': True,
+                'notice': f'AI generation notice: {str(e)}'
+            }
+
+    def _generate_fallback_json_routine(self, body_type: str, enriched_baseline: str, days_per_week: int, equipment: str, injuries: str) -> dict:
+        """
+        Generate deterministic fallback program adhering strictly to the JSON schema:
+        {
+          "program_overview": "...",
+          "weekly_schedule": [...]
+        }
+        """
+        bt = str(body_type).lower()
+        if 'overweight' in enriched_baseline.lower() or 'joint' in enriched_baseline.lower() or 'endo' in bt:
+            overview = "Joint-friendly low-impact program focused on fat loss, metabolic conditioning, and knee protection."
+            schedule = [
+                {
+                    "day_number": 1,
+                    "muscle_focus": "Lower Body (Joint-Friendly)",
+                    "routine": [
+                        {"exercise_name": "Box Squats", "sets": 4, "reps": "12-15", "rest_seconds": 60, "form_cue": "Sit back onto box to reduce patellar knee stress."},
+                        {"exercise_name": "Glute Bridges", "sets": 3, "reps": "15", "rest_seconds": 60, "form_cue": "Squeeze glutes at top without hyperextending lower back."}
+                    ]
+                },
+                {
+                    "day_number": 2,
+                    "muscle_focus": "Upper Body Push & Pull",
+                    "routine": [
+                        {"exercise_name": "Incline Push-Ups", "sets": 3, "reps": "12-15", "rest_seconds": 60, "form_cue": "Maintain rigid core alignment throughout set."},
+                        {"exercise_name": "Seated Lat Pulldowns", "sets": 4, "reps": "12", "rest_seconds": 60, "form_cue": "Pull with elbows down towards chest."}
+                    ]
+                },
+                {
+                    "day_number": 3,
+                    "muscle_focus": "Active Recovery / Low-Impact Cardio",
+                    "routine": [
+                        {"exercise_name": "Stationary Cycling / Incline Walking", "sets": 1, "reps": "30 mins", "rest_seconds": 0, "form_cue": "Keep steady conversational pace to maximize fat oxidation."}
+                    ]
+                },
+                {
+                    "day_number": 4,
+                    "muscle_focus": "Full Body Conditioning",
+                    "routine": [
+                        {"exercise_name": "Step-ups on Low Box", "sets": 3, "reps": "10 per leg", "rest_seconds": 60, "form_cue": "Drive through front heel, avoid pushing off back toe."},
+                        {"exercise_name": "Standing Overhead Cable / Band Press", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Press vertically while bracing abdominal wall."}
+                    ]
+                },
+                {
+                    "day_number": 5,
+                    "muscle_focus": "Rest & Mobility",
+                    "routine": [
+                        {"exercise_name": "Dynamic Hip & Hamstring Mobility Stretch", "sets": 1, "reps": "20 mins", "rest_seconds": 0, "form_cue": "Breathe deeply into stretches without bouncing."}
+                    ]
+                }
+            ]
+        elif 'fast metabolism' in enriched_baseline.lower() or 'ecto' in bt or 'skinny' in bt or 'lean' in bt:
+            overview = "High-yield compound hypertrophy program designed to maximize muscle mass and preserve energy."
+            schedule = [
+                {
+                    "day_number": 1,
+                    "muscle_focus": "Lower Body Power",
+                    "routine": [
+                        {"exercise_name": "Barbell / Heavy Goblet Squats", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Break parallel with chest high and knees tracking toes."},
+                        {"exercise_name": "Romanian Deadlifts", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Hinge at hips with flat back until stretch in hamstrings."}
+                    ]
+                },
+                {
+                    "day_number": 2,
+                    "muscle_focus": "Upper Body Heavy Compounds",
+                    "routine": [
+                        {"exercise_name": "Flat Bench Press", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Tuck elbows slightly and touch lower sternum."},
+                        {"exercise_name": "Weighted Pull-ups", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Full extension at bottom, pull chin over bar."}
+                    ]
+                },
+                {
+                    "day_number": 3,
+                    "muscle_focus": "Rest & Hypertrophy Recovery",
+                    "routine": [
+                        {"exercise_name": "Caloric Surplus Rest & Recovery", "sets": 0, "reps": "Rest", "rest_seconds": 0, "form_cue": "Prioritize sleep and protein intake."}
+                    ]
+                },
+                {
+                    "day_number": 4,
+                    "muscle_focus": "Shoulders & Back Hypertrophy",
+                    "routine": [
+                        {"exercise_name": "Overhead Barbell Press", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Squeeze glutes and press overhead without leaning back."},
+                        {"exercise_name": "Bent-over Dumbbell Rows", "sets": 4, "reps": "8", "rest_seconds": 90, "form_cue": "Pull dumbbell to hip, squeezing lats."}
+                    ]
+                },
+                {
+                    "day_number": 5,
+                    "muscle_focus": "Arms & Core Accessory",
+                    "routine": [
+                        {"exercise_name": "Incline Dumbbell Bicep Curls", "sets": 3, "reps": "10-12", "rest_seconds": 90, "form_cue": "Keep upper arms stationary and isolate bicep peak."},
+                        {"exercise_name": "Triceps Skullcrushers", "sets": 3, "reps": "10-12", "rest_seconds": 90, "form_cue": "Lower bar towards forehead keeping elbows elbowed."}
+                    ]
+                }
+            ]
+        elif 'moderate body fat, low underlying' in enriched_baseline.lower() or 'skinnyfat' in bt or 'skinny_fat' in bt:
+            overview = "Body recomposition protocol balancing strength overload with progressive metabolic conditioning."
+            schedule = [
+                {
+                    "day_number": 1,
+                    "muscle_focus": "Push / Strength Recomp",
+                    "routine": [
+                        {"exercise_name": "Barbell Bench Press", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Drive feet into floor and maintain arched upper back."},
+                        {"exercise_name": "Standing Overhead Dumbbell Press", "sets": 3, "reps": "10", "rest_seconds": 90, "form_cue": "Lock out shoulders overhead on every rep."}
+                    ]
+                },
+                {
+                    "day_number": 2,
+                    "muscle_focus": "Pull / Back & Core",
+                    "routine": [
+                        {"exercise_name": "Barbell Rows", "sets": 4, "reps": "10", "rest_seconds": 90, "form_cue": "Keep torso at 45 degree angle and pull to belly button."},
+                        {"exercise_name": "Hanging Leg Raises", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Raise legs using lower abs without momentum."}
+                    ]
+                },
+                {
+                    "day_number": 3,
+                    "muscle_focus": "Legs & Recomp Cardio",
+                    "routine": [
+                        {"exercise_name": "Barbell Back Squats", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Push through middle of foot and keep chest tall."},
+                        {"exercise_name": "Kettlebell Swing Finisher", "sets": 3, "reps": "15", "rest_seconds": 60, "form_cue": "Snap hips forward forcefully."}
+                    ]
+                },
+                {
+                    "day_number": 4,
+                    "muscle_focus": "Rest & Active Walk",
+                    "routine": [
+                        {"exercise_name": "Brisk Outdoor Walk", "sets": 1, "reps": "40 mins", "rest_seconds": 0, "form_cue": "Promote blood flow and non-exercise physical activity."}
+                    ]
+                }
+            ]
+        else:
+            overview = "Advanced Push/Pull/Legs volume accumulation program for athletic conditioning and muscle density."
+            schedule = [
+                {
+                    "day_number": 1,
+                    "muscle_focus": "Push Split",
+                    "routine": [
+                        {"exercise_name": "Barbell Bench Press", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Control 2-second eccentric phase."},
+                        {"exercise_name": "Incline Dumbbell Press", "sets": 3, "reps": "10-12", "rest_seconds": 75, "form_cue": "Focus on upper chest stretch."}
+                    ]
+                },
+                {
+                    "day_number": 2,
+                    "muscle_focus": "Pull Split",
+                    "routine": [
+                        {"exercise_name": "Barbell Deadlifts", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Pull slack out of bar before lifting."},
+                        {"exercise_name": "Weighted Pull-ups", "sets": 4, "reps": "8", "rest_seconds": 90, "form_cue": "Drive elbows down to side ribs."}
+                    ]
+                },
+                {
+                    "day_number": 3,
+                    "muscle_focus": "Legs Split",
+                    "routine": [
+                        {"exercise_name": "Barbell Back Squats", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Spread floor with feet to engage glutes."},
+                        {"exercise_name": "Bulgarian Split Squats", "sets": 3, "reps": "10 per leg", "rest_seconds": 75, "form_cue": "Keep front shin vertical."}
+                    ]
+                },
+                {
+                    "day_number": 4,
+                    "muscle_focus": "Conditioning & Rest",
+                    "routine": [
+                        {"exercise_name": "Sprint Intervals", "sets": 5, "reps": "30 sec sprint", "rest_seconds": 60, "form_cue": "Maximum effort output on bike or track."}
+                    ]
+                }
+            ]
+
+        return {
+            "program_overview": overview,
+            "weekly_schedule": schedule
+        }
 
 
 def extract_section(markdown_text: str, header: str) -> str:
@@ -335,3 +654,137 @@ def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Option
             })
             
     return days
+
+
+    def generate_weekly_workout_json(self, body_type: str) -> Dict:
+        """
+        Generate a weekly workout plan strictly as a JSON array tailored to enriched body type.
+        
+        Strict System Prompt:
+        Act as an elite strength and conditioning coach. Generate a weekly workout plan for a new client.
+        The client's current physical baseline is: [Insert Enriched Body Type Variable].
+        You must tailor the exercise selection, volume, and cardio recommendations to optimize results for this specific baseline.
+        Output the routine strictly as a JSON array containing day of the week, exercise name, sets, reps, and rest periods. Do not include introductory text or disclaimers.
+        """
+        import json
+        enriched_baseline = enrich_body_type(body_type)
+        
+        prompt = f"""Act as an elite strength and conditioning coach. Generate a weekly workout plan for a new client.
+The client's current physical baseline is: {enriched_baseline}
+You must tailor the exercise selection, volume, and cardio recommendations to optimize results for this specific baseline.
+Output the routine strictly as a JSON array containing day of the week, exercise name, sets, reps, and rest periods. Do not include introductory text or disclaimers."""
+
+        if not self.is_configured():
+            fallback_routine = self._generate_fallback_json_routine(body_type, enriched_baseline)
+            return {
+                'success': True,
+                'body_type': body_type,
+                'enriched_baseline': enriched_baseline,
+                'routine': fallback_routine,
+                'is_fallback': True
+            }
+
+        try:
+            response = self.client.models.generate_content(
+                model=MODEL_NAME,
+                contents=[prompt]
+            )
+            raw_text = response.text or ""
+            clean_text = raw_text.strip()
+            if clean_text.startswith("```json"):
+                clean_text = clean_text[7:]
+            if clean_text.startswith("```"):
+                clean_text = clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            clean_text = clean_text.strip()
+            
+            routine_json = json.loads(clean_text)
+            return {
+                'success': True,
+                'body_type': body_type,
+                'enriched_baseline': enriched_baseline,
+                'routine': routine_json,
+                'is_fallback': False
+            }
+        except Exception as e:
+            fallback_routine = self._generate_fallback_json_routine(body_type, enriched_baseline)
+            return {
+                'success': True,
+                'body_type': body_type,
+                'enriched_baseline': enriched_baseline,
+                'routine': fallback_routine,
+                'is_fallback': True,
+                'notice': f'AI generation notice: {str(e)}'
+            }
+
+    def _generate_fallback_json_routine(self, body_type: str, enriched_baseline: str) -> list:
+        """
+        Generate deterministic JSON array fallback routine adhering to enriched body type rules:
+        - Lean/Skinny: Hypertrophy, heavy compound lifts, minimal cardio, longer rest periods (90-120s)
+        - Skinny-Fat: Body recomposition, progressive overload, moderate metabolic conditioning (60-90s)
+        - Overweight: Fat loss, joint-friendly variations (box squats, incline pushups), higher cardio, 60s rest
+        - Athletic: Advanced Push/Pull/Legs split, volume accumulation, specialized accessory work
+        """
+        bt = str(body_type).lower()
+        if 'overweight' in enriched_baseline.lower() or 'joint' in enriched_baseline.lower() or 'endo' in bt:
+            return [
+                {"day_of_week": "Monday", "exercise_name": "Box Squats (Joint-Friendly)", "sets": 4, "reps": "12-15", "rest_period": "60s"},
+                {"day_of_week": "Monday", "exercise_name": "Incline Push-Ups", "sets": 3, "reps": "12-15", "rest_period": "60s"},
+                {"day_of_week": "Monday", "exercise_name": "Stationary Bike / Incline Walking Cardio", "sets": 1, "reps": "25 mins", "rest_period": "60s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Seated Resistance Cable / Band Rows", "sets": 4, "reps": "15", "rest_period": "60s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Step-ups on Low Box", "sets": 3, "reps": "12 per leg", "rest_period": "60s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Rowing Machine / Low-Impact Cardio", "sets": 1, "reps": "20 mins", "rest_period": "60s"},
+                {"day_of_week": "Wednesday", "exercise_name": "Active Recovery Stretch & Mobility", "sets": 1, "reps": "30 mins", "rest_period": "None"},
+                {"day_of_week": "Thursday", "exercise_name": "Glute Bridges & Hamstring Curls", "sets": 4, "reps": "15", "rest_period": "60s"},
+                {"day_of_week": "Thursday", "exercise_name": "Dumbbell Overhead Press (Seated)", "sets": 3, "reps": "12", "rest_period": "60s"},
+                {"day_of_week": "Thursday", "exercise_name": "Water Aerobics / Elliptical Cardio", "sets": 1, "reps": "25 mins", "rest_period": "60s"},
+                {"day_of_week": "Friday", "exercise_name": "Wall Sits & Standing Calf Raises", "sets": 3, "reps": "45 sec hold / 20 reps", "rest_period": "60s"},
+                {"day_of_week": "Friday", "exercise_name": "Lat Pulldowns / Assisted Pulls", "sets": 4, "reps": "12", "rest_period": "60s"},
+                {"day_of_week": "Saturday", "exercise_name": "Brisk Walking & Core Stabilization", "sets": 1, "reps": "35 mins", "rest_period": "60s"},
+                {"day_of_week": "Sunday", "exercise_name": "Full Rest & Recovery Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
+            ]
+        elif 'fast metabolism' in enriched_baseline.lower() or 'ecto' in bt or 'skinny' in bt or 'lean' in bt:
+            return [
+                {"day_of_week": "Monday", "exercise_name": "Barbell / Heavy Goblet Squats", "sets": 4, "reps": "6-8", "rest_period": "120s"},
+                {"day_of_week": "Monday", "exercise_name": "Flat Bench Press", "sets": 4, "reps": "6-8", "rest_period": "120s"},
+                {"day_of_week": "Monday", "exercise_name": "Weighted Dips", "sets": 3, "reps": "8-10", "rest_period": "90s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Barbell / Heavy Dumbbell Deadlifts", "sets": 4, "reps": "5", "rest_period": "120s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Weighted Pull-ups", "sets": 4, "reps": "6-8", "rest_period": "120s"},
+                {"day_of_week": "Wednesday", "exercise_name": "Hypertrophy Caloric Rest & Recovery", "sets": 0, "reps": "Rest", "rest_period": "None"},
+                {"day_of_week": "Thursday", "exercise_name": "Overhead Shoulder Press", "sets": 4, "reps": "6-8", "rest_period": "120s"},
+                {"day_of_week": "Thursday", "exercise_name": "Incline Dumbbell Press", "sets": 3, "reps": "8-10", "rest_period": "90s"},
+                {"day_of_week": "Friday", "exercise_name": "Romanian Deadlifts & Hamstring Curls", "sets": 4, "reps": "8-10", "rest_period": "90s"},
+                {"day_of_week": "Friday", "exercise_name": "Heavy Dumbbell Rows", "sets": 4, "reps": "8", "rest_period": "90s"},
+                {"day_of_week": "Saturday", "exercise_name": "Barbell Bicep Curls & Skullcrushers", "sets": 3, "reps": "10-12", "rest_period": "90s"},
+                {"day_of_week": "Sunday", "exercise_name": "Full Muscle Growth Rest Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
+            ]
+        elif 'moderate body fat, low underlying' in enriched_baseline.lower() or 'skinnyfat' in bt or 'skinny_fat' in bt:
+            return [
+                {"day_of_week": "Monday", "exercise_name": "Barbell Squats", "sets": 4, "reps": "8-10", "rest_period": "90s"},
+                {"day_of_week": "Monday", "exercise_name": "Push-Ups / Bench Press", "sets": 4, "reps": "10-12", "rest_period": "90s"},
+                {"day_of_week": "Monday", "exercise_name": "Kettlebell Swing Conditioning", "sets": 3, "reps": "15", "rest_period": "60s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Bent-over Barbell Rows", "sets": 4, "reps": "10", "rest_period": "90s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Bulgarian Split Squats", "sets": 3, "reps": "10 per leg", "rest_period": "60s"},
+                {"day_of_week": "Wednesday", "exercise_name": "Active Recovery Walk & Stretching", "sets": 1, "reps": "30 mins", "rest_period": "None"},
+                {"day_of_week": "Thursday", "exercise_name": "Dumbbell Shoulder Press", "sets": 4, "reps": "10", "rest_period": "90s"},
+                {"day_of_week": "Thursday", "exercise_name": "Bodyweight Dips & Chin-ups", "sets": 3, "reps": "10", "rest_period": "60s"},
+                {"day_of_week": "Friday", "exercise_name": "Romanian Deadlifts", "sets": 4, "reps": "10", "rest_period": "90s"},
+                {"day_of_week": "Friday", "exercise_name": "HIIT Bodyweight Circuit", "sets": 4, "reps": "45 sec work", "rest_period": "45s"},
+                {"day_of_week": "Saturday", "exercise_name": "Core Recomp (Planks & Russian Twists)", "sets": 4, "reps": "60s hold / 20 reps", "rest_period": "60s"},
+                {"day_of_week": "Sunday", "exercise_name": "Recomposition Rest & Recovery Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
+            ]
+        else:
+            return [
+                {"day_of_week": "Monday", "exercise_name": "Push: Barbell Bench Press", "sets": 4, "reps": "8-10", "rest_period": "90s"},
+                {"day_of_week": "Monday", "exercise_name": "Push: Overhead Dumbbell Press", "sets": 4, "reps": "10", "rest_period": "90s"},
+                {"day_of_week": "Monday", "exercise_name": "Push: Incline Chest Flyes & Dips", "sets": 3, "reps": "12", "rest_period": "60s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Pull: Barbell Deadlifts", "sets": 4, "reps": "6-8", "rest_period": "120s"},
+                {"day_of_week": "Tuesday", "exercise_name": "Pull: Weighted Pull-ups & Cable Rows", "sets": 4, "reps": "8-10", "rest_period": "90s"},
+                {"day_of_week": "Wednesday", "exercise_name": "Legs: Barbell Back Squats", "sets": 4, "reps": "8-10", "rest_period": "90s"},
+                {"day_of_week": "Wednesday", "exercise_name": "Legs: Romanian Deadlifts & Walking Lunges", "sets": 4, "reps": "10", "rest_period": "90s"},
+                {"day_of_week": "Thursday", "exercise_name": "Active Recovery & Mobility Work", "sets": 1, "reps": "30 mins", "rest_period": "None"},
+                {"day_of_week": "Friday", "exercise_name": "Hypertrophy Upper Body Accessories", "sets": 4, "reps": "12-15", "rest_period": "60s"},
+                {"day_of_week": "Saturday", "exercise_name": "Athletic Conditioning & Sprint Intervals", "sets": 5, "reps": "30s sprint", "rest_period": "60s"},
+                {"day_of_week": "Sunday", "exercise_name": "Advanced Athlete Rest & Reset Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
+            ]

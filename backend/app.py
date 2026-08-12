@@ -1047,6 +1047,33 @@ def physique_history():
     return jsonify({'history': history})
 
 
+@app.route('/api/workout/generate-by-bodytype', methods=['POST'])
+@login_required
+def generate_workout_by_bodytype():
+    """
+    Backend Fitness Programming Engine Endpoint
+    Generates a highly optimized, physiologically safe, and effective weekly workout plan.
+    """
+    from physique_analyzer import PhysiqueAnalyzer
+    data = request.get_json() or {}
+    user_id = session.get('user_id')
+    user_stats = stats_manager.get_player_stats(user_id) or {}
+    
+    body_type = data.get('body_type') or user_stats.get('body_type', 'mesomorph')
+    days_per_week = data.get('days_per_week') or user_stats.get('days_per_week', 5)
+    equipment = data.get('equipment') or "Full Commercial Gym"
+    injuries = data.get('injuries') or "None"
+    
+    analyzer = PhysiqueAnalyzer()
+    result = analyzer.generate_weekly_workout_json(
+        body_type=body_type,
+        days_per_week=days_per_week,
+        equipment=equipment,
+        injuries=injuries
+    )
+    return jsonify(result)
+
+
 @app.route('/api/physique/<int:quest_log_id>/activate', methods=['POST'])
 @login_required
 def activate_physique_quest(quest_log_id):
