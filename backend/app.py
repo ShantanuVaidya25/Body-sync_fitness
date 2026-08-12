@@ -1850,12 +1850,69 @@ def admin_get_exercises():
 @app.route('/api/penalty/status', methods=['GET'])
 @login_required
 def get_penalty_status():
-    """Check if user currently has an active Penalty Zone quest"""
+    """Check if user currently has an active Penalty Zone quest or if they missed a past daily workout"""
     user_id = session.get('user_id')
+    
+    # 1. Check for existing active penalty
     penalty = penalty_manager.get_active_penalty(user_id)
+    
+    # 2. If no active penalty, check if user missed a previous daily workout
+    if not penalty:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        
+        cursor.execute('''
+            SELECT * FROM daily_quests 
+            WHERE user_id = ? AND quest_date < ? AND completed = 0
+            ORDER BY quest_date DESC LIMIT 1
+        ''', (user_id, today_str))
+        missed_quest = cursor.fetchone()
+        conn.close()
+        
+        if missed_quest:
+            try:
+                quest_data = json.loads(missed_quest['quest_data']) if isinstance(missed_quest['quest_data'], str) else (missed_quest['quest_data'] or {})
+                is_rest = quest_data.get('is_rest', False) or 'Rest' in quest_data.get('title', '')
+            except Exception:
+                is_rest = False
+                
+            if not is_rest:
+                penalty_quest_data = quest_generator.generate_penalty_quest(user_id)
+                penalty = penalty_manager.create_penalty(
+                    user_id=user_id,
+                    quest_data=penalty_quest_data,
+                    duration_hours=4,
+                    reason=f"Missed Daily Workout Protocol ({missed_quest['quest_date']})"
+                )
+                print(f"🚨 Automatic Penalty triggered for user ID {user_id} (Missed workout on {missed_quest['quest_date']})")
+                
     return jsonify({
         'success': True,
         'has_penalty': penalty is not None and penalty.get('status') == 'active',
+        'penalty': penalty
+    })
+
+
+@app.route('/api/quest/skip', methods=['POST'])
+@login_required
+def skip_workout():
+    """Skip today's workout and trigger Penalty Zone emergency quest"""
+    user_id = session.get('user_id')
+    username = session.get('username', 'Unknown')
+    
+    quest_data = quest_generator.generate_penalty_quest(user_id)
+    penalty = penalty_manager.create_penalty(
+        user_id=user_id,
+        quest_data=quest_data,
+        duration_hours=4,
+        reason="Skipped Daily Workout Protocol"
+    )
+    print(f"🚨 User '{username}' skipped workout -> Penalty Zone Initiated (ID: {penalty.get('id')})")
+    
+    return jsonify({
+        'success': True,
+        'message': 'WARNING: Workout skipped! Emergency Penalty Zone initiated.',
         'penalty': penalty
     })
 
