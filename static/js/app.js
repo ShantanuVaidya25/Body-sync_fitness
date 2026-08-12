@@ -3461,6 +3461,11 @@ async function launchRoutineWorkout(routineId) {
 
 let currentPenaltyId = null;
 
+function closePenaltyModal() {
+    const modal = document.getElementById('penalty-zone-modal');
+    if (modal) modal.style.display = 'none';
+}
+
 async function checkPenaltyStatus() {
     if (!currentUser) return;
     try {
