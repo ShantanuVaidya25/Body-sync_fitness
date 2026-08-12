@@ -455,36 +455,12 @@
                     </div>
 
                     <div class="stat-points-section" id="stat-points-section" style="display: none;">
-                        <div class="stat-points-banner">
-                            <div class="stat-points-title">
-                                <span class="stat-pulse-icon">⚡</span>
-                                <span>SYSTEM NOTIFICATION: UNSPENT ATTRIBUTE POINTS</span>
-                            </div>
-                            <div class="stat-points-counter">
-                                <span id="available-points">0</span> <small>POINTS</small>
-                            </div>
-                        </div>
-                        <div class="stat-allocation-grid">
-                            <button class="stat-alloc-btn btn-str" onclick="allocateStatPoint('strength')">
-                                <span class="stat-alloc-icon">💪</span>
-                                <span class="stat-alloc-label">STR</span>
-                                <span class="stat-alloc-add">+1</span>
-                            </button>
-                            <button class="stat-alloc-btn btn-end" onclick="allocateStatPoint('endurance')">
-                                <span class="stat-alloc-icon">🏃</span>
-                                <span class="stat-alloc-label">END</span>
-                                <span class="stat-alloc-add">+1</span>
-                            </button>
-                            <button class="stat-alloc-btn btn-agi" onclick="allocateStatPoint('agility')">
-                                <span class="stat-alloc-icon">⚡</span>
-                                <span class="stat-alloc-label">AGI</span>
-                                <span class="stat-alloc-add">+1</span>
-                            </button>
-                            <button class="stat-alloc-btn btn-vit" onclick="allocateStatPoint('vitality')">
-                                <span class="stat-alloc-icon">❤️</span>
-                                <span class="stat-alloc-label">VIT</span>
-                                <span class="stat-alloc-add">+1</span>
-                            </button>
+                        <h4>Available Stat Points: <span id="available-points">0</span></h4>
+                        <div class="stat-allocation">
+                            <button onclick="allocateStatPoint('strength')">+💪</button>
+                            <button onclick="allocateStatPoint('endurance')">+🏃</button>
+                            <button onclick="allocateStatPoint('agility')">+⚡</button>
+                            <button onclick="allocateStatPoint('vitality')">+❤️</button>
                         </div>
                     </div>
                 </div>
@@ -1656,6 +1632,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="/static/js/app.js?v=20260812_15"></script>
+    <script src="/static/js/app.js?v=20260812_14"></script>
 </body>
 </html>
