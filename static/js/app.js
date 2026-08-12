@@ -341,9 +341,6 @@ async function loadDashboard() {
         // Load today's quest preview
         await loadTodaysQuest();
         
-        // Check for active Penalty Zone status
-        await checkPenaltyStatus();
-        
         // Set username
         if (document.getElementById('nav-username')) document.getElementById('nav-username').textContent = currentUser.username;
         if (document.getElementById('nav-username-mobile')) document.getElementById('nav-username-mobile').textContent = currentUser.username;
@@ -355,7 +352,7 @@ async function loadDashboard() {
         // Check for pending friend requests & notification badge
         checkPendingBadgeNotification();
         if (!window._socialNotificationInterval) {
-            window._socialNotificationInterval = setInterval(checkPendingBadgeNotification, 15000);
+            window._socialNotificationInterval = setInterval(checkPendingBadgeNotification, 60000);
         }
     } catch (error) {
         console.error('Failed to load dashboard:', error);
