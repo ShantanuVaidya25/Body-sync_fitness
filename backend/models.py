@@ -88,6 +88,7 @@ class Database:
                 days_per_week INTEGER DEFAULT 5,
                 body_type TEXT DEFAULT 'mesomorph',
                 injuries TEXT DEFAULT 'None',
+                equipment TEXT DEFAULT 'Full Commercial Gym',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
@@ -343,7 +344,8 @@ class Database:
             'experience_level': "ALTER TABLE player_stats ADD COLUMN experience_level TEXT DEFAULT 'beginner'",
             'days_per_week': "ALTER TABLE player_stats ADD COLUMN days_per_week INTEGER DEFAULT 5",
             'body_type': "ALTER TABLE player_stats ADD COLUMN body_type TEXT DEFAULT 'mesomorph'",
-            'injuries': "ALTER TABLE player_stats ADD COLUMN injuries TEXT DEFAULT 'None'"
+            'injuries': "ALTER TABLE player_stats ADD COLUMN injuries TEXT DEFAULT 'None'",
+            'equipment': "ALTER TABLE player_stats ADD COLUMN equipment TEXT DEFAULT 'Full Commercial Gym'"
         }
         
         for col, sql in migrations.items():
@@ -626,7 +628,8 @@ class PlayerStats:
                            experience_level: str = 'beginner',
                            days_per_week: int = 5,
                            body_type: str = 'mesomorph',
-                           injuries: str = 'None') -> bool:
+                           injuries: str = 'None',
+                           equipment: str = 'Full Commercial Gym') -> bool:
         """Create initial player stats"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
@@ -636,12 +639,12 @@ class PlayerStats:
                 INSERT INTO player_stats 
                 (user_id, age, height_cm, weight_kg, initial_height, initial_weight,
                  target_height, target_weight, primary_focus_areas, experience_level,
-                 days_per_week, body_type, injuries)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 days_per_week, body_type, injuries, equipment)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (user_id, age, height_cm, weight_kg, height_cm, weight_kg,
                   target_height or height_cm, target_weight or weight_kg,
                   json.dumps(primary_focus_areas or []), experience_level,
-                  days_per_week, body_type, injuries or 'None'))
+                  days_per_week, body_type, injuries or 'None', equipment or 'Full Commercial Gym'))
             conn.commit()
             conn.close()
             return True

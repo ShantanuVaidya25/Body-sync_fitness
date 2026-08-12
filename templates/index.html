@@ -241,6 +241,32 @@
                 </div>
                 <div id="objective-path-error" class="error-message"></div>
 
+                <h3>🏋️ Workout Location & Equipment Access</h3>
+                <p class="info-text">Select where you plan to train and what equipment you have access to. Your workout routines will only prescribe exercises you can actually perform.</p>
+
+                <div class="equipment-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 25px;">
+                    <label class="equipment-card" style="background: rgba(15, 23, 42, 0.7); border: 2px solid rgba(255, 255, 255, 0.08); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer;">
+                        <input type="radio" name="setup-equipment" value="Full Commercial Gym" checked>
+                        <div style="font-size: 1.5rem;">🏋️‍♂️</div>
+                        <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">Full Commercial Gym</div>
+                        <div style="font-size: 0.75rem; color: #94a3b8;">Barbells, dumbbells, cable machines, squat racks, and leg press.</div>
+                    </label>
+
+                    <label class="equipment-card" style="background: rgba(15, 23, 42, 0.7); border: 2px solid rgba(255, 255, 255, 0.08); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer;">
+                        <input type="radio" name="setup-equipment" value="Dumbbells Only">
+                        <div style="font-size: 1.5rem;">🧱</div>
+                        <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">Dumbbells & Home Setup</div>
+                        <div style="font-size: 0.75rem; color: #94a3b8;">Adjustable dumbbells, bench, pull-up bar, or resistance bands.</div>
+                    </label>
+
+                    <label class="equipment-card" style="background: rgba(15, 23, 42, 0.7); border: 2px solid rgba(255, 255, 255, 0.08); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer;">
+                        <input type="radio" name="setup-equipment" value="Home/Bodyweight">
+                        <div style="font-size: 1.5rem;">🏠</div>
+                        <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">Home / Bodyweight</div>
+                        <div style="font-size: 0.75rem; color: #94a3b8;">No equipment needed! Pure calisthenics, push-ups, squats & bodyweight moves.</div>
+                    </label>
+                </div>
+
                 <div class="form-row" style="margin-top: 20px;">
                     <div class="form-group">
                         <label>Training Experience</label>
@@ -1547,6 +1573,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="/static/js/app.js?v=20260812_10"></script>
+    <script src="/static/js/app.js?v=20260812_11"></script>
 </body>
 </html>
