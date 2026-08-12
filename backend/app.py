@@ -966,12 +966,16 @@ def analyze_physique():
     
     user_stats = stats_manager.get_player_stats(user_id) or {}
     user_body_type = user_stats.get('body_type', 'mesomorph')
+    user_injuries = user_stats.get('injuries', 'None')
+    user_equipment = user_stats.get('equipment', 'Full Commercial Gym')
 
     try:
         result = analyzer.generate_quest_log(
             target_name=target_name,
             image_path=image_path,
-            current_body_type=user_body_type
+            current_body_type=user_body_type,
+            injuries=user_injuries,
+            equipment=user_equipment
         )
         
         if not result.get('success'):
@@ -1063,8 +1067,8 @@ def generate_workout_by_bodytype():
     
     body_type = data.get('body_type') or user_stats.get('body_type', 'mesomorph')
     days_per_week = data.get('days_per_week') or user_stats.get('days_per_week', 5)
-    equipment = data.get('equipment') or "Full Commercial Gym"
-    injuries = data.get('injuries') or "None"
+    equipment = data.get('equipment') or user_stats.get('equipment', 'Full Commercial Gym')
+    injuries = data.get('injuries') or user_stats.get('injuries', 'None')
     
     analyzer = PhysiqueAnalyzer()
     result = analyzer.generate_weekly_workout_json(

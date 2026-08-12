@@ -92,7 +92,9 @@ class PhysiqueAnalyzer:
 
     def _build_contents(self, target_name: Optional[str],
                          image_path: Optional[str],
-                         current_body_type: Optional[str] = None) -> list:
+                         current_body_type: Optional[str] = None,
+                         injuries: Optional[str] = None,
+                         equipment: Optional[str] = None) -> list:
         """Build the multimodal contents list: optional image + text prompt"""
         if target_name:
             target_desc = target_name
@@ -104,6 +106,12 @@ class PhysiqueAnalyzer:
         if current_body_type:
             enriched_baseline = enrich_body_type(current_body_type)
             prompt_text += f"\n\nCRITICAL ADAPTIVE CONTEXT: The client's current physical baseline is: **{enriched_baseline}** ({current_body_type.upper()}). Please tailor the exercise selection, volume, and cardio recommendations to optimize results for this specific baseline as they transform into {target_desc}."
+
+        if injuries and str(injuries).lower() != 'none':
+            prompt_text += f"\n\nINJURIES / MEDICAL LIMITATIONS: **{injuries}**. You MUST avoid any exercises that aggravate these conditions (e.g. no heavy spinal loading for back pain, no heavy knee-bending for knee pain). Prescribe 100% safe, joint-friendly alternative movements."
+
+        if equipment:
+            prompt_text += f"\n\nAVAILABLE EQUIPMENT ACCESS: **{equipment}**. Restrict all prescribed exercises strictly to what can be performed with this equipment access."
 
         contents = []
 
@@ -122,7 +130,9 @@ class PhysiqueAnalyzer:
 
     def generate_quest_log(self, target_name: Optional[str] = None,
                           image_path: Optional[str] = None,
-                          current_body_type: Optional[str] = None) -> Dict:
+                          current_body_type: Optional[str] = None,
+                          injuries: Optional[str] = None,
+                          equipment: Optional[str] = None) -> Dict:
         """
         Generate a Quest Log by analyzing a named character/person or an
         uploaded photo. Exactly one of target_name / image_path should be
@@ -141,7 +151,13 @@ class PhysiqueAnalyzer:
             }
 
         try:
-            contents = self._build_contents(target_name, image_path)
+            contents = self._build_contents(
+                target_name=target_name,
+                image_path=image_path,
+                current_body_type=current_body_type,
+                injuries=injuries,
+                equipment=equipment
+            )
 
             response = self.client.models.generate_content(
                 model=MODEL_NAME,
