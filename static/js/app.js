@@ -294,6 +294,15 @@ async function setupProfile() {
     const bodyTypeRadio = document.querySelector('input[name="setup-body-type"]:checked');
     const body_type = bodyTypeRadio ? bodyTypeRadio.value : 'mesomorph';
     
+    // Collect medical conditions & injuries
+    const selectedConditions = Array.from(document.querySelectorAll('input[name="setup-medical-condition"]:checked')).map(cb => cb.value);
+    const medicalNotesInput = document.getElementById('setup-medical-notes');
+    const medical_notes = medicalNotesInput ? medicalNotesInput.value.trim() : '';
+    
+    const injuries = (selectedConditions.length > 0 || medical_notes)
+        ? (selectedConditions.join(', ') + (medical_notes ? ` (${medical_notes})` : ''))
+        : 'None';
+    
     try {
         const response = await fetch(`${API_BASE}/api/setup-profile`, {
             method: 'POST',
@@ -301,7 +310,7 @@ async function setupProfile() {
             body: JSON.stringify({
                 age, height_cm, weight_kg, target_height, target_weight,
                 primary_focus_areas, experience_level, days_per_week,
-                body_type, initial_exercises
+                body_type, injuries, initial_exercises
             }),
             credentials: 'include'
         });

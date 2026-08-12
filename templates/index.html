@@ -262,6 +262,37 @@
                     </div>
                 </div>
 
+                <h3>🏥 Joint Pain & Medical Conditions</h3>
+                <p class="info-text">Select any joint issues or medical conditions so the System adapts exercises to be 100% safe (e.g. box squats instead of heavy barbell squats).</p>
+
+                <div class="medical-conditions-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" name="setup-medical-condition" value="knee_pain">
+                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🦵 Knee Pain / Issues</span>
+                    </label>
+                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" name="setup-medical-condition" value="back_pain">
+                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🪵 Lower Back Pain</span>
+                    </label>
+                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" name="setup-medical-condition" value="shoulder_pain">
+                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🦾 Shoulder Discomfort</span>
+                    </label>
+                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" name="setup-medical-condition" value="wrist_elbow_pain">
+                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🖐️ Wrist / Elbow Pain</span>
+                    </label>
+                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" name="setup-medical-condition" value="asthma_cardio">
+                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🫁 Asthma / Low Stamina</span>
+                    </label>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 25px;">
+                    <label style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; display: block;">Other Specific Injuries or Medical Notes (Optional)</label>
+                    <input type="text" id="setup-medical-notes" placeholder="e.g. Recovering from ankle sprain, high blood pressure, etc." style="width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: #fff;">
+                </div>
+
                 <h3>💪 Current Exercise Capabilities</h3>
                 <p class="info-text">Tell us what you can currently do. This helps us generate appropriate quests.</p>
                 
@@ -1516,6 +1547,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="/static/js/app.js?v=20260812_09"></script>
+    <script src="/static/js/app.js?v=20260812_10"></script>
 </body>
 </html>

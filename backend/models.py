@@ -87,6 +87,7 @@ class Database:
                 experience_level TEXT DEFAULT 'beginner',
                 days_per_week INTEGER DEFAULT 5,
                 body_type TEXT DEFAULT 'mesomorph',
+                injuries TEXT DEFAULT 'None',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
@@ -341,7 +342,8 @@ class Database:
             'primary_focus_areas': "ALTER TABLE player_stats ADD COLUMN primary_focus_areas TEXT",
             'experience_level': "ALTER TABLE player_stats ADD COLUMN experience_level TEXT DEFAULT 'beginner'",
             'days_per_week': "ALTER TABLE player_stats ADD COLUMN days_per_week INTEGER DEFAULT 5",
-            'body_type': "ALTER TABLE player_stats ADD COLUMN body_type TEXT DEFAULT 'mesomorph'"
+            'body_type': "ALTER TABLE player_stats ADD COLUMN body_type TEXT DEFAULT 'mesomorph'",
+            'injuries': "ALTER TABLE player_stats ADD COLUMN injuries TEXT DEFAULT 'None'"
         }
         
         for col, sql in migrations.items():
@@ -623,7 +625,8 @@ class PlayerStats:
                            primary_focus_areas: List[str] = None,
                            experience_level: str = 'beginner',
                            days_per_week: int = 5,
-                           body_type: str = 'mesomorph') -> bool:
+                           body_type: str = 'mesomorph',
+                           injuries: str = 'None') -> bool:
         """Create initial player stats"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
@@ -633,12 +636,12 @@ class PlayerStats:
                 INSERT INTO player_stats 
                 (user_id, age, height_cm, weight_kg, initial_height, initial_weight,
                  target_height, target_weight, primary_focus_areas, experience_level,
-                 days_per_week, body_type)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 days_per_week, body_type, injuries)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (user_id, age, height_cm, weight_kg, height_cm, weight_kg,
                   target_height or height_cm, target_weight or weight_kg,
                   json.dumps(primary_focus_areas or []), experience_level,
-                  days_per_week, body_type))
+                  days_per_week, body_type, injuries or 'None'))
             conn.commit()
             conn.close()
             return True

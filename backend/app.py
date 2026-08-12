@@ -341,6 +341,7 @@ def setup_profile():
     experience_level = data.get('experience_level', 'beginner')
     days_per_week = data.get('days_per_week', 5)
     body_type = data.get('body_type', 'mesomorph')
+    injuries = data.get('injuries', 'None')
     
     if not all([age, height_cm, weight_kg]):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -353,7 +354,7 @@ def setup_profile():
         user_id, age, height_cm, weight_kg,
         target_height, target_weight,
         primary_focus_areas, experience_level, days_per_week,
-        body_type
+        body_type, injuries
     )
     
     if not success:
