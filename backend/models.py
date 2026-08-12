@@ -761,6 +761,35 @@ class PlayerStats:
             'exp_to_next': exp_to_next,
             'stat_points': stat_points
         }
+
+    def deduct_exp(self, user_id: int, exp_amount: int) -> Dict:
+        """Deduct experience if a user unchecks a set or exercise"""
+        stats = self.get_player_stats(user_id)
+        if not stats:
+            return {'leveled_up': False}
+        
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        new_exp = max(0, stats['exp'] - exp_amount)
+        
+        cursor.execute('''
+            UPDATE player_stats 
+            SET exp = ?, updated_at = ?
+            WHERE user_id = ?
+        ''', (new_exp, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            'leveled_up': False,
+            'levels_gained': 0,
+            'new_level': stats['level'],
+            'current_exp': new_exp,
+            'exp_to_next': stats['exp_to_next_level'],
+            'stat_points': stats['stat_points']
+        }
     
     def allocate_stat_points(self, user_id: int, strength: int = 0, 
                             endurance: int = 0, agility: int = 0, 

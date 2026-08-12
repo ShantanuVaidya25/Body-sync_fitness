@@ -609,6 +609,80 @@ def get_weekly_schedule():
     return jsonify(schedule_data)
 
 
+@app.route('/api/quest/log-set-completion', methods=['POST'])
+@login_required
+def log_set_completion():
+    """Real-time EXP allocation as soon as 1 set or 1 exercise task is completed or uncompleted"""
+    user_id = session['user_id']
+    data = request.json or {}
+    
+    quest_id = data.get('quest_id')
+    set_key = data.get('set_key')  # e.g. "ex0_set1" or "ex0_master"
+    action = data.get('action', 'completed')  # 'completed' or 'uncompleted'
+    exercise_name = data.get('exercise_name', 'Exercise')
+    
+    if not quest_id or set_key is None:
+        return jsonify({'error': 'Missing required fields'}), 400
+        
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM daily_quests WHERE id = ? AND user_id = ?', (quest_id, user_id))
+    quest_row = cursor.fetchone()
+    if not quest_row:
+        conn.close()
+        return jsonify({'error': 'Quest not found'}), 404
+        
+    quest_data = json.loads(quest_row['quest_data'])
+    completed_sets = set(quest_data.get('completed_sets', []))
+    
+    # Calculate EXP per set/task
+    total_sets = 0
+    for ex in quest_data.get('exercises', []):
+        total_sets += ex.get('sets', 3)
+    total_sets = max(1, total_sets)
+    
+    exp_reward = quest_data.get('exp_reward', 100)
+    set_exp = max(5, int(exp_reward / total_sets))
+    
+    level_result = {'leveled_up': False}
+    exp_gained = 0
+    
+    if action == 'completed':
+        if set_key not in completed_sets:
+            completed_sets.add(set_key)
+            exp_gained = set_exp
+            level_result = stats_manager.add_exp(user_id, set_exp)
+    else:  # uncompleted
+        if set_key in completed_sets:
+            completed_sets.remove(set_key)
+            exp_gained = -set_exp
+            level_result = stats_manager.deduct_exp(user_id, set_exp)
+            
+    quest_data['completed_sets'] = list(completed_sets)
+    
+    cursor.execute('''
+        UPDATE daily_quests
+        SET quest_data = ?
+        WHERE id = ?
+    ''', (json.dumps(quest_data), quest_id))
+    conn.commit()
+    conn.close()
+    
+    updated_stats = stats_manager.get_player_stats(user_id)
+    
+    return jsonify({
+        'success': True,
+        'action': action,
+        'set_key': set_key,
+        'exp_gained': exp_gained,
+        'exercise_name': exercise_name,
+        'stats': updated_stats,
+        'level_result': level_result,
+        'completed_sets': list(completed_sets)
+    })
+
+
 @app.route('/api/quest/complete', methods=['POST'])
 @login_required
 def complete_quest():

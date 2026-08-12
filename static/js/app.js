@@ -1062,14 +1062,122 @@ function updateExerciseCheckState(exIndex) {
     }
 }
 
+async function handleSetCheckChange(checkbox, exIndex, setIndex, exerciseName) {
+    const isChecked = checkbox.checked;
+    const setKey = `ex${exIndex}_set${setIndex}`;
+    const action = isChecked ? 'completed' : 'uncompleted';
+    
+    updateExerciseCheckState(exIndex);
+    
+    if (!currentQuest || !currentQuest.id) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/quest/log-set-completion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                quest_id: currentQuest.id,
+                exercise_index: exIndex,
+                set_index: setIndex,
+                set_key: setKey,
+                action: action,
+                exercise_name: exerciseName
+            }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            currentStats = data.stats;
+            if (currentQuest) {
+                currentQuest.completed_sets = data.completed_sets;
+            }
+            
+            updatePlayerCard(currentStats);
+            updateStatusTabCard();
+            
+            if (action === 'completed') {
+                showToast(`⚡ +${data.exp_gained} EXP! ${exerciseName} (Set ${setIndex + 1}) Completed!`);
+                if (data.level_result && data.level_result.leveled_up) {
+                    showToast(`🎉 LEVEL UP! You reached Level ${data.level_result.new_level}! (+5 Stat Points)`);
+                }
+            } else {
+                showToast(`- ${Math.abs(data.exp_gained)} EXP (${exerciseName} Set ${setIndex + 1} unchecked)`);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to log set completion:', error);
+    }
+}
+
+async function handleExerciseCheckChange(checkbox, exIndex, exerciseName) {
+    const isChecked = checkbox.checked;
+    const exKey = `ex${exIndex}_master`;
+    const action = isChecked ? 'completed' : 'uncompleted';
+    
+    const setChecks = document.querySelectorAll(`.set-complete-check[data-exercise="${exIndex}"]`);
+    setChecks.forEach(cb => { cb.checked = isChecked; });
+    updateMasterCheckboxState();
+    
+    if (!currentQuest || !currentQuest.id) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/quest/log-set-completion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                quest_id: currentQuest.id,
+                exercise_index: exIndex,
+                set_index: -1,
+                set_key: exKey,
+                action: action,
+                exercise_name: exerciseName
+            }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            currentStats = data.stats;
+            if (currentQuest) {
+                currentQuest.completed_sets = data.completed_sets;
+            }
+            
+            updatePlayerCard(currentStats);
+            updateStatusTabCard();
+            
+            if (action === 'completed') {
+                showToast(`⚡ +${data.exp_gained} EXP! ${exerciseName} Completed!`);
+                if (data.level_result && data.level_result.leveled_up) {
+                    showToast(`🎉 LEVEL UP! You reached Level ${data.level_result.new_level}! (+5 Stat Points)`);
+                }
+            } else {
+                showToast(`- ${Math.abs(data.exp_gained)} EXP (${exerciseName} unchecked)`);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to log exercise completion:', error);
+    }
+}
+
 function createExerciseCard(exercise, index) {
+    const completedSets = (currentQuest && currentQuest.completed_sets) || [];
     const setCount = exercise.sets || 3;
-    const setCheckboxes = Array.from({ length: setCount }, (_, sIndex) => `
-        <label class="set-checkbox-item" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; background: var(--dark-bg); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
-            <input type="checkbox" class="set-complete-check" data-exercise="${index}" data-set="${sIndex}" onchange="updateExerciseCheckState(${index})" style="accent-color: var(--secondary-color); cursor: pointer;">
-            <span>Set ${sIndex + 1}</span>
-        </label>
-    `).join('');
+    const setCheckboxes = Array.from({ length: setCount }, (_, sIndex) => {
+        const setKey = `ex${index}_set${sIndex}`;
+        const isChecked = completedSets.includes(setKey);
+        const safeName = (exercise.name || 'Exercise').replace(/'/g, "\\'");
+        return `
+            <label class="set-checkbox-item" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; background: var(--dark-bg); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
+                <input type="checkbox" class="set-complete-check" data-exercise="${index}" data-set="${sIndex}" ${isChecked ? 'checked' : ''} onchange="handleSetCheckChange(this, ${index}, ${sIndex}, '${safeName}')" style="accent-color: var(--secondary-color); cursor: pointer;">
+                <span>Set ${sIndex + 1}</span>
+            </label>
+        `;
+    }).join('');
+
+    const exKey = `ex${index}_master`;
+    const isExChecked = completedSets.includes(exKey);
+    const safeExName = (exercise.name || 'Exercise').replace(/'/g, "\\'");
 
     return `
         <div class="exercise-card" data-exercise-index="${index}" style="border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 15px; padding: 18px;">
@@ -1100,7 +1208,7 @@ function createExerciseCard(exercise, index) {
             </div>
             <div class="exercise-progress" style="background: rgba(16, 185, 129, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
                 <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
-                    <input type="checkbox" class="exercise-complete-check" data-index="${index}" onchange="updateMasterCheckboxState()" style="width: 18px; height: 18px; accent-color: var(--secondary-color); cursor: pointer;">
+                    <input type="checkbox" class="exercise-complete-check" data-index="${index}" ${isExChecked ? 'checked' : ''} onchange="handleExerciseCheckChange(this, ${index}, '${safeExName}')" style="width: 18px; height: 18px; accent-color: var(--secondary-color); cursor: pointer;">
                     <span>Mark ${exercise.name} as Completed</span>
                 </label>
             </div>
@@ -1109,6 +1217,11 @@ function createExerciseCard(exercise, index) {
 }
 
 function createRestExerciseCard(exercise, index) {
+    const completedSets = (currentQuest && currentQuest.completed_sets) || [];
+    const exKey = `ex${index}_master`;
+    const isExChecked = completedSets.includes(exKey);
+    const safeExName = (exercise.name || 'Rest Exercise').replace(/'/g, "\\'");
+
     return `
         <div class="exercise-card" style="border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 15px; padding: 18px;">
             <div class="exercise-header">
@@ -1118,7 +1231,7 @@ function createRestExerciseCard(exercise, index) {
             <p><strong>Duration:</strong> ${exercise.duration_minutes} minutes</p>
             <div class="exercise-progress" style="margin-top: 12px; background: rgba(16, 185, 129, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
                 <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
-                    <input type="checkbox" class="exercise-complete-check" data-index="${index}" onchange="updateMasterCheckboxState()" style="width: 18px; height: 18px; accent-color: var(--secondary-color); cursor: pointer;">
+                    <input type="checkbox" class="exercise-complete-check" data-index="${index}" ${isExChecked ? 'checked' : ''} onchange="handleExerciseCheckChange(this, ${index}, '${safeExName}')" style="width: 18px; height: 18px; accent-color: var(--secondary-color); cursor: pointer;">
                     <span>Mark ${exercise.name} as Completed</span>
                 </label>
             </div>
