@@ -2782,8 +2782,6 @@ function updateStatusTabCard() {
     }
     if (title) title.textContent = rankTitle;
     if (levelExp) levelExp.textContent = `Level ${level} • ${exp} / ${maxExp} EXP`;
-    
-    loadWeeklyActivity();
 }
 
 function openAllRanksModal() {
@@ -3455,95 +3453,9 @@ async function launchRoutineWorkout(routineId) {
     }
 }
 
-// ============================================================================
-// 🛑 PENALTY ZONE HANDLERS (AUTOMATIC DISPATCH)
-// ============================================================================
-
-let currentPenaltyId = null;
-
-function closePenaltyModal() {
-    const modal = document.getElementById('penalty-zone-modal');
-    if (modal) modal.style.display = 'none';
-}
-
 async function checkPenaltyStatus() {
-    if (!currentUser) return;
-    try {
-        const response = await fetch(`${API_BASE}/api/penalty/status`, {
-            credentials: 'include'
-        });
-        const data = await response.json();
-        if (response.ok && data.success && data.has_penalty) {
-            renderPenaltyModal(data.penalty);
-        }
-    } catch (error) {
-        console.error('Error checking penalty status:', error);
-    }
-}
-
-function renderPenaltyModal(penalty) {
-    if (!penalty) return;
-    currentPenaltyId = penalty.id;
-    
-    const modal = document.getElementById('penalty-zone-modal');
-    const titleEl = document.getElementById('penalty-modal-title');
-    const reasonEl = document.getElementById('penalty-modal-reason');
-    const rewardEl = document.getElementById('penalty-reward-text');
-    const listEl = document.getElementById('penalty-exercises-list');
-    
-    if (!modal) return;
-    
-    if (titleEl) titleEl.textContent = penalty.title || 'PENALTY QUEST INITIATED';
-    if (reasonEl) reasonEl.textContent = penalty.reason || "Skipped Daily Workout Protocol";
-    
-    const questData = typeof penalty.quest_data === 'string' ? JSON.parse(penalty.quest_data) : (penalty.quest_data || {});
-    if (rewardEl) rewardEl.textContent = `+${questData.exp_reward || 500} EXP`;
-    
-    const exercises = questData.exercises || [
-        { name: 'Push-Ups (Penalty Protocol)', target_reps: 100 },
-        { name: 'Sit-Ups (Penalty Protocol)', target_reps: 100 },
-        { name: 'Bodyweight Squats (Penalty Protocol)', target_reps: 100 },
-        { name: 'Survival Run (10 KM)', target_reps: 1 }
-    ];
-    
-    if (listEl) {
-        listEl.innerHTML = exercises.map(ex => `
-            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.04); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
-                <span style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">🏋️ ${escapeHtml(ex.name || ex.exercise_name)}</span>
-                <span style="font-weight: 800; color: #f87171; font-family: 'Orbitron', sans-serif; font-size: 0.9rem;">
-                    ${ex.target_reps ? ex.target_reps + ' reps' : (ex.reps_per_set ? ex.reps_per_set + ' reps/set' : 'Complete')}
-                </span>
-            </div>
-        `).join('');
-    }
-    
-    modal.style.display = 'flex';
-}
-
-async function completePenaltyZone() {
-    try {
-        const response = await fetch(`${API_BASE}/api/penalty/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ penalty_id: currentPenaltyId }),
-            credentials: 'include'
-        });
-        
-        const data = await response.json();
-        if (response.ok && data.success) {
-            const modal = document.getElementById('penalty-zone-modal');
-            if (modal) modal.style.display = 'none';
-            
-            if (data.stats) currentStats = data.stats;
-            showToast(`🎉 PENALTY ZONE SURVIVED! +${data.exp_gained || 500} EXP Awarded!`);
-            await loadDashboard();
-        } else {
-            showToast(data.message || 'Failed to complete penalty zone');
-        }
-    } catch (error) {
-        console.error('Error completing penalty zone:', error);
-        showToast('Failed to complete penalty zone');
-    }
+    // Penalty Zone feature disabled
+    return;
 }
 
 

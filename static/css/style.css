@@ -2718,3 +2718,9 @@ h4 {
     color: #94a3b8;
     line-height: 1.3;
 }
+
+/* Hardware Acceleration & Rendering Performance Optimizations */
+.card, .modal-content, .day-bubble, .exercise-card, .btn {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}

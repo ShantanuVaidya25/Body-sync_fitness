@@ -23,9 +23,16 @@ class Database:
         self.init_database()
     
     def get_connection(self):
-        """Create a new database connection"""
-        conn = sqlite3.connect(self.db_path)
+        """Create a new database connection with high-performance PRAGMAs"""
+        conn = sqlite3.connect(self.db_path, timeout=15.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA temp_store=MEMORY;")
+            conn.execute("PRAGMA cache_size=-64000;")
+        except Exception:
+            pass
         return conn
     
     def init_database(self):
@@ -302,6 +309,12 @@ class Database:
             )
         ''')
         
+        # Performance Indexes
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_daily_quests_user_date ON daily_quests(user_id, quest_date);')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_penalty_quests_user_status ON penalty_quests(user_id, status);')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_custom_routines_user ON custom_routines(user_id);')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_strength_calc_user ON strength_calc_history(user_id);')
+
         conn.commit()
         conn.close()
         
