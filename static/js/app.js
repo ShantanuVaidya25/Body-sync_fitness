@@ -402,8 +402,17 @@ function updatePlayerCard(stats) {
 
     const bodyTypePill = document.getElementById('player-body-type');
     if (bodyTypePill) {
-        const bType = (stats.body_type || 'mesomorph').toUpperCase().replace('_', '-');
-        bodyTypePill.textContent = `${bType} BUILD`;
+        const btMap = {
+            'ectomorph': 'SLIM & LEAN',
+            'mesomorph': 'ATHLETIC & FIT',
+            'endomorph': 'OVERWEIGHT',
+            'skinny_fat': 'SKINNY-FAT',
+            'skinnyfat': 'SKINNY-FAT',
+            'muscular': 'MUSCULAR & STRONG'
+        };
+        const rawBt = (stats.body_type || 'mesomorph').toLowerCase();
+        const friendlyBt = btMap[rawBt] || rawBt.toUpperCase().replace('_', '-');
+        bodyTypePill.textContent = `${friendlyBt} BUILD`;
     }
     
     // Quest Tab Mini Profile Bar
