@@ -2856,7 +2856,7 @@ let progressChartInstance = null;
 
 async function updateCharts() {
     const timeframeSelect = document.getElementById('chart-timeframe');
-    const days = timeframeSelect ? timeframeSelect.value : 30;
+    const days = timeframeSelect ? parseInt(timeframeSelect.value) : 30;
     
     try {
         const response = await fetch(`${API_BASE}/api/stats/progress?days=${days}`, {
@@ -2867,8 +2867,19 @@ async function updateCharts() {
         const canvas = document.getElementById('progress-chart');
         if (!canvas) return;
         
-        const labels = (data.exp_progress || []).map(item => item.date);
-        const expValues = (data.exp_progress || []).map(item => item.exp);
+        const expItems = data.exp_progress || [];
+        const labels = expItems.map((item) => {
+            if (days <= 7) {
+                // Day 1 (Aug 08)
+                return item.short_label || item.label || item.date;
+            } else if (days <= 30) {
+                // Day 1 to Day 30 / Date
+                return item.label || item.date;
+            } else {
+                return item.label || item.date;
+            }
+        });
+        const expValues = expItems.map(item => item.exp);
         
         if (progressChartInstance) {
             progressChartInstance.destroy();
@@ -2877,7 +2888,7 @@ async function updateCharts() {
         if (typeof Chart !== 'undefined') {
             const ctx = canvas.getContext('2d');
             const gradient = ctx.createLinearGradient(0, 0, 0, 260);
-            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.45)');
             gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
 
             progressChartInstance = new Chart(ctx, {
@@ -2885,17 +2896,17 @@ async function updateCharts() {
                 data: {
                     labels: labels.length > 0 ? labels : ['No Data'],
                     datasets: [{
-                        label: 'EXP Progress',
+                        label: `${days}-Day EXP Curve`,
                         data: expValues.length > 0 ? expValues : [0],
                         borderColor: '#6366f1',
                         borderWidth: 3,
                         backgroundColor: gradient,
                         fill: true,
-                        tension: 0.35,
-                        pointBackgroundColor: '#38bdf8',
-                        pointBorderColor: '#6366f1',
-                        pointBorderWidth: 2,
-                        pointRadius: 5,
+                        tension: 0.3,
+                        pointBackgroundColor: expItems.map(it => (it.daily_gain > 0 ? '#38bdf8' : 'rgba(99, 102, 241, 0.5)')),
+                        pointBorderColor: expItems.map(it => (it.daily_gain > 0 ? '#ffffff' : '#6366f1')),
+                        pointBorderWidth: expItems.map(it => (it.daily_gain > 0 ? 2 : 1)),
+                        pointRadius: days <= 7 ? 6 : (days <= 30 ? 3.5 : 2),
                         pointHoverRadius: 8
                     }]
                 },
@@ -2917,12 +2928,37 @@ async function updateCharts() {
                             bodyColor: '#f8fafc',
                             borderColor: '#6366f1',
                             borderWidth: 1,
-                            padding: 10
+                            padding: 12,
+                            callbacks: {
+                                title: function(context) {
+                                    const index = context[0].dataIndex;
+                                    const item = expItems[index];
+                                    if (item) {
+                                        return `${item.label} (Day ${item.day_index}/${days})`;
+                                    }
+                                    return context[0].label;
+                                },
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const item = expItems[index];
+                                    const lines = [`Total EXP: ${context.parsed.y} EXP`];
+                                    if (item && item.daily_gain > 0) {
+                                        lines.push(`⚡ Gained Today: +${item.daily_gain} EXP`);
+                                    }
+                                    return lines;
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: { 
-                            ticks: { color: '#94a3b8', font: { size: 11 } }, 
+                            ticks: { 
+                                color: '#94a3b8', 
+                                font: { size: days <= 7 ? 10.5 : 9 },
+                                autoSkip: days > 7,
+                                maxTicksLimit: days <= 7 ? 7 : (days <= 30 ? 15 : 12),
+                                maxRotation: days <= 7 ? 0 : 45
+                            }, 
                             grid: { color: 'rgba(255, 255, 255, 0.05)' } 
                         },
                         y: { 

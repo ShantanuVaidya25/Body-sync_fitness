@@ -1698,21 +1698,26 @@ def get_user_profile(user_id):
 @app.route('/api/stats/progress', methods=['GET'])
 @login_required
 def get_progress_data():
-    """Get progress data for charts"""
+    """Get continuous day-by-day progress data for charts (7 parts for 7 days, 30 parts for 30 days)"""
     user_id = session['user_id']
     days = request.args.get('days', 30, type=int)
+    days_count = max(1, min(days, 365))
     
     conn = db.get_connection()
     cursor = conn.cursor()
+    
+    today = datetime.now().date()
+    start_date = today - timedelta(days=days_count - 1)
+    start_date_str = start_date.strftime('%Y-%m-%d')
     
     # 1. Gather all activity dates and EXP gains from daily_quests
     cursor.execute('''
         SELECT id, quest_date, completed, completed_at, exp_reward, quest_data
         FROM daily_quests
         WHERE user_id = ? 
-        AND quest_date >= date('now', ? || ' days')
+        AND quest_date >= ?
         ORDER BY quest_date ASC
-    ''', (user_id, -days))
+    ''', (user_id, start_date_str))
     quest_rows = cursor.fetchall()
     
     daily_exp_map = {}
@@ -1735,7 +1740,6 @@ def get_progress_data():
             daily_exp_map[q_date] = daily_exp_map.get(q_date, 0) + reward
             daily_workout_map[q_date] = daily_workout_map.get(q_date, 0) + 1
         elif len(completed_sets) > 0:
-            # Partial set EXP
             total_sets = sum(ex.get('sets', 3) for ex in q_data.get('exercises', [])) or 1
             earned = max(5, int(reward / total_sets)) * len(completed_sets)
             daily_exp_map[q_date] = daily_exp_map.get(q_date, 0) + earned
@@ -1746,9 +1750,9 @@ def get_progress_data():
         SELECT workout_date, exp_gained, total_exercises
         FROM workout_history
         WHERE user_id = ?
-        AND workout_date >= date('now', ? || ' days')
+        AND workout_date >= ?
         ORDER BY workout_date ASC
-    ''', (user_id, -days))
+    ''', (user_id, start_date_str))
     for wh in cursor.fetchall():
         w_date = wh['workout_date']
         w_exp = wh['exp_gained'] or 50
@@ -1762,9 +1766,9 @@ def get_progress_data():
         SELECT DATE(completed_at) as c_date, COUNT(*) as cnt
         FROM quest_completions
         WHERE user_id = ?
-        AND DATE(completed_at) >= date('now', ? || ' days')
+        AND DATE(completed_at) >= ?
         GROUP BY DATE(completed_at)
-    ''', (user_id, -days))
+    ''', (user_id, start_date_str))
     for qc in cursor.fetchall():
         c_date = qc['c_date']
         if c_date and c_date not in daily_exp_map:
@@ -1772,28 +1776,50 @@ def get_progress_data():
         if c_date and c_date not in daily_workout_map:
             daily_workout_map[c_date] = 1
 
-    # Build sorted progressive timeline
-    sorted_dates = sorted(daily_exp_map.keys())
+    # Generate continuous day-by-day sequence for exactly days_count parts
     exp_data = []
+    workout_data = []
     running_total = 0
     
-    # If no workout activity in range, anchor with current stats
-    if not sorted_dates:
-        stats = stats_manager.get_player_stats(user_id)
-        if stats and (stats.get('level', 1) > 1 or stats.get('exp', 0) > 0):
-            today_str = datetime.now().strftime('%Y-%m-%d')
-            total_hunter_exp = ((stats.get('level', 1) - 1) * 100) + stats.get('exp', 0)
-            exp_data.append({'date': today_str, 'exp': total_hunter_exp})
-    else:
-        for d in sorted_dates:
-            running_total += daily_exp_map[d]
-            exp_data.append({'date': d, 'exp': running_total})
+    for i in range(days_count):
+        cur_date = start_date + timedelta(days=i)
+        date_str = cur_date.strftime('%Y-%m-%d')
+        
+        # Format labels
+        if days_count <= 7:
+            label = cur_date.strftime('%a, %b %d')
+            short_label = f"Day {i+1} ({cur_date.strftime('%b %d')})"
+        elif days_count <= 30:
+            label = cur_date.strftime('%b %d')
+            short_label = f"Day {i+1}"
+        else:
+            label = cur_date.strftime('%b %d')
+            short_label = cur_date.strftime('%m/%d')
             
-    workout_data = [{'date': d, 'workouts': daily_workout_map.get(d, 1)} for d in sorted_dates]
+        daily_gained = daily_exp_map.get(date_str, 0)
+        running_total += daily_gained
+        workouts_done = daily_workout_map.get(date_str, 0)
+        
+        exp_data.append({
+            'date': date_str,
+            'label': label,
+            'short_label': short_label,
+            'day_index': i + 1,
+            'daily_gain': daily_gained,
+            'exp': running_total
+        })
+        
+        workout_data.append({
+            'date': date_str,
+            'label': label,
+            'workouts': workouts_done
+        })
+        
     conn.close()
     
     return jsonify({
         'success': True,
+        'timeframe_days': days_count,
         'exp_progress': exp_data,
         'workout_completions': workout_data
     })
