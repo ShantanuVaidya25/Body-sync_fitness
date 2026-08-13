@@ -879,6 +879,58 @@ class PlayerStats:
         conn.close()
         return True
 
+    def update_player_stats_settings(self, user_id: int, age: int = None,
+                                     height_cm: float = None, weight_kg: float = None,
+                                     target_weight: float = None, days_per_week: int = None,
+                                     experience_level: str = None, injuries: str = None,
+                                     equipment: str = None) -> bool:
+        """Update configurable player stats settings"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        updates = []
+        params = []
+        
+        if age is not None:
+            updates.append('age = ?')
+            params.append(age)
+        if height_cm is not None:
+            updates.append('height_cm = ?')
+            params.append(height_cm)
+        if weight_kg is not None:
+            updates.append('weight_kg = ?')
+            params.append(weight_kg)
+        if target_weight is not None:
+            updates.append('target_weight = ?')
+            params.append(target_weight)
+        if days_per_week is not None:
+            updates.append('days_per_week = ?')
+            params.append(days_per_week)
+        if experience_level is not None:
+            updates.append('experience_level = ?')
+            params.append(experience_level)
+        if injuries is not None:
+            updates.append('injuries = ?')
+            params.append(injuries)
+        if equipment is not None:
+            updates.append('equipment = ?')
+            params.append(equipment)
+            
+        if not updates:
+            conn.close()
+            return False
+            
+        updates.append('updated_at = ?')
+        params.append(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        params.append(user_id)
+        
+        query = f"UPDATE player_stats SET {', '.join(updates)} WHERE user_id = ?"
+        cursor.execute(query, params)
+        
+        conn.commit()
+        conn.close()
+        return True
+
 
 class ExerciseManager:
     """Exercise tracking and progression"""

@@ -3628,4 +3628,96 @@ async function checkPenaltyStatus() {
     return;
 }
 
+function openHunterSettingsModal() {
+    if (!currentStats) {
+        showToast('Please wait for stats to load');
+        return;
+    }
+    
+    // Set text values
+    if (document.getElementById('settings-age')) document.getElementById('settings-age').value = currentStats.age || '';
+    if (document.getElementById('settings-days-per-week')) document.getElementById('settings-days-per-week').value = currentStats.days_per_week || 5;
+    if (document.getElementById('settings-height')) document.getElementById('settings-height').value = currentStats.height_cm || '';
+    if (document.getElementById('settings-weight')) document.getElementById('settings-weight').value = currentStats.weight_kg || '';
+    if (document.getElementById('settings-experience-level')) document.getElementById('settings-experience-level').value = currentStats.experience_level || 'beginner';
+    
+    // Set equipment radio
+    const equipment = currentStats.equipment || 'Full Commercial Gym';
+    const equipRadio = document.querySelector(`input[name="settings-equipment"][value="${equipment}"]`);
+    if (equipRadio) equipRadio.checked = true;
+    
+    // Set medical/injuries checkboxes
+    const injuries = currentStats.injuries || 'None';
+    const checkboxes = document.querySelectorAll('input[name="settings-medical-condition"]');
+    checkboxes.forEach(cb => {
+        cb.checked = injuries.includes(cb.value);
+    });
+    
+    // Parse out medical notes text
+    let notes = '';
+    const match = injuries.match(/\(([^)]+)\)/);
+    if (match) {
+        notes = match[1];
+    } else {
+        const standardOptions = ["Knee Pain", "Back Pain", "Shoulder Discomfort", "Wrist/Elbow Pain", "Asthma"];
+        const customParts = injuries.split(', ').filter(part => part !== 'None' && !standardOptions.some(opt => part.includes(opt)));
+        if (customParts.length > 0) {
+            notes = customParts.join(', ');
+        }
+    }
+    
+    const notesArea = document.getElementById('settings-medical-notes');
+    if (notesArea) notesArea.value = notes;
+    
+    const modal = document.getElementById('hunter-settings-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeHunterSettingsModal() {
+    const modal = document.getElementById('hunter-settings-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function saveHunterSettings() {
+    const age = parseInt(document.getElementById('settings-age').value) || null;
+    const days_per_week = parseInt(document.getElementById('settings-days-per-week').value) || 5;
+    const height_cm = parseFloat(document.getElementById('settings-height').value) || null;
+    const weight_kg = parseFloat(document.getElementById('settings-weight').value) || null;
+    const experience_level = document.getElementById('settings-experience-level').value;
+    
+    const equipRadio = document.querySelector('input[name="settings-equipment"]:checked');
+    const equipment = equipRadio ? equipRadio.value : 'Full Commercial Gym';
+    
+    const selectedConditions = Array.from(document.querySelectorAll('input[name="settings-medical-condition"]:checked')).map(cb => cb.value);
+    const notesInput = document.getElementById('settings-medical-notes');
+    const notes = notesInput ? notesInput.value.trim() : '';
+    
+    const injuries = (selectedConditions.length > 0 || notes)
+        ? (selectedConditions.join(', ') + (notes ? ` (${notes})` : ''))
+        : 'None';
+        
+    try {
+        const res = await fetch(`${API_BASE}/api/player/update-settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                age, height_cm, weight_kg, days_per_week, experience_level, injuries, equipment
+            }),
+            credentials: 'include'
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            showToast('💾 Settings saved successfully!');
+            closeHunterSettingsModal();
+            await loadDashboard();
+        } else {
+            showToast(data.error || 'Failed to save settings');
+        }
+    } catch (e) {
+        console.error('Error saving settings:', e);
+        showToast('Error saving settings');
+    }
+}
+
 

@@ -415,6 +415,61 @@ def setup_profile():
     })
 
 
+@app.route('/api/player/update-settings', methods=['POST'])
+@login_required
+def update_player_settings():
+    """Update user stats settings like injuries and equipment"""
+    data = request.json or {}
+    user_id = session['user_id']
+    
+    # Extract fields
+    age = data.get('age')
+    height_cm = data.get('height_cm')
+    weight_kg = data.get('weight_kg')
+    target_weight = data.get('target_weight')
+    days_per_week = data.get('days_per_week')
+    experience_level = data.get('experience_level')
+    injuries = data.get('injuries')
+    equipment = data.get('equipment')
+    
+    # Safe casting
+    if age is not None:
+        try: age = int(age)
+        except ValueError: age = None
+    if height_cm is not None:
+        try: height_cm = float(height_cm)
+        except ValueError: height_cm = None
+    if weight_kg is not None:
+        try: weight_kg = float(weight_kg)
+        except ValueError: weight_kg = None
+    if target_weight is not None:
+        try: target_weight = float(target_weight)
+        except ValueError: target_weight = None
+    if days_per_week is not None:
+        try: days_per_week = int(days_per_week)
+        except ValueError: days_per_week = None
+        
+    success = stats_manager.update_player_stats_settings(
+        user_id=user_id,
+        age=age,
+        height_cm=height_cm,
+        weight_kg=weight_kg,
+        target_weight=target_weight,
+        days_per_week=days_per_week,
+        experience_level=experience_level,
+        injuries=injuries,
+        equipment=equipment
+    )
+    
+    if not success:
+        return jsonify({'error': 'No settings updated or user not found'}), 400
+        
+    return jsonify({
+        'success': True,
+        'message': 'Hunter configuration updated! The system has adapted to your changes.'
+    })
+
+
 @app.route('/api/stats', methods=['GET'])
 @login_required
 def get_stats():
