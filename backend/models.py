@@ -599,6 +599,13 @@ class User:
             'physique_quests', 'weekly_training_plan', 'user_settings'
         ]
         for tbl in tables:
+            # Explicit Whitelist Validation to satisfy Bandit B608
+            if tbl not in [
+                'player_stats', 'exercise_records', 'daily_quests', 'quest_completions',
+                'workout_history', 'goals', 'friends', 'achievements', 'rest_schedule',
+                'physique_quests', 'weekly_training_plan', 'user_settings'
+            ]:
+                raise ValueError("Unauthorized table name")
             try:
                 cursor.execute(f'DELETE FROM {tbl} WHERE user_id = ?', (user_id,))
             except sqlite3.OperationalError:

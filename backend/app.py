@@ -2230,6 +2230,9 @@ if __name__ == '__main__':
     print(f"📊 Database: {db.db_path}")
     print("\n💡 Tip: Check this terminal for quest generation logs")
     print("\n" + "="*60 + "\n")
+    run_host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
+    run_port = int(os.environ.get('FLASK_RUN_PORT', 5000))
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug_mode, host=run_host, port=run_port)
 
