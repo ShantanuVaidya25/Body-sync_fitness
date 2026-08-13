@@ -3641,26 +3641,47 @@ function openHunterSettingsModal() {
     if (document.getElementById('settings-weight')) document.getElementById('settings-weight').value = currentStats.weight_kg || '';
     if (document.getElementById('settings-experience-level')) document.getElementById('settings-experience-level').value = currentStats.experience_level || 'beginner';
     
-    // Set equipment radio
-    const equipment = currentStats.equipment || 'Full Commercial Gym';
-    const equipRadio = document.querySelector(`input[name="settings-equipment"][value="${equipment}"]`);
-    if (equipRadio) equipRadio.checked = true;
+    // Set equipment radio with flexible matching
+    const equipment = (currentStats.equipment || 'Full Commercial Gym').toLowerCase();
+    const equipRadios = document.querySelectorAll('input[name="settings-equipment"]');
+    equipRadios.forEach(radio => {
+        const val = radio.value.toLowerCase();
+        if (equipment.includes('dumbbell') && val.includes('dumbbell')) {
+            radio.checked = true;
+        } else if ((equipment.includes('home') || equipment.includes('bodyweight')) && val.includes('bodyweight')) {
+            radio.checked = true;
+        } else if (equipment.includes('gym') && val.includes('gym')) {
+            radio.checked = true;
+        } else if (radio.value === currentStats.equipment) {
+            radio.checked = true;
+        }
+    });
     
-    // Set medical/injuries checkboxes
-    const injuries = currentStats.injuries || 'None';
+    // Set medical/injuries checkboxes with flexible keyword matching
+    const rawInjuries = currentStats.injuries || 'None';
+    const lowerInjuries = rawInjuries.toLowerCase();
     const checkboxes = document.querySelectorAll('input[name="settings-medical-condition"]');
     checkboxes.forEach(cb => {
-        cb.checked = injuries.includes(cb.value);
+        const val = cb.value.toLowerCase();
+        if (val.includes('knee') && lowerInjuries.includes('knee')) cb.checked = true;
+        else if (val.includes('back') && lowerInjuries.includes('back')) cb.checked = true;
+        else if (val.includes('shoulder') && lowerInjuries.includes('shoulder')) cb.checked = true;
+        else if ((val.includes('wrist') || val.includes('elbow')) && (lowerInjuries.includes('wrist') || lowerInjuries.includes('elbow'))) cb.checked = true;
+        else if (val.includes('asthma') && lowerInjuries.includes('asthma')) cb.checked = true;
+        else cb.checked = false;
     });
     
     // Parse out medical notes text
     let notes = '';
-    const match = injuries.match(/\(([^)]+)\)/);
+    const match = rawInjuries.match(/\(([^)]+)\)/);
     if (match) {
         notes = match[1];
     } else {
-        const standardOptions = ["Knee Pain", "Back Pain", "Shoulder Discomfort", "Wrist/Elbow Pain", "Asthma"];
-        const customParts = injuries.split(', ').filter(part => part !== 'None' && !standardOptions.some(opt => part.includes(opt)));
+        const standardKeywords = ['knee', 'back', 'shoulder', 'wrist', 'elbow', 'asthma', 'none'];
+        const customParts = rawInjuries.split(', ').filter(part => {
+            const p = part.trim().toLowerCase();
+            return p && !standardKeywords.some(kw => p.includes(kw));
+        });
         if (customParts.length > 0) {
             notes = customParts.join(', ');
         }
