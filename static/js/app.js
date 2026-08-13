@@ -12,6 +12,7 @@ const API_BASE = '';
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     checkSharedHunterUrl();
+    initHorizontalMouseScroll();
 });
 
 // ============================================================================
@@ -3739,6 +3740,63 @@ async function saveHunterSettings() {
         console.error('Error saving settings:', e);
         showToast('Error saving settings');
     }
+}
+
+function initHorizontalMouseScroll() {
+    const scrollContainers = document.querySelectorAll('.nav-menu, .admin-subnav-bar');
+    
+    scrollContainers.forEach(container => {
+        if (!container) return;
+
+        // Convert vertical mouse wheel into horizontal scroll
+        container.addEventListener('wheel', (e) => {
+            if (e.deltaY !== 0) {
+                // Check if container is horizontally scrollable
+                if (container.scrollWidth > container.clientWidth) {
+                    e.preventDefault();
+                    container.scrollLeft += e.deltaY;
+                }
+            }
+        }, { passive: false });
+
+        // Enable click-and-drag smooth panning for mouse users
+        let isDown = false;
+        let startX = 0;
+        let scrollLeftPos = 0;
+        let hasMoved = false;
+
+        container.addEventListener('mousedown', (e) => {
+            isDown = true;
+            hasMoved = false;
+            startX = e.pageX - container.offsetLeft;
+            scrollLeftPos = container.scrollLeft;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDown = false;
+            container.style.cursor = '';
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            const x = e.pageX - container.offsetLeft;
+            const walk = (x - startX);
+            if (Math.abs(walk) > 4) {
+                hasMoved = true;
+                container.style.cursor = 'grab';
+                e.preventDefault();
+                container.scrollLeft = scrollLeftPos - walk;
+            }
+        });
+
+        // Prevent accidental link navigation if user was dragging/panning
+        container.addEventListener('click', (e) => {
+            if (hasMoved) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    });
 }
 
 
