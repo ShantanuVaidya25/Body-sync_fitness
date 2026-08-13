@@ -241,21 +241,42 @@ def get_weekly_activity():
     for i in range(7):
         current_date = sunday + timedelta(days=i)
         date_str = current_date.strftime('%Y-%m-%d')
+        count = 0
         
+        # 1. Check daily_quests for completed quests or logged sets
         cursor.execute('''
-            SELECT COUNT(*) FROM quest_completions 
-            WHERE user_id = ? AND DATE(completed_at) = ?
-        ''', (user_id, date_str))
-        count = cursor.fetchone()[0] or 0
-        
+            SELECT id, completed, quest_data FROM daily_quests 
+            WHERE user_id = ? AND (quest_date = ? OR DATE(completed_at) = ?)
+        ''', (user_id, date_str, date_str))
+        q_rows = cursor.fetchall()
+        for qr in q_rows:
+            if qr['completed']:
+                count += 1
+            else:
+                try:
+                    q_data = json.loads(qr['quest_data']) if qr['quest_data'] else {}
+                    if len(q_data.get('completed_sets', [])) > 0:
+                        count += 1
+                except Exception:
+                    pass
+                    
+        # 2. Check quest_completions
+        if count == 0:
+            cursor.execute('''
+                SELECT COUNT(*) FROM quest_completions 
+                WHERE user_id = ? AND DATE(completed_at) = ?
+            ''', (user_id, date_str))
+            count += (cursor.fetchone()[0] or 0)
+            
+        # 3. Check workout_history
         if count == 0:
             cursor.execute('''
                 SELECT total_exercises FROM workout_history 
-                WHERE user_id = ? AND workout_date = ?
-            ''', (user_id, date_str))
+                WHERE user_id = ? AND (workout_date = ? OR DATE(created_at) = ?)
+            ''', (user_id, date_str, date_str))
             row = cursor.fetchone()
             if row and row[0]:
-                count = row[0]
+                count += row[0]
                 
         week_days.append({
             'day_code': day_codes[i],
@@ -268,10 +289,16 @@ def get_weekly_activity():
     current_level = stats['level'] if stats else 1
     
     cursor.execute('''
-        SELECT COUNT(DISTINCT DATE(completed_at)) FROM quest_completions WHERE user_id = ?
+        SELECT COUNT(DISTINCT workout_date) FROM workout_history WHERE user_id = ?
     ''', (user_id,))
-    total_completed_days = cursor.fetchone()[0] or 0
+    hist_days = cursor.fetchone()[0] or 0
     
+    cursor.execute('''
+        SELECT COUNT(DISTINCT DATE(completed_at)) FROM daily_quests WHERE user_id = ? AND completed = 1
+    ''', (user_id,))
+    quest_days = cursor.fetchone()[0] or 0
+    
+    total_completed_days = max(hist_days, quest_days)
     rank_ups = (current_level - 1) + total_completed_days
     conn.close()
     
@@ -717,12 +744,34 @@ def log_set_completion():
             level_result = stats_manager.deduct_exp(user_id, set_exp)
             
     quest_data['completed_sets'] = list(completed_sets)
+    is_fully_completed = len(completed_sets) >= total_sets and total_sets > 0
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    cursor.execute('''
-        UPDATE daily_quests
-        SET quest_data = ?
-        WHERE id = ?
-    ''', (json.dumps(quest_data), quest_id))
+    if is_fully_completed:
+        cursor.execute('''
+            UPDATE daily_quests
+            SET quest_data = ?, completed = 1, completed_at = COALESCE(completed_at, ?)
+            WHERE id = ?
+        ''', (json.dumps(quest_data), now_str, quest_id))
+    else:
+        cursor.execute('''
+            UPDATE daily_quests
+            SET quest_data = ?
+            WHERE id = ?
+        ''', (json.dumps(quest_data), quest_id))
+        
+    # Ensure workout_history record is present for this workout date
+    if len(completed_sets) > 0:
+        q_date = quest_row['quest_date'] or datetime.now().strftime('%Y-%m-%d')
+        cursor.execute('''
+            SELECT id FROM workout_history WHERE user_id = ? AND workout_date = ?
+        ''', (user_id, q_date))
+        if not cursor.fetchone():
+            cursor.execute('''
+                INSERT INTO workout_history (user_id, workout_date, total_exercises, total_reps, total_duration_minutes, exp_gained, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, q_date, len(quest_data.get('exercises', [])), len(completed_sets) * 10, 30, exp_reward, 'Daily Quest Completed'))
+            
     conn.commit()
     conn.close()
     
@@ -1656,35 +1705,95 @@ def get_progress_data():
     conn = db.get_connection()
     cursor = conn.cursor()
     
-    # Get daily EXP gains
+    # 1. Gather all activity dates and EXP gains from daily_quests
     cursor.execute('''
-        SELECT quest_date as date, SUM(exp_reward) as exp
+        SELECT id, quest_date, completed, completed_at, exp_reward, quest_data
         FROM daily_quests
         WHERE user_id = ? 
         AND quest_date >= date('now', ? || ' days')
-        AND completed = 1
-        GROUP BY quest_date
-        ORDER BY quest_date
+        ORDER BY quest_date ASC
     ''', (user_id, -days))
+    quest_rows = cursor.fetchall()
     
-    exp_data = [dict(row) for row in cursor.fetchall()]
+    daily_exp_map = {}
+    daily_workout_map = {}
     
-    # Get workout completions
+    for row in quest_rows:
+        q_date = row['quest_date']
+        is_completed = bool(row['completed'])
+        reward = row['exp_reward'] or 50
+        
+        q_data = {}
+        try:
+            q_data = json.loads(row['quest_data']) if row['quest_data'] else {}
+        except Exception:
+            pass
+            
+        completed_sets = q_data.get('completed_sets', [])
+        
+        if is_completed:
+            daily_exp_map[q_date] = daily_exp_map.get(q_date, 0) + reward
+            daily_workout_map[q_date] = daily_workout_map.get(q_date, 0) + 1
+        elif len(completed_sets) > 0:
+            # Partial set EXP
+            total_sets = sum(ex.get('sets', 3) for ex in q_data.get('exercises', [])) or 1
+            earned = max(5, int(reward / total_sets)) * len(completed_sets)
+            daily_exp_map[q_date] = daily_exp_map.get(q_date, 0) + earned
+            daily_workout_map[q_date] = daily_workout_map.get(q_date, 0) + 1
+
+    # 2. Check workout_history
     cursor.execute('''
-        SELECT quest_date as date, COUNT(*) as workouts
-        FROM daily_quests
+        SELECT workout_date, exp_gained, total_exercises
+        FROM workout_history
         WHERE user_id = ?
-        AND quest_date >= date('now', ? || ' days')
-        AND completed = 1
-        GROUP BY quest_date
-        ORDER BY quest_date
+        AND workout_date >= date('now', ? || ' days')
+        ORDER BY workout_date ASC
     ''', (user_id, -days))
+    for wh in cursor.fetchall():
+        w_date = wh['workout_date']
+        w_exp = wh['exp_gained'] or 50
+        if w_date not in daily_exp_map:
+            daily_exp_map[w_date] = w_exp
+        if w_date not in daily_workout_map:
+            daily_workout_map[w_date] = 1
+
+    # 3. Check quest_completions
+    cursor.execute('''
+        SELECT DATE(completed_at) as c_date, COUNT(*) as cnt
+        FROM quest_completions
+        WHERE user_id = ?
+        AND DATE(completed_at) >= date('now', ? || ' days')
+        GROUP BY DATE(completed_at)
+    ''', (user_id, -days))
+    for qc in cursor.fetchall():
+        c_date = qc['c_date']
+        if c_date and c_date not in daily_exp_map:
+            daily_exp_map[c_date] = qc['cnt'] * 15
+        if c_date and c_date not in daily_workout_map:
+            daily_workout_map[c_date] = 1
+
+    # Build sorted progressive timeline
+    sorted_dates = sorted(daily_exp_map.keys())
+    exp_data = []
+    running_total = 0
     
-    workout_data = [dict(row) for row in cursor.fetchall()]
-    
+    # If no workout activity in range, anchor with current stats
+    if not sorted_dates:
+        stats = stats_manager.get_player_stats(user_id)
+        if stats and (stats.get('level', 1) > 1 or stats.get('exp', 0) > 0):
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            total_hunter_exp = ((stats.get('level', 1) - 1) * 100) + stats.get('exp', 0)
+            exp_data.append({'date': today_str, 'exp': total_hunter_exp})
+    else:
+        for d in sorted_dates:
+            running_total += daily_exp_map[d]
+            exp_data.append({'date': d, 'exp': running_total})
+            
+    workout_data = [{'date': d, 'workouts': daily_workout_map.get(d, 1)} for d in sorted_dates]
     conn.close()
     
     return jsonify({
+        'success': True,
         'exp_progress': exp_data,
         'workout_completions': workout_data
     })
