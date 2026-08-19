@@ -10,6 +10,8 @@ const API_BASE = '';
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    const savedEquipment = localStorage.getItem('hunter_equipment');
+    if (savedEquipment) syncEquipmentUI(savedEquipment);
     checkAuth();
     checkSharedHunterUrl();
     initHorizontalMouseScroll();
@@ -4032,6 +4034,9 @@ async function switchEquipmentAccess(newEquipment, forceOverride = false) {
         }
         syncEquipmentUI(newEquipment);
 
+        // Persist selection to localStorage
+        localStorage.setItem('hunter_equipment', newEquipment);
+
         // Update quest view
         if (data.quest) {
             currentQuest = data.quest;
@@ -4059,10 +4064,70 @@ async function switchEquipmentAccess(newEquipment, forceOverride = false) {
         showToast(`⚡ Location switched to ${newEquipment}. Workout adapted on the spot!`);
 
     } catch (error) {
-        console.error('Error switching equipment access:', error);
-        if (overlay) overlay.style.display = 'none';
-        showToast(`Recalibration error: ${error.message}`);
+        console.warn('Equipment change error (activating local fallback):', error);
+        
+        // LocalStorage fallback for offline / static preview mode
+        localStorage.setItem('hunter_equipment', newEquipment);
+        if (!currentStats) currentStats = {};
+        currentStats.equipment = newEquipment;
+        syncEquipmentUI(newEquipment);
+        
+        if (currentQuest) {
+            adaptLocalQuestToEquipment(currentQuest, newEquipment);
+            displayFullQuest(currentQuest);
+        }
+        
+        if (overlay) {
+            if (fill) fill.style.width = '100%';
+            if (statusText) statusText.textContent = '⚡ RECALIBRATION COMPLETE (LOCAL)!';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 300);
+        }
+        
+        showToast(`⚡ Location switched to ${newEquipment} (Local mode).`);
     }
+}
+
+function adaptLocalQuestToEquipment(quest, equipment) {
+    if (!quest) return quest;
+    const eq = (equipment || '').toLowerCase();
+    
+    let pool = [];
+    if (eq.includes('calisthenic')) {
+        pool = [
+            { name: 'Strict Pull-Ups', category: 'strength', sets: 4, target_reps: 10, rest_between_sets: 75, description: 'Bar mastery & lat V-taper development.' },
+            { name: 'Parallel Bar Dips', category: 'strength', sets: 4, target_reps: 12, rest_between_sets: 75, description: 'Tricep and lower chest lockout power.' },
+            { name: 'Handstand Push-Ups', category: 'strength', sets: 3, target_reps: 8, rest_between_sets: 90, description: 'Vertical shoulder power & balance.' },
+            { name: 'Strict Pistol Squats', category: 'strength', sets: 4, target_reps: 8, rest_between_sets: 60, description: 'Single-leg quad control and mobility.' },
+            { name: 'Dragon Flags', category: 'strength', sets: 3, target_reps: 8, rest_between_sets: 60, description: 'Gymnastic core compression pillar.' }
+        ];
+    } else if (eq.includes('home') || eq.includes('bodyweight')) {
+        pool = [
+            { name: 'Standard Push-Ups', category: 'strength', sets: 4, target_reps: 15, rest_between_sets: 60, description: 'Upper body chest and core foundation.' },
+            { name: 'Bodyweight Squats', category: 'strength', sets: 4, target_reps: 20, rest_between_sets: 60, description: 'Quad endurance and knee mobility.' },
+            { name: 'Chair / Bed Dips', category: 'strength', sets: 3, target_reps: 12, rest_between_sets: 60, description: 'Tricep lockout with zero equipment.' },
+            { name: 'Plank Hold', category: 'strength', sets: 3, target_duration_minutes: 1, rest_between_sets: 45, description: 'Solid core isometric brace.' },
+            { name: 'Mountain Climbers', category: 'cardio', sets: 3, target_duration_minutes: 1, rest_between_sets: 45, description: 'High-speed combat agility.' }
+        ];
+    } else if (eq.includes('dumbbell')) {
+        pool = [
+            { name: 'Dumbbell Floor / Bench Press', category: 'strength', sets: 4, target_reps: 10, rest_between_sets: 75, description: 'Chest and tricep hypertrophy overload.' },
+            { name: 'Dumbbell Bent-Over Rows', category: 'strength', sets: 4, target_reps: 10, rest_between_sets: 75, description: 'Lat and upper back thickness.' },
+            { name: 'Dumbbell Goblet Squats', category: 'strength', sets: 4, target_reps: 12, rest_between_sets: 75, description: 'Deep quad and glute power.' },
+            { name: 'Dumbbell Lateral Raises', category: 'strength', sets: 3, target_reps: 15, rest_between_sets: 60, description: '3D deltoid shoulder capping.' }
+        ];
+    } else {
+        pool = [
+            { name: 'Barbell Bench Press', category: 'strength', sets: 4, target_reps: 8, rest_between_sets: 90, description: 'Heavy compound chest power.' },
+            { name: 'Barbell Back Squats', category: 'strength', sets: 4, target_reps: 8, rest_between_sets: 90, description: 'Full lower body strength foundation.' },
+            { name: 'Lat Pulldowns', category: 'strength', sets: 4, target_reps: 10, rest_between_sets: 75, description: 'Upper back width and lat overload.' },
+            { name: 'Overhead Barbell Press', category: 'strength', sets: 3, target_reps: 8, rest_between_sets: 90, description: 'Overhead shoulder deltoid power.' }
+        ];
+    }
+    
+    quest.exercises = pool;
+    return quest;
 }
 
 async function saveHunterSettings() {
