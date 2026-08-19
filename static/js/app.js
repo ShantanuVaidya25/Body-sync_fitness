@@ -1065,23 +1065,82 @@ function displayFullQuest(quest) {
             completeBtn.textContent = '✅ Complete Quest';
         }
     }
+
+    // Synchronize Master Checkbox state with current quest completion
+    updateMasterCheckboxState();
 }
 
-function toggleAllQuestCheckboxes(masterCheckbox) {
+async function toggleAllQuestCheckboxes(masterCheckbox) {
     const isChecked = masterCheckbox.checked;
     const exerciseChecks = document.querySelectorAll('.exercise-complete-check');
     const setChecks = document.querySelectorAll('.set-complete-check');
     
     exerciseChecks.forEach(cb => { cb.checked = isChecked; });
     setChecks.forEach(cb => { cb.checked = isChecked; });
+
+    if (!currentQuest || !currentQuest.id) return;
+    
+    const action = isChecked ? 'completed' : 'uncompleted';
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/quest/log-set-completion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                quest_id: currentQuest.id,
+                set_key: 'all',
+                toggle_all: true,
+                action: action,
+                exercise_name: "Today's Quest"
+            }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            currentStats = data.stats;
+            if (currentQuest) {
+                currentQuest.completed_sets = data.completed_sets;
+                currentQuest.completed = isChecked ? 1 : 0;
+            }
+            
+            updatePlayerCard(currentStats);
+            updateStatusTabCard();
+            
+            const completeBtn = document.getElementById('complete-quest-btn');
+            if (completeBtn) {
+                if (isChecked) {
+                    completeBtn.textContent = '✅ Complete Quest (Ready)';
+                } else {
+                    completeBtn.disabled = false;
+                    completeBtn.textContent = '✅ Complete Quest';
+                }
+            }
+            
+            if (action === 'completed') {
+                showToast(`⚡ All exercises checked! +${data.exp_gained} EXP!`);
+                if (data.level_result && data.level_result.leveled_up) {
+                    showToast(`🎉 LEVEL UP! You reached Level ${data.level_result.new_level}! (+5 Stat Points)`);
+                }
+            } else {
+                showToast(`🔄 All exercises unchecked. (${data.exp_gained} EXP)`);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to toggle all quest exercises:', error);
+    }
 }
 
 function updateMasterCheckboxState() {
     const exerciseChecks = document.querySelectorAll('.exercise-complete-check');
     const masterCheck = document.getElementById('master-quest-complete-check');
-    if (masterCheck && exerciseChecks.length > 0) {
-        const allChecked = Array.from(exerciseChecks).every(cb => cb.checked);
-        masterCheck.checked = allChecked;
+    if (masterCheck) {
+        if (exerciseChecks.length > 0) {
+            const allChecked = Array.from(exerciseChecks).every(cb => cb.checked);
+            masterCheck.checked = allChecked;
+        } else {
+            masterCheck.checked = false;
+        }
     }
 }
 
@@ -1273,11 +1332,6 @@ function createRestExerciseCard(exercise, index) {
 }
 
 async function completeQuest() {
-    const masterCheck = document.getElementById('master-quest-complete-check');
-    if (masterCheck && masterCheck.checked) {
-        toggleAllQuestCheckboxes(masterCheck);
-    }
-    
     const checkboxes = document.querySelectorAll('.exercise-complete-check');
     const allCompleted = Array.from(checkboxes).every(cb => cb.checked);
     
@@ -1308,12 +1362,12 @@ async function completeQuest() {
         
         const data = await response.json();
         
-        if (response.ok) {
+        if (response.ok && data.success) {
             showQuestCompletionModal(data);
             await loadDashboard();
             await loadTodaysQuest();
         } else {
-            showToast(data.message || 'Failed to complete quest');
+            showToast(data.message || data.error || 'Failed to complete quest');
         }
     } catch (error) {
         console.error('Failed to complete quest:', error);
@@ -1326,18 +1380,25 @@ function showQuestCompletionModal(result) {
     const rewards = document.getElementById('completion-rewards');
     if (!modal) return;
     
+    let expGained = 100;
+    if (result && typeof result.exp_gained === 'number' && !isNaN(result.exp_gained)) {
+        expGained = result.exp_gained;
+    } else if (currentQuest) {
+        expGained = currentQuest.exp_reward || (currentQuest.exercises ? currentQuest.exercises.length * 50 : 100);
+    }
+    
     let rewardHTML = `
         <p style="font-size: 1.25rem; margin-bottom: 15px; color: #f8fafc; font-weight: 700;">
-            You gained <strong style="color: #38bdf8; font-size: 1.4rem;">+${result.exp_gained} EXP</strong>!
+            You gained <strong style="color: #38bdf8; font-size: 1.4rem;">+${expGained} EXP</strong>!
         </p>
     `;
     
-    if (result.level_result && result.level_result.leveled_up) {
+    if (result && result.level_result && result.level_result.leveled_up) {
         rewardHTML += `
             <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%); border: 1.5px solid #10b981; padding: 18px; border-radius: 14px; margin: 15px 0; box-shadow: 0 0 25px rgba(16, 185, 129, 0.3);">
                 <h3 style="font-size: 1.6rem; color: #34d399; font-family: 'Orbitron', sans-serif; margin-bottom: 6px;">⬆️ LEVEL UP!</h3>
                 <p style="font-size: 1.3rem; font-weight: 800; color: #ffffff; margin-bottom: 4px;">Level ${result.level_result.new_level}</p>
-                <p style="color: #cbd5e1; font-size: 0.9rem;">You gained ${result.level_result.levels_gained} level(s) and <strong style="color: #fbbf24;">+${result.level_result.stat_points} stat points</strong>!</p>
+                <p style="color: #cbd5e1; font-size: 0.9rem;">You gained ${result.level_result.levels_gained || 1} level(s) and <strong style="color: #fbbf24;">+${result.level_result.stat_points || 5} stat points</strong>!</p>
             </div>
         `;
     }

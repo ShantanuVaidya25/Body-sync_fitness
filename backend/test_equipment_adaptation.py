@@ -167,15 +167,24 @@ class TestFlaskEquipmentEndpoints(unittest.TestCase):
             user = user_mgr.get_user_by_username('test_equipment_hunter')
             
         self.user_id = user['id']
-        stats_mgr.create_player_stats(
-            user_id=self.user_id,
-            age=25,
-            height_cm=180,
-            weight_kg=80,
-            experience_level='intermediate',
-            body_type='mesomorph',
-            equipment='Full Commercial Gym'
-        )
+        stats = stats_mgr.get_player_stats(self.user_id)
+        if not stats:
+            stats_mgr.create_player_stats(
+                user_id=self.user_id,
+                age=25,
+                height_cm=180,
+                weight_kg=80,
+                experience_level='intermediate',
+                body_type='mesomorph',
+                equipment='Full Commercial Gym',
+                injuries='None'
+            )
+        else:
+            stats_mgr.update_player_stats_settings(
+                user_id=self.user_id,
+                equipment='Full Commercial Gym',
+                injuries='None'
+            )
 
     def test_change_equipment_endpoint(self):
         with self.client.session_transaction() as sess:

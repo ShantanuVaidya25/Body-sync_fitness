@@ -842,6 +842,53 @@ def log_set_completion():
     level_result = {'leveled_up': False}
     exp_gained = 0
     
+    # Handle bulk master checkbox toggle
+    if data.get('toggle_all') or set_key == 'all':
+        all_keys = set()
+        exercises = quest_data.get('exercises', [])
+        for i, ex in enumerate(exercises):
+            all_keys.add(f"ex{i}_master")
+            for s in range(ex.get('sets', 3)):
+                all_keys.add(f"ex{i}_set{s}")
+                
+        if action == 'completed':
+            added_count = len(all_keys - completed_sets)
+            completed_sets = all_keys
+            exp_gained = added_count * set_exp
+            if exp_gained > 0:
+                level_result = stats_manager.add_exp(user_id, exp_gained)
+        else:  # uncompleted
+            removed_count = len(completed_sets)
+            completed_sets = set()
+            exp_gained = -(removed_count * set_exp)
+            if exp_gained < 0:
+                level_result = stats_manager.deduct_exp(user_id, abs(exp_gained))
+                
+        quest_data['completed_sets'] = list(completed_sets)
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        is_completed_flag = 1 if (action == 'completed' and len(exercises) > 0) else 0
+        
+        cursor.execute('''
+            UPDATE daily_quests
+            SET quest_data = ?, completed = ?, completed_at = ?
+            WHERE id = ?
+        ''', (json.dumps(quest_data), is_completed_flag, now_str if is_completed_flag else None, quest_id))
+        
+        conn.commit()
+        conn.close()
+        
+        updated_stats = stats_manager.get_player_stats(user_id)
+        return jsonify({
+            'success': True,
+            'action': action,
+            'toggle_all': True,
+            'exp_gained': exp_gained,
+            'exercise_name': "Today's Quest",
+            'stats': updated_stats,
+            'level_result': level_result,
+            'completed_sets': list(completed_sets)
+        })
+
     if action == 'completed':
         if set_key not in completed_sets:
             completed_sets.add(set_key)
@@ -866,7 +913,7 @@ def log_set_completion():
     else:
         cursor.execute('''
             UPDATE daily_quests
-            SET quest_data = ?
+            SET quest_data = ?, completed = 0, completed_at = NULL
             WHERE id = ?
         ''', (json.dumps(quest_data), quest_id))
         
@@ -919,11 +966,12 @@ def complete_quest():
         
         if result.get('success'):
             print(f"✅ Quest completed!")
-            print(f"   EXP gained: {result['exp_gained']}")
-            if result['level_result'].get('leveled_up'):
+            print(f"   EXP gained: {result.get('exp_gained', 0)}")
+            if result.get('level_result') and result['level_result'].get('leveled_up'):
                 print(f"   🎉 LEVEL UP! New level: {result['level_result']['new_level']}")
-        
-        return jsonify(result)
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
         
     except Exception as e:
         print(f"❌ Error completing quest: {e}")

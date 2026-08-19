@@ -854,11 +854,24 @@ class AIQuestGenerator:
         cursor.execute('SELECT * FROM daily_quests WHERE id = ?', (quest_id,))
         quest_row = cursor.fetchone()
         
-        if not quest_row or quest_row['completed']:
+        if not quest_row:
             conn.close()
-            return {'success': False, 'message': 'Quest not found or already completed'}
+            return {'success': False, 'message': 'Quest not found'}
         
         quest_data = json.loads(quest_row['quest_data'])
+        total_exp = quest_data.get('exp_reward', 100) + quest_data.get('completion_bonus', 0)
+        
+        if quest_row['completed']:
+            conn.close()
+            stats_manager = PlayerStats(self.db)
+            current_stats = stats_manager.get_player_stats(user_id) or {}
+            return {
+                'success': True,
+                'already_completed': True,
+                'exp_gained': total_exp,
+                'level_result': {'leveled_up': False, 'new_level': current_stats.get('level', 1)},
+                'message': 'Quest completed! You are growing stronger, Hunter!'
+            }
         
         # Save exercise completions
         for completion in exercise_completions:
