@@ -543,12 +543,27 @@ def change_player_equipment():
     user_id = session['user_id']
     data = request.json or {}
     new_equipment = data.get('equipment')
+    force_override = data.get('force_override', False)
     
     if not new_equipment:
         return jsonify({'error': 'Equipment location specification required'}), 400
         
     prev_stats = stats_manager.get_player_stats(user_id) or {}
     old_equipment = prev_stats.get('equipment', 'Full Commercial Gym')
+    
+    # Check for fatal injuries in Calisthenics (shoulder, wrist, elbow, rotator cuff, severe joint)
+    if 'calisthenic' in new_equipment.lower():
+        user_injuries = (prev_stats.get('injuries') or 'None').lower()
+        fatal_keywords = ['shoulder', 'wrist', 'elbow', 'rotator', 'tendonitis', 'dislocation', 'fracture', 'tear', 'impingement', 'joint']
+        has_fatal_calisthenics_injury = any(kw in user_injuries for kw in fatal_keywords) and user_injuries != 'none'
+        
+        if has_fatal_calisthenics_injury and not force_override:
+            return jsonify({
+                'success': False,
+                'blocked_by_injury': True,
+                'injury_detected': prev_stats.get('injuries'),
+                'message': f"⚠️ SYSTEM REJECTION: Calisthenics access locked! You have registered '{prev_stats.get('injuries')}'. High-torque bar & inversion movements are unsafe for your recovery. Recommended: Home / Low-Impact."
+            }), 403
     
     # Update stats
     stats_manager.update_player_stats_settings(

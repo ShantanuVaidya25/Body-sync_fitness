@@ -41,6 +41,7 @@ class TestEquipmentAdaptation(unittest.TestCase):
     def test_exercise_pools_by_equipment(self):
         pool_gym = self.quest_gen.get_exercise_pool('Full Commercial Gym')
         pool_home = self.quest_gen.get_exercise_pool('Home / Bodyweight')
+        pool_calisthenics = self.quest_gen.get_exercise_pool('Calisthenics')
         pool_db = self.quest_gen.get_exercise_pool('Dumbbells & Home Setup')
 
         # Verify Gym pool contains barbell / gym machines in strength
@@ -48,12 +49,18 @@ class TestEquipmentAdaptation(unittest.TestCase):
         self.assertIn('barbell_back_squats', pool_gym['strength']['lower_body'])
         self.assertIn('lat_pulldowns', pool_gym['strength']['upper_body'])
 
-        # Verify Home pool is strictly bodyweight
+        # Verify Home pool is strictly floor bodyweight
         self.assertIn('push_ups', pool_home['strength']['upper_body'])
         self.assertIn('diamond_push_ups', pool_home['strength']['upper_body'])
         self.assertIn('squats', pool_home['strength']['lower_body'])
         self.assertNotIn('barbell_bench_press', pool_home['strength']['upper_body'])
         self.assertNotIn('leg_press', pool_home['strength']['lower_body'])
+
+        # Verify Calisthenics pool contains bar & gymnastic movements
+        self.assertIn('muscle_ups', pool_calisthenics['strength']['upper_body'])
+        self.assertIn('handstand_push_ups', pool_calisthenics['strength']['upper_body'])
+        self.assertIn('dragon_flags', pool_calisthenics['strength']['core'])
+        self.assertIn('pistol_squats', pool_calisthenics['strength']['lower_body'])
 
         # Verify Dumbbell pool contains dumbbell movements
         self.assertIn('dumbbell_bench_press', pool_db['strength']['upper_body'])
@@ -194,6 +201,16 @@ class TestFlaskEquipmentEndpoints(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['equipment'], 'Dumbbells & Home Setup')
         print("Endpoint switched to Dumbbells. New Quest:", data['quest']['title'], [e['name'] for e in data['quest']['exercises']])
+
+        # 3. Change equipment to Calisthenics
+        res = self.client.post('/api/player/change-equipment', json={
+            'equipment': 'Calisthenics'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['equipment'], 'Calisthenics')
+        print("Endpoint switched to Calisthenics. New Quest:", data['quest']['title'], [e['name'] for e in data['quest']['exercises']])
 
 
 if __name__ == '__main__':

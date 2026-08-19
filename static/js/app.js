@@ -1374,6 +1374,14 @@ async function generateNewQuest() {
 }
 
 const BEST_EXERCISES_PER_GOAL = {
+    'calisthenics': [
+        { name: 'Muscle-Up Progressions', sets: 4, reps: '6-8', benefit: 'Explosive bar transition & full upper body pulling/pressing dominance' },
+        { name: 'Handstand Push-Ups', sets: 4, reps: '8', benefit: 'Elite vertical shoulder deltoid pressing power & balance' },
+        { name: 'Dragon Flags', sets: 3, reps: '8', benefit: 'Shadow Monarch gymnastics hollow-body core pillar' },
+        { name: 'Strict Pistol Squats', sets: 4, reps: '8 per leg', benefit: 'Single-leg quad mastery, ankle mobility & balance' },
+        { name: 'Deep Parallel Bar Dips', sets: 4, reps: '12-15', benefit: 'Lower chest & tricep power lockout' },
+        { name: 'L-Sit / Front Lever Holds', sets: 3, reps: '30 sec', benefit: 'Isometric abdominal & lat compression strength' }
+    ],
     'strength': [
         { name: 'Diamond Push-ups', sets: 4, reps: '12-15', benefit: 'Progressive overload for chest, triceps & core power' },
         { name: 'Pull-ups / Chin-ups', sets: 3, reps: '8-10', benefit: 'Lats, upper back & bicep pulling strength' },
@@ -1574,6 +1582,7 @@ function loadBestExercisesGuide() {
     if (!guideDiv) return;
     
     const categories = [
+        { key: 'calisthenics', label: '🤸‍♂️ Calisthenics Mastery', desc: 'Top tier bodyweight skills, bar transitions & gymnastics progressions' },
         { key: 'strength', label: '💪 Strength & Muscle', desc: 'Top exercises to maximize power, hypertrophy & muscle strength' },
         { key: 'endurance', label: '🏃 Endurance & Stamina', desc: 'Top exercises for cardiovascular capacity, VO2 max & stamina' },
         { key: 'weight', label: '🔥 Weight Loss & Fat Burn', desc: 'Highest metabolic demand exercises for maximum fat burn' },
@@ -3766,15 +3775,17 @@ function syncEquipmentUI(equipment) {
     if (badge) {
         let icon = '🏋️‍♂️';
         const eqLower = equipment.toLowerCase();
-        if (eqLower.includes('dumbbell')) icon = '🧱';
-        else if (eqLower.includes('home') || eqLower.includes('bodyweight') || eqLower.includes('calisthenic') || eqLower.includes('none')) icon = '🏠';
+        if (eqLower.includes('calisthenic')) icon = '🤸‍♂️';
+        else if (eqLower.includes('dumbbell')) icon = '🧱';
+        else if (eqLower.includes('home') || eqLower.includes('bodyweight')) icon = '🏠';
         badge.innerHTML = `<span>${icon}</span> ${equipment}`;
     }
 
     const getEquipKey = (str) => {
         const s = (str || '').toLowerCase();
+        if (s.includes('calisthenic')) return 'calisthenics';
         if (s.includes('dumbbell')) return 'dumbbell';
-        if (s.includes('home') || s.includes('bodyweight') || s.includes('calisthenic') || s.includes('none')) return 'home';
+        if (s.includes('home') || s.includes('bodyweight') || s.includes('none')) return 'home';
         return 'gym';
     };
 
@@ -3793,15 +3804,77 @@ function syncEquipmentUI(equipment) {
         }
     });
 
-    // Also synchronize settings select dropdown if present
-    const settingsSelect = document.getElementById('settings-equipment');
-    if (settingsSelect) {
-        settingsSelect.value = equipment;
+    // Also synchronize settings radio buttons if present
+    const equipRadios = document.querySelectorAll('input[name="settings-equipment"]');
+    equipRadios.forEach(radio => {
+        const rKey = getEquipKey(radio.value);
+        if (rKey === targetKey) {
+            radio.checked = true;
+        }
+    });
+}
+
+function checkCalisthenicsInjuryRisk(equipment) {
+    if (!equipment || !equipment.toLowerCase().includes('calisthenic')) return null;
+    if (!currentStats || !currentStats.injuries) return null;
+    const rawInjuries = currentStats.injuries.trim();
+    if (rawInjuries.toLowerCase() === 'none' || !rawInjuries) return null;
+    
+    const fatalKeywords = ['shoulder', 'wrist', 'elbow', 'rotator', 'tendonitis', 'dislocation', 'fracture', 'tear', 'impingement', 'joint'];
+    const lower = rawInjuries.toLowerCase();
+    const hasFatal = fatalKeywords.some(kw => lower.includes(kw));
+    if (hasFatal) {
+        return rawInjuries;
+    }
+    return null;
+}
+
+function showInjuryWarningModal(injuryName) {
+    const modal = document.getElementById('injury-warning-modal');
+    const nameEl = document.getElementById('injury-detected-name');
+    const msgEl = document.getElementById('injury-warning-message');
+    
+    if (nameEl) nameEl.textContent = injuryName || 'Shoulder / Joint Injury';
+    if (msgEl) {
+        msgEl.innerHTML = `The System detected registered <strong style="color: #f87171;">${injuryName || 'Joint Injury'}</strong> in your Hunter profile. High-torque calisthenics (Muscle-ups, Handstand Push-ups, Levers, Deep Dips) impose extreme joint strain and are fatal to your recovery. Access is restricted for your safety.`;
+    }
+    
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
     }
 }
 
-async function switchEquipmentAccess(newEquipment) {
+function closeInjuryWarningModal() {
+    const modal = document.getElementById('injury-warning-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+}
+
+async function confirmSafeEquipmentChoice(safeChoice) {
+    closeInjuryWarningModal();
+    await switchEquipmentAccess(safeChoice, true);
+}
+
+async function forceUnlockCalisthenics() {
+    closeInjuryWarningModal();
+    showToast('⚠️ Proceeding with Calisthenics under joint safety caution.');
+    await switchEquipmentAccess('Calisthenics', true);
+}
+
+async function switchEquipmentAccess(newEquipment, forceOverride = false) {
     if (!newEquipment) return;
+    
+    // Check for fatal injury risk before initiating calisthenics switch
+    if (newEquipment.toLowerCase().includes('calisthenic') && !forceOverride) {
+        const detectedInjury = checkCalisthenicsInjuryRisk(newEquipment);
+        if (detectedInjury) {
+            showInjuryWarningModal(detectedInjury);
+            return;
+        }
+    }
     
     const overlay = document.getElementById('system-recalibration-overlay');
     const fill = document.getElementById('recalibration-progress-fill');
@@ -3830,7 +3903,9 @@ async function switchEquipmentAccess(newEquipment) {
             step2.className = 'recal-step';
             if (step2Text) {
                 const eqL = newEquipment.toLowerCase();
-                if (eqL.includes('home') || eqL.includes('bodyweight')) {
+                if (eqL.includes('calisthenic')) {
+                    step2Text.textContent = 'Converting Routine to High-Skill Calisthenics & Gymnastics Mastery Progressions...';
+                } else if (eqL.includes('home') || eqL.includes('bodyweight')) {
                     step2Text.textContent = 'Converting Compound Gym Lifts to Calisthenics & Bodyweight Progressions...';
                 } else if (eqL.includes('dumbbell')) {
                     step2Text.textContent = 'Adapting Routine to Free Weights & Dumbbell Hypertrophy Overload...';
@@ -3862,14 +3937,22 @@ async function switchEquipmentAccess(newEquipment) {
         const response = await fetch(`${API_BASE}/api/player/change-equipment`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ equipment: newEquipment }),
+            body: JSON.stringify({ 
+                equipment: newEquipment,
+                force_override: forceOverride 
+            }),
             credentials: 'include'
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to recalibrate training equipment');
+            if (data.blocked_by_injury) {
+                if (overlay) overlay.style.display = 'none';
+                showInjuryWarningModal(data.injury_detected);
+                return;
+            }
+            throw new Error(data.error || data.message || 'Failed to recalibrate training equipment');
         }
 
         // Step 3 animation

@@ -415,10 +415,45 @@ The JSON payload must follow this exact structure:
         Generate deterministic fallback program adhering strictly to equipment access and body type.
         """
         eq = (equipment or '').lower()
-        is_db = 'dumbbell' in eq
-        is_home = not is_db and ('home' in eq or 'bodyweight' in eq or 'calisthenics' in eq or 'none' in eq)
+        is_calisthenics = 'calisthenic' in eq
+        is_db = not is_calisthenics and 'dumbbell' in eq
+        is_home = not is_calisthenics and not is_db and ('home' in eq or 'bodyweight' in eq or 'none' in eq)
         
-        if is_home:
+        if is_calisthenics:
+            overview = f"Elite Calisthenics & Body Mastery Protocol tailored for {body_type.upper()} build with bar & ring gymnastics skills."
+            schedule = [
+                {
+                    "day_number": 1,
+                    "muscle_focus": "Upper Pull & Front Lever Mastery (Calisthenics)",
+                    "routine": [
+                        {"exercise_name": "Explosive Pull-Ups / Muscle-Up Progressions", "sets": 4, "reps": "6-8", "rest_seconds": 90, "form_cue": "Explosive pull to chest level, hollow body core."},
+                        {"exercise_name": "Wide Grip Strict Pull-Ups", "sets": 3, "reps": "8-10", "rest_seconds": 75, "form_cue": "Full dead hang to chin over bar with zero kipping."},
+                        {"exercise_name": "L-Sit Chin-Ups", "sets": 3, "reps": "6-8", "rest_seconds": 75, "form_cue": "Lock legs straight parallel to floor during entire pull."},
+                        {"exercise_name": "Dragon Flags / Hollow Body Hold", "sets": 3, "reps": "8 reps / 45s", "rest_seconds": 60, "form_cue": "Pivot only on upper back, rigid core pillar."}
+                    ]
+                },
+                {
+                    "day_number": 2,
+                    "muscle_focus": "Upper Push & Handstand / Planche Power (Calisthenics)",
+                    "routine": [
+                        {"exercise_name": "Handstand Push-Ups / Pike Push-Ups", "sets": 4, "reps": "6-8", "rest_seconds": 90, "form_cue": "Slow controlled descent, press back through shoulders."},
+                        {"exercise_name": "Deep Parallel Bar Dips", "sets": 4, "reps": "12", "rest_seconds": 75, "form_cue": "Full depth below 90 degrees, lock triceps at top."},
+                        {"exercise_name": "Archer Push-Ups", "sets": 3, "reps": "8 per side", "rest_seconds": 60, "form_cue": "Keep straight arm locked while other arm presses."},
+                        {"exercise_name": "Pseudo Planche Push-Ups", "sets": 3, "reps": "10", "rest_seconds": 60, "form_cue": "Lean shoulders far forward past wrists, protract scapula."}
+                    ]
+                },
+                {
+                    "day_number": 3,
+                    "muscle_focus": "Calisthenics Leg Explosiveness & Mobility",
+                    "routine": [
+                        {"exercise_name": "Strict Pistol Squats", "sets": 4, "reps": "8 per leg", "rest_seconds": 75, "form_cue": "Non-working leg straight forward, full rock-bottom depth."},
+                        {"exercise_name": "Explosive Tuck Jump Squats", "sets": 4, "reps": "12", "rest_seconds": 60, "form_cue": "Maximum vertical height, soft quiet landing."},
+                        {"exercise_name": "Shrimp Squats / Single-Leg Glute Bridges", "sets": 3, "reps": "8 per leg", "rest_seconds": 60, "form_cue": "Control descent to back knee gently touching floor."},
+                        {"exercise_name": "Elevated Calf Raises & Ankle Mobility", "sets": 4, "reps": "25", "rest_seconds": 45, "form_cue": "Deep stretch at bottom, 2s peak hold at top."}
+                    ]
+                }
+            ]
+        elif is_home:
             overview = f"Home Calisthenics Routine tailored for {body_type.upper()} build with zero equipment requirements."
             schedule = [
                 {
@@ -697,12 +732,48 @@ def generate_character_equipment_split(target_name: str, equipment: str, body_ty
     t_name = target_name or "Shadow Hunter"
     t_lower = t_name.lower()
     eq = (equipment or "Full Commercial Gym").lower()
-    is_db = 'dumbbell' in eq
-    is_home = not is_db and ('home' in eq or 'bodyweight' in eq or 'calisthenics' in eq or 'none' in eq)
+    is_calisthenics = 'calisthenic' in eq
+    is_db = not is_calisthenics and 'dumbbell' in eq
+    is_home = not is_calisthenics and not is_db and ('home' in eq or 'bodyweight' in eq or 'none' in eq)
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     if 'jin-woo' in t_lower or 'jinwoo' in t_lower or 'sung' in t_lower:
-        if is_home:
+        if is_calisthenics:
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Bar Mastery & Explosive Pull", 'is_rest': False, 'exercises': [
+                    {'name': 'Explosive Pull-ups / Muscle-ups', 'sets': 4, 'reps': '6-8', 'rest_seconds': 90, 'notes': 'Shadow Monarch explosive bar power'},
+                    {'name': 'Wide-Grip Strict Pull-ups', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Lat V-taper development'},
+                    {'name': 'L-Sit Chin-ups', 'sets': 3, 'reps': '8', 'rest_seconds': 75, 'notes': 'Bicep & core isometric synergy'},
+                    {'name': 'Dragon Flags', 'sets': 3, 'reps': '8', 'rest_seconds': 60, 'notes': 'Ultimate hollow body abdominal strength'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Handstand & Dips Power", 'is_rest': False, 'exercises': [
+                    {'name': 'Handstand Push-ups', 'sets': 4, 'reps': '6-8', 'rest_seconds': 90, 'notes': 'Vertical shoulder & deltoid pressing power'},
+                    {'name': 'Deep Parallel Bar Dips', 'sets': 4, 'reps': '12-15', 'rest_seconds': 75, 'notes': 'Heavy tricep & lower chest lockout'},
+                    {'name': 'Archer Push-ups', 'sets': 3, 'reps': '8 per arm', 'rest_seconds': 60, 'notes': 'Unilateral pressing balance'},
+                    {'name': 'Pseudo Planche Push-ups', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Straight-arm scapular protraction'}
+                ]},
+                {'focus': f"🛌 {t_name}: Shadow Realm Rest & Mobility", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Ruler's Calisthenics Legs", 'is_rest': False, 'exercises': [
+                    {'name': 'Strict Pistol Squats', 'sets': 4, 'reps': '8 per leg', 'rest_seconds': 75, 'notes': 'Single-leg quad and balance mastery'},
+                    {'name': 'Explosive Jump Squats', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Dungeon dash vertical leap'},
+                    {'name': 'Shrimp Squats', 'sets': 3, 'reps': '8 per leg', 'rest_seconds': 60, 'notes': 'Deep knee and glute stabilization'},
+                    {'name': 'Elevated Single-Leg Calf Raises', 'sets': 4, 'reps': '20', 'rest_seconds': 45, 'notes': 'Ankle stiffness & reflex power'}
+                ]},
+                {'focus': f"⚔️ {t_name}: 100x Daily Quest Trial", 'is_rest': False, 'exercises': [
+                    {'name': 'Standard Push-ups', 'sets': 4, 'reps': '25', 'rest_seconds': 60, 'notes': 'System daily quest target (100 pushups)'},
+                    {'name': 'Bodyweight Squats', 'sets': 4, 'reps': '25', 'rest_seconds': 60, 'notes': 'System daily quest target (100 squats)'},
+                    {'name': 'Hanging Leg Raises', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'System core advancement target'},
+                    {'name': 'High-Knee Sprint in Place', 'sets': 4, 'reps': '60 sec', 'rest_seconds': 60, 'notes': '10km conditioning trial'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Monarch Bar Flow & Core", 'is_rest': False, 'exercises': [
+                    {'name': 'Straight Bar Dips', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Bar transition power'},
+                    {'name': 'Typewriter Pull-ups', 'sets': 3, 'reps': '6 per side', 'rest_seconds': 75, 'notes': 'Side-to-side lat control'},
+                    {'name': 'Hanging Windshield Wipers', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Oblique and abdominal rotational control'},
+                    {'name': 'L-Sit Hold', 'sets': 3, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Hip flexor & core compression'}
+                ]},
+                {'focus': f"🛌 {t_name}: System Full Recovery", 'is_rest': True, 'exercises': []}
+            ]
+        elif is_home:
             split_days = [
                 {'focus': f"⚔️ {t_name}: Shadow Daily Trial (Push & Core)", 'is_rest': False, 'exercises': [
                     {'name': 'Diamond Push-ups', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Tricep and chest power for dagger thrusts'},
@@ -809,7 +880,41 @@ def generate_character_equipment_split(target_name: str, equipment: str, body_ty
             ]
     else:
         # General character / Custom / Photo build split adapted to equipment
-        if is_home:
+        if is_calisthenics:
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Bar Mastery & Explosive Pull", 'is_rest': False, 'exercises': [
+                    {'name': 'Strict Pull-ups', 'sets': 4, 'reps': '8-10', 'rest_seconds': 75, 'notes': 'Upper body pulling strength'},
+                    {'name': 'Chin-ups / L-Sit Chin-ups', 'sets': 3, 'reps': '8', 'rest_seconds': 75, 'notes': 'Bicep & lat pulling power'},
+                    {'name': 'Dragon Flags / Hanging Leg Raises', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Advanced gymnastic core'},
+                    {'name': 'Doorframe / Towel Inverted Rows', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Scapular retraction'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Calisthenics Push & Dips", 'is_rest': False, 'exercises': [
+                    {'name': 'Parallel Bar Dips', 'sets': 4, 'reps': '12', 'rest_seconds': 75, 'notes': 'Tricep and lower chest power'},
+                    {'name': 'Handstand Push-ups / Pike Push-ups', 'sets': 4, 'reps': '8', 'rest_seconds': 75, 'notes': 'Vertical deltoid pressing'},
+                    {'name': 'Archer Push-ups', 'sets': 3, 'reps': '8 per arm', 'rest_seconds': 60, 'notes': 'Unilateral chest strength'},
+                    {'name': 'Pseudo Planche Push-ups', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Scapula protraction & shoulder mass'}
+                ]},
+                {'focus': f"🛌 {t_name}: Active Recovery & Mobility Flow", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Single-Leg Calisthenics & Explosiveness", 'is_rest': False, 'exercises': [
+                    {'name': 'Strict Pistol Squats', 'sets': 4, 'reps': '8 per leg', 'rest_seconds': 75, 'notes': 'Single-leg quad and balance mastery'},
+                    {'name': 'Explosive Jump Squats', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Explosive leg power'},
+                    {'name': 'Shrimp Squats / Single-Leg Glute Bridges', 'sets': 3, 'reps': '10 per leg', 'rest_seconds': 60, 'notes': 'Posterior chain stability'},
+                    {'name': 'Elevated Calf Raises', 'sets': 4, 'reps': '20', 'rest_seconds': 45, 'notes': 'Ankle reflex power'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Full Body Bar Flow & Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Straight Bar Dips', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Bar transition power'},
+                    {'name': 'Typewriter Pull-ups', 'sets': 3, 'reps': '6 per side', 'rest_seconds': 75, 'notes': 'Lat symmetry & control'},
+                    {'name': 'Burpees to Pull-up', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Combat conditioning'},
+                    {'name': 'Hollow Body Hold', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 45, 'notes': 'Solid gymnastics midline'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Core Mastery & Stretch", 'is_rest': False, 'exercises': [
+                    {'name': 'Hanging Windshield Wipers', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Oblique and abdominal rotational control'},
+                    {'name': 'L-Sit Hold', 'sets': 3, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Hip flexor & core compression'},
+                    {'name': 'Full Body Mobility & Bridge Flow', 'sets': 1, 'reps': '20 mins', 'rest_seconds': 0, 'notes': 'Flexibility and joint longevity'}
+                ]},
+                {'focus': f"🛌 {t_name}: Rest & Growth Day", 'is_rest': True, 'exercises': []}
+            ]
+        elif is_home:
             split_days = [
                 {'focus': f"⚔️ {t_name}: Upper Body Calisthenics", 'is_rest': False, 'exercises': [
                     {'name': 'Standard Push-ups', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Upper body pushing foundation'},

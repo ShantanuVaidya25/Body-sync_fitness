@@ -46,6 +46,35 @@ class AIQuestGenerator:
                     'mobility': ['hip_circles', 'arm_circles', 'neck_rolls', 'world_greatest_stretch']
                 }
             },
+            'calisthenics': {
+                'strength': {
+                    'upper_body': [
+                        'muscle_ups', 'pull_ups', 'chin_ups', 'dips',
+                        'handstand_push_ups', 'pike_push_ups', 'archer_push_ups',
+                        'pseudo_planche_push_ups', 'typewriter_pull_ups',
+                        'chest_to_bar_pull_ups', 'straight_bar_dips', 'diamond_push_ups'
+                    ],
+                    'core': [
+                        'dragon_flags', 'l_sits', 'hanging_leg_raises',
+                        'hollow_body_holds', 'hanging_windshield_wipers',
+                        'v_ups', 'ab_wheel_rollouts', 'side_planks'
+                    ],
+                    'lower_body': [
+                        'pistol_squats', 'shrimp_squats', 'explosive_jump_squats',
+                        'bulgarian_splits', 'calf_raises', 'sissy_squats',
+                        'glute_bridges', 'single_leg_deadlifts'
+                    ]
+                },
+                'cardio': {
+                    'running': ['sprints', 'interval_run', 'high_knees', 'jog'],
+                    'bodyweight': ['burpees', 'jumping_jacks', 'mountain_climbers', 'lateral_hops'],
+                    'other': ['jump_rope', 'shadow_boxing', 'stair_climbing']
+                },
+                'flexibility': {
+                    'stretching': ['yoga', 'dynamic_stretches', 'cobra_stretch', 'bridge_holds'],
+                    'mobility': ['shoulder_dislocations', 'hip_circles', 'wrist_mobility', 'pancake_stretch']
+                }
+            },
             'dumbbells': {
                 'strength': {
                     'upper_body': [
@@ -116,9 +145,11 @@ class AIQuestGenerator:
     def get_exercise_pool(self, equipment: str = "Full Commercial Gym") -> Dict:
         """Return the exercise pool matching the user's location/equipment access"""
         eq = (equipment or '').lower()
-        if 'dumbbell' in eq:
+        if 'calisthenic' in eq:
+            return self.exercise_pools['calisthenics']
+        elif 'dumbbell' in eq:
             return self.exercise_pools['dumbbells']
-        elif 'home' in eq or 'bodyweight' in eq or 'calisthenics' in eq or 'none' in eq:
+        elif 'home' in eq or 'bodyweight' in eq or 'none' in eq:
             return self.exercise_pools['bodyweight']
         else:
             return self.exercise_pools['gym']
