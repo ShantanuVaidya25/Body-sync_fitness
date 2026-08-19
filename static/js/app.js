@@ -1014,9 +1014,16 @@ function displayFullQuest(quest) {
     document.getElementById('quest-reward').textContent = 
         `Reward: ${quest.exp_reward || 0} EXP`;
     
-    // Sync equipment UI
-    syncEquipmentUI(quest.equipment || (currentStats && currentStats.equipment) || 'Full Commercial Gym');
-    
+    // Update dashboard preview card if present
+    const preview = document.getElementById('quest-preview');
+    if (preview) {
+        preview.innerHTML = `
+            <h3>${quest.title}</h3>
+            <p>${(quest.exercises || []).length} exercises • ${quest.exp_reward || 0} EXP</p>
+            ${quest.completed ? '<p class="quest-completed">✅ Completed!</p>' : ''}
+        `;
+    }
+
     const content = document.getElementById('quest-content');
     content.innerHTML = '';
     
@@ -3760,28 +3767,37 @@ function syncEquipmentUI(equipment) {
         let icon = '🏋️‍♂️';
         const eqLower = equipment.toLowerCase();
         if (eqLower.includes('dumbbell')) icon = '🧱';
-        else if (eqLower.includes('home') || eqLower.includes('bodyweight')) icon = '🏠';
+        else if (eqLower.includes('home') || eqLower.includes('bodyweight') || eqLower.includes('calisthenic') || eqLower.includes('none')) icon = '🏠';
         badge.innerHTML = `<span>${icon}</span> ${equipment}`;
     }
 
-    // Highlight active location pill buttons across all views
+    const getEquipKey = (str) => {
+        const s = (str || '').toLowerCase();
+        if (s.includes('dumbbell')) return 'dumbbell';
+        if (s.includes('home') || s.includes('bodyweight') || s.includes('calisthenic') || s.includes('none')) return 'home';
+        return 'gym';
+    };
+
+    const targetKey = getEquipKey(equipment);
+
+    // Highlight active location pill buttons across all views (mutually exclusive)
     const pillButtons = document.querySelectorAll('.location-pill-btn');
     pillButtons.forEach(btn => {
         const btnEq = btn.getAttribute('data-equipment') || '';
-        const eqLower = equipment.toLowerCase();
-        const btnLower = btnEq.toLowerCase();
-        let match = false;
-        if (eqLower.includes('dumbbell') && btnLower.includes('dumbbell')) match = true;
-        else if ((eqLower.includes('home') || eqLower.includes('bodyweight')) && (btnLower.includes('home') || btnLower.includes('bodyweight'))) match = true;
-        else if (eqLower.includes('gym') && btnLower.includes('gym')) match = true;
-        else if (eqLower === btnLower) match = true;
-
-        if (match) {
+        const btnKey = getEquipKey(btnEq);
+        
+        if (btnKey === targetKey) {
             btn.classList.add('active');
         } else {
             btn.classList.remove('active');
         }
     });
+
+    // Also synchronize settings select dropdown if present
+    const settingsSelect = document.getElementById('settings-equipment');
+    if (settingsSelect) {
+        settingsSelect.value = equipment;
+    }
 }
 
 async function switchEquipmentAccess(newEquipment) {
