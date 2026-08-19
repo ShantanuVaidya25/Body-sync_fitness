@@ -445,7 +445,7 @@ def setup_profile():
 @app.route('/api/player/update-settings', methods=['POST'])
 @login_required
 def update_player_settings():
-    """Update user stats settings like injuries and equipment"""
+    """Update user stats settings and adapt workouts on the spot if equipment changes"""
     data = request.json or {}
     user_id = session['user_id']
     
@@ -458,6 +458,10 @@ def update_player_settings():
     experience_level = data.get('experience_level')
     injuries = data.get('injuries')
     equipment = data.get('equipment')
+    
+    # Get previous stats to detect equipment change
+    prev_stats = stats_manager.get_player_stats(user_id) or {}
+    old_equipment = prev_stats.get('equipment', 'Full Commercial Gym')
     
     # Safe casting
     if age is not None:
@@ -490,10 +494,101 @@ def update_player_settings():
     
     if not success:
         return jsonify({'error': 'No settings updated or user not found'}), 400
+    
+    updated_stats = stats_manager.get_player_stats(user_id) or {}
+    equipment_changed = equipment and (equipment != old_equipment)
+    weekly_plan_adapted = False
+    new_quest = None
+    
+    # If equipment was updated, adapt active workout routines and daily quest on the spot
+    if equipment_changed or data.get('force_adapt'):
+        active_physique = quest_generator.get_active_physique_quest(user_id)
+        if active_physique:
+            user_analyzer = get_analyzer_for_user(user_id)
+            adapt_res = user_analyzer.adapt_physique_quest_to_equipment(
+                user_id=user_id,
+                active_quest=active_physique,
+                new_equipment=equipment,
+                user_stats=updated_stats,
+                db=db
+            )
+            weekly_plan_adapted = adapt_res.get('success', False)
+        
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM goals WHERE user_id = ? AND status = 'active'", (user_id,))
+        goals = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        primary_focus_areas = stats_manager.get_primary_focus_areas(user_id)
+        try:
+            new_quest = quest_generator.regenerate_daily_quest(user_id, goals, primary_focus_areas)
+        except Exception as ex_quest:
+            print(f"⚠️ Error regenerating daily quest on settings update: {ex_quest}")
         
     return jsonify({
         'success': True,
-        'message': 'Hunter configuration updated! The system has adapted to your changes.'
+        'equipment': equipment or old_equipment,
+        'equipment_changed': equipment_changed,
+        'weekly_plan_adapted': weekly_plan_adapted,
+        'quest': new_quest,
+        'message': f"Hunter configuration updated! Training protocol adapted to '{equipment or old_equipment}'."
+    })
+
+
+@app.route('/api/player/change-equipment', methods=['POST'])
+@login_required
+def change_player_equipment():
+    """1-Click quick endpoint to change location/equipment and adapt workout routine on the spot"""
+    user_id = session['user_id']
+    data = request.json or {}
+    new_equipment = data.get('equipment')
+    
+    if not new_equipment:
+        return jsonify({'error': 'Equipment location specification required'}), 400
+        
+    prev_stats = stats_manager.get_player_stats(user_id) or {}
+    old_equipment = prev_stats.get('equipment', 'Full Commercial Gym')
+    
+    # Update stats
+    stats_manager.update_player_stats_settings(
+        user_id=user_id,
+        equipment=new_equipment
+    )
+    
+    updated_stats = stats_manager.get_player_stats(user_id) or {}
+    weekly_plan_adapted = False
+    
+    # Check for active character build goal
+    active_physique = quest_generator.get_active_physique_quest(user_id)
+    if active_physique:
+        user_analyzer = get_analyzer_for_user(user_id)
+        adapt_res = user_analyzer.adapt_physique_quest_to_equipment(
+            user_id=user_id,
+            active_quest=active_physique,
+            new_equipment=new_equipment,
+            user_stats=updated_stats,
+            db=db
+        )
+        weekly_plan_adapted = adapt_res.get('success', False)
+        
+    # Regenerate today's active quest
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM goals WHERE user_id = ? AND status = 'active'", (user_id,))
+    goals = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    primary_focus_areas = stats_manager.get_primary_focus_areas(user_id)
+    new_quest = quest_generator.regenerate_daily_quest(user_id, goals, primary_focus_areas)
+    
+    return jsonify({
+        'success': True,
+        'equipment': new_equipment,
+        'old_equipment': old_equipment,
+        'weekly_plan_adapted': weekly_plan_adapted,
+        'quest': new_quest,
+        'message': f"⚡ SYSTEM NOTICE: Training environment switched to '{new_equipment}'. Workout routines adapted on the spot!"
     })
 
 

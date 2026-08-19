@@ -451,6 +451,9 @@ function updatePlayerCard(stats) {
             statPointsSec.style.display = 'none';
         }
     }
+    
+    // Sync equipment UI buttons and badges
+    syncEquipmentUI(stats.equipment || 'Full Commercial Gym');
 }
 
 function getRankFromLevel(level) {
@@ -1010,6 +1013,9 @@ function displayFullQuest(quest) {
     document.getElementById('quest-difficulty').textContent = `Rank: ${rankLetter}`;
     document.getElementById('quest-reward').textContent = 
         `Reward: ${quest.exp_reward || 0} EXP`;
+    
+    // Sync equipment UI
+    syncEquipmentUI(quest.equipment || (currentStats && currentStats.equipment) || 'Full Commercial Gym');
     
     const content = document.getElementById('quest-content');
     content.innerHTML = '';
@@ -3736,6 +3742,163 @@ function closeHunterSettingsModal() {
     if (modal) modal.style.display = 'none';
 }
 
+function syncEquipmentUI(equipment) {
+    if (!equipment) return;
+    const currentLabel = document.getElementById('current-equipment-label');
+    if (currentLabel) {
+        currentLabel.textContent = equipment;
+    }
+    
+    const badge = document.getElementById('quest-equipment-badge');
+    if (badge) {
+        let icon = '🏋️‍♂️';
+        const eqLower = equipment.toLowerCase();
+        if (eqLower.includes('dumbbell')) icon = '🧱';
+        else if (eqLower.includes('home') || eqLower.includes('bodyweight')) icon = '🏠';
+        badge.innerHTML = `<span>${icon}</span> ${equipment}`;
+    }
+
+    // Highlight active location pill buttons across all views
+    const pillButtons = document.querySelectorAll('.location-pill-btn');
+    pillButtons.forEach(btn => {
+        const btnEq = btn.getAttribute('data-equipment') || '';
+        const eqLower = equipment.toLowerCase();
+        const btnLower = btnEq.toLowerCase();
+        let match = false;
+        if (eqLower.includes('dumbbell') && btnLower.includes('dumbbell')) match = true;
+        else if ((eqLower.includes('home') || eqLower.includes('bodyweight')) && (btnLower.includes('home') || btnLower.includes('bodyweight'))) match = true;
+        else if (eqLower.includes('gym') && btnLower.includes('gym')) match = true;
+        else if (eqLower === btnLower) match = true;
+
+        if (match) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+async function switchEquipmentAccess(newEquipment) {
+    if (!newEquipment) return;
+    
+    const overlay = document.getElementById('system-recalibration-overlay');
+    const fill = document.getElementById('recalibration-progress-fill');
+    const title = document.getElementById('recalibration-title');
+    const subtitle = document.getElementById('recalibration-subtitle');
+    const statusText = document.getElementById('recalibration-status-text');
+    const step1 = document.getElementById('recal-step-1');
+    const step2 = document.getElementById('recal-step-2');
+    const step3 = document.getElementById('recal-step-3');
+    const step1Text = document.getElementById('recal-step-1-text');
+    const step2Text = document.getElementById('recal-step-2-text');
+    const step3Text = document.getElementById('recal-step-3-text');
+
+    if (overlay) {
+        // Reset steps & progress animation
+        if (fill) fill.style.width = '12%';
+        if (title) title.textContent = 'RECALIBRATING TRAINING PROTOCOL';
+        if (subtitle) subtitle.textContent = `Adapting your workout routine, daily quests, and weekly splits to ${newEquipment}...`;
+        if (statusText) statusText.textContent = 'SYSTEM RECALIBRATION IN PROGRESS...';
+        
+        if (step1) {
+            step1.className = 'recal-step active';
+            if (step1Text) step1Text.textContent = `Switching training access to ${newEquipment}...`;
+        }
+        if (step2) {
+            step2.className = 'recal-step';
+            if (step2Text) {
+                const eqL = newEquipment.toLowerCase();
+                if (eqL.includes('home') || eqL.includes('bodyweight')) {
+                    step2Text.textContent = 'Converting Compound Gym Lifts to Calisthenics & Bodyweight Progressions...';
+                } else if (eqL.includes('dumbbell')) {
+                    step2Text.textContent = 'Adapting Routine to Free Weights & Dumbbell Hypertrophy Overload...';
+                } else {
+                    step2Text.textContent = 'Scaling Up Routine to Full Commercial Gym Machines & Barbells...';
+                }
+            }
+        }
+        if (step3) {
+            step3.className = 'recal-step';
+            if (step3Text) step3Text.textContent = "Syncing Today's Daily Dungeon Quest & Weekly Story Split...";
+        }
+
+        overlay.style.display = 'flex';
+    }
+
+    try {
+        // Step 1 animation
+        await new Promise(r => setTimeout(r, 350));
+        if (fill) fill.style.width = '38%';
+        if (step1) step1.className = 'recal-step completed';
+        if (step2) step2.className = 'recal-step active';
+
+        // Step 2 animation
+        await new Promise(r => setTimeout(r, 450));
+        if (fill) fill.style.width = '72%';
+
+        // Call backend API
+        const response = await fetch(`${API_BASE}/api/player/change-equipment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ equipment: newEquipment }),
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to recalibrate training equipment');
+        }
+
+        // Step 3 animation
+        if (step2) step2.className = 'recal-step completed';
+        if (step3) step3.className = 'recal-step active';
+        if (fill) fill.style.width = '92%';
+        await new Promise(r => setTimeout(r, 400));
+
+        if (step3) step3.className = 'recal-step completed';
+        if (fill) fill.style.width = '100%';
+        if (statusText) statusText.textContent = '⚡ RECALIBRATION COMPLETE!';
+
+        // Update local stats state
+        if (currentStats) {
+            currentStats.equipment = newEquipment;
+        }
+        syncEquipmentUI(newEquipment);
+
+        // Update quest view
+        if (data.quest) {
+            currentQuest = data.quest;
+            displayFullQuest(data.quest);
+        } else {
+            await loadTodaysQuest();
+        }
+
+        // Reload schedule and active target
+        await loadWeeklySchedule();
+        if (typeof loadActiveTargetBanner === 'function') {
+            loadActiveTargetBanner();
+        }
+
+        // Finish animation and hide overlay smoothly
+        await new Promise(r => setTimeout(r, 500));
+        if (overlay) {
+            overlay.style.animation = 'fadeInOverlay 0.25s reverse forwards';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                overlay.style.animation = '';
+            }, 250);
+        }
+
+        showToast(`⚡ Location switched to ${newEquipment}. Workout adapted on the spot!`);
+
+    } catch (error) {
+        console.error('Error switching equipment access:', error);
+        if (overlay) overlay.style.display = 'none';
+        showToast(`Recalibration error: ${error.message}`);
+    }
+}
+
 async function saveHunterSettings() {
     const age = parseInt(document.getElementById('settings-age').value) || null;
     const days_per_week = parseInt(document.getElementById('settings-days-per-week').value) || 5;
@@ -3754,12 +3917,24 @@ async function saveHunterSettings() {
         ? (selectedConditions.join(', ') + (notes ? ` (${notes})` : ''))
         : 'None';
         
+    const oldEquipment = (currentStats && currentStats.equipment) ? currentStats.equipment : '';
+    const equipmentChanged = equipment && (equipment !== oldEquipment);
+    
+    closeHunterSettingsModal();
+
+    if (equipmentChanged) {
+        // Trigger the full System Recalibration loading screen experience on the spot
+        await switchEquipmentAccess(equipment);
+        return;
+    }
+        
     try {
         const res = await fetch(`${API_BASE}/api/player/update-settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                age, height_cm, weight_kg, days_per_week, experience_level, injuries, equipment
+                age, height_cm, weight_kg, days_per_week, experience_level, injuries, equipment,
+                force_adapt: equipmentChanged
             }),
             credentials: 'include'
         });
@@ -3767,8 +3942,11 @@ async function saveHunterSettings() {
         const data = await res.json();
         if (res.ok) {
             showToast('💾 Settings saved successfully!');
-            closeHunterSettingsModal();
             await loadDashboard();
+            if (data.quest) {
+                currentQuest = data.quest;
+                displayFullQuest(data.quest);
+            }
         } else {
             showToast(data.error || 'Failed to save settings');
         }

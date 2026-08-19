@@ -554,6 +554,30 @@
                     </div>
                 </div>
 
+                <!-- Location & Equipment Access Quick Switcher -->
+                <div class="card location-quick-switch-bar" style="margin-bottom: 20px; padding: 14px 18px; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="font-size: 1.6rem; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(56, 189, 248, 0.12); border-radius: 10px; border: 1px solid rgba(56, 189, 248, 0.3);">📍</div>
+                            <div>
+                                <div style="font-size: 0.72rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Orbitron', sans-serif;">TRAINING ACCESS & LOCATION</div>
+                                <div style="font-size: 0.96rem; font-weight: 700; color: #f8fafc;" id="current-equipment-label">Full Commercial Gym</div>
+                            </div>
+                        </div>
+                        <div class="location-switcher-buttons" id="quest-location-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="location-pill-btn active" data-equipment="Full Commercial Gym" onclick="switchEquipmentAccess('Full Commercial Gym')">
+                                <span>🏋️‍♂️</span> Full Gym
+                            </button>
+                            <button type="button" class="location-pill-btn" data-equipment="Dumbbells & Home Setup" onclick="switchEquipmentAccess('Dumbbells & Home Setup')">
+                                <span>🧱</span> Dumbbells
+                            </button>
+                            <button type="button" class="location-pill-btn" data-equipment="Home / Bodyweight" onclick="switchEquipmentAccess('Home / Bodyweight')">
+                                <span>🏠</span> Home / Bodyweight
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Active Character Target Banner -->
                 <div id="active-target-banner" class="active-target-banner" style="margin-bottom: 20px;"></div>
 
@@ -562,6 +586,7 @@
                     <div class="quest-meta">
                         <span class="quest-difficulty" id="quest-difficulty"></span>
                         <span class="quest-reward" id="quest-reward"></span>
+                        <span class="quest-equipment-badge" id="quest-equipment-badge">🏋️ Full Commercial Gym</span>
                     </div>
                 </div>
 
@@ -1752,6 +1777,53 @@
                         <button type="button" class="btn btn-secondary" onclick="closeCreateRoutineModal()">Cancel</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Recalibration & Equipment Adaptation Loading Modal -->
+    <div id="system-recalibration-overlay" class="modal-overlay system-recalibration-modal" style="display: none;">
+        <div class="system-recalibration-box">
+            <div class="recalibration-glow-ring"></div>
+            <div class="system-header-badge">
+                <span class="pulsing-blue-dot"></span>
+                <span>SYSTEM PROTOCOL: TRAINING RECALIBRATION</span>
+            </div>
+            
+            <div class="recalibration-icon-wrapper">
+                <div class="recalibration-portal-pulse"></div>
+                <div class="recalibration-icon" id="recalibration-main-icon">⚡</div>
+            </div>
+
+            <h2 id="recalibration-title" class="recalibration-title">RECALIBRATING TRAINING PROTOCOL</h2>
+            <p id="recalibration-subtitle" class="recalibration-subtitle">
+                Adapting your workout routine, daily quests, and weekly splits from Gym to Home Setup...
+            </p>
+            
+            <div class="recalibration-progress-container">
+                <div class="recalibration-progress-bar">
+                    <div id="recalibration-progress-fill" class="recalibration-progress-fill"></div>
+                </div>
+            </div>
+            
+            <div class="recalibration-steps-list">
+                <div class="recal-step active" id="recal-step-1">
+                    <span class="recal-step-icon">📍</span>
+                    <span class="recal-step-text" id="recal-step-1-text">Updating Hunter Equipment Profile to Home Setup...</span>
+                </div>
+                <div class="recal-step" id="recal-step-2">
+                    <span class="recal-step-icon">🔄</span>
+                    <span class="recal-step-text" id="recal-step-2-text">Converting Compound Lifts to Home & Calisthenics Variations...</span>
+                </div>
+                <div class="recal-step" id="recal-step-3">
+                    <span class="recal-step-icon">⚔️</span>
+                    <span class="recal-step-text" id="recal-step-3-text">Syncing Today's Daily Dungeon Quest & Weekly Story Split...</span>
+                </div>
+            </div>
+
+            <div class="system-recalibration-status" id="recalibration-status-badge">
+                <span class="spinner-inline"></span>
+                <span id="recalibration-status-text">SYSTEM RECALIBRATION IN PROGRESS...</span>
             </div>
         </div>
     </div>

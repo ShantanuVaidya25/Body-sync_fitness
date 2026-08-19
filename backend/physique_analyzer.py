@@ -249,6 +249,67 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
         fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name)
         return {'success': True, 'days': fallback_days, 'fallback_used': True}
 
+    def adapt_physique_quest_to_equipment(self, user_id: int, active_quest: Dict,
+                                          new_equipment: str, user_stats: Dict, db) -> Dict:
+        """
+        Adapts the active character build goal (physique quest) and its structured 7-day
+        training split on the spot to match the newly selected equipment / location access.
+        """
+        from models import WeeklyPlanManager
+        target_name = active_quest.get('target_name') or 'Custom Build'
+        quest_id = active_quest['id']
+        current_body_type = user_stats.get('body_type', 'mesomorph')
+        injuries = user_stats.get('injuries', 'None')
+        
+        adapted_markdown = None
+        structured_days = None
+        
+        # 1. Try AI Generation if configured
+        if self.is_configured():
+            try:
+                res = self.generate_quest_log(
+                    target_name=target_name,
+                    image_path=None,
+                    current_body_type=current_body_type,
+                    injuries=injuries,
+                    equipment=new_equipment
+                )
+                if res.get('success'):
+                    adapted_markdown = res['quest_log_markdown']
+                    weekly_res = self.extract_structured_weekly_plan(adapted_markdown, target_name=target_name)
+                    if weekly_res.get('success'):
+                        structured_days = weekly_res.get('days')
+            except Exception as e:
+                print(f"⚠️  AI adaptation for {target_name} to {new_equipment} failed ({e}), using deterministic character adapter.")
+
+        # 2. Deterministic character adapter fallback
+        if not structured_days:
+            adapted_markdown, structured_days = generate_character_equipment_split(
+                target_name, new_equipment, current_body_type, injuries
+            )
+
+        # 3. Save to database
+        try:
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE physique_quests SET quest_log_markdown = ? WHERE id = ? AND user_id = ?',
+                           (adapted_markdown, quest_id, user_id))
+            conn.commit()
+            conn.close()
+
+            weekly_plan_mgr = WeeklyPlanManager(db)
+            weekly_plan_mgr.save_weekly_plan(user_id, quest_id, structured_days)
+        except Exception as ex_db:
+            print(f"⚠️  Error saving adapted weekly plan: {ex_db}")
+
+        return {
+            'success': True,
+            'target_name': target_name,
+            'equipment': new_equipment,
+            'days': structured_days,
+            'quest_log_markdown': adapted_markdown
+        }
+
     def generate_weekly_workout_json(self, 
                                      body_type: str, 
                                      days_per_week: int = 5, 
@@ -256,27 +317,6 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
                                      injuries: str = "None") -> Dict:
         """
         Generate a weekly workout plan strictly following the Backend Fitness Programming Engine schema.
-        
-        STRICT OUTPUT FORMATTING:
-        Valid JSON payload matching:
-        {
-          "program_overview": "A 1-sentence summary of the program focus based on the body type",
-          "weekly_schedule": [
-            {
-              "day_number": 1,
-              "muscle_focus": "e.g., Push / Pull / Legs / Full Body / Rest",
-              "routine": [
-                {
-                  "exercise_name": "Exact name of movement",
-                  "sets": 3,
-                  "reps": "8-12",
-                  "rest_seconds": 90,
-                  "form_cue": "1 short sentence on form or alternative modification"
-                }
-              ]
-            }
-          ]
-        }
         """
         import json
         enriched_baseline = enrich_body_type(body_type)
@@ -290,12 +330,12 @@ USER PROFILE AND INPUT VARIABLES:
 - Known Injuries/Limitations: {injuries}
 
 PROGRAMMING RULES:
-1. Baseline Alignment: You must tailor the exercise selection strictly to the user's physical baseline. If the profile dictates low joint tolerance (e.g., overweight), do not prescribe high-impact plyometrics or heavy spinal loading. If the profile indicates low muscle mass and fast metabolism, prioritize heavy compound lifts with adequate recovery.
-2. Volume and Intensity: Modulate the set/rep schemes to match the user's implied recovery capacity. Do not prescribe advanced split routines to absolute beginners.
+1. Baseline Alignment: You must tailor the exercise selection strictly to the user's physical baseline and equipment access. If the equipment is Home / Bodyweight, only prescribe bodyweight calisthenics. If Dumbbells, prescribe dumbbell movements. If Full Gym, prescribe gym equipment.
+2. Volume and Intensity: Modulate the set/rep schemes to match the user's implied recovery capacity.
 3. Realistic Progression: Every exercise must include actionable rest periods and rep ranges.
 
 STRICT OUTPUT FORMATTING:
-You are a data API. You must output the requested workout plan STRICTLY as a valid JSON object. Do not output any conversational text, introductory greetings, markdown formatting outside of the JSON block, or medical disclaimers. Any output other than raw JSON will break the application architecture.
+You are a data API. You must output the requested workout plan STRICTLY as a valid JSON object. Do not output any conversational text, markdown outside of JSON, or disclaimers.
 
 The JSON payload must follow this exact structure:
 {{
@@ -372,165 +412,159 @@ The JSON payload must follow this exact structure:
 
     def _generate_fallback_json_routine(self, body_type: str, enriched_baseline: str, days_per_week: int, equipment: str, injuries: str) -> dict:
         """
-        Generate deterministic fallback program adhering strictly to the JSON schema:
-        {
-          "program_overview": "...",
-          "weekly_schedule": [...]
-        }
+        Generate deterministic fallback program adhering strictly to equipment access and body type.
         """
-        bt = str(body_type).lower()
-        if 'overweight' in enriched_baseline.lower() or 'joint' in enriched_baseline.lower() or 'endo' in bt:
-            overview = "Joint-friendly low-impact program focused on fat loss, metabolic conditioning, and knee protection."
+        eq = (equipment or '').lower()
+        is_db = 'dumbbell' in eq
+        is_home = not is_db and ('home' in eq or 'bodyweight' in eq or 'calisthenics' in eq or 'none' in eq)
+        
+        if is_home:
+            overview = f"Home Calisthenics Routine tailored for {body_type.upper()} build with zero equipment requirements."
             schedule = [
                 {
                     "day_number": 1,
-                    "muscle_focus": "Lower Body (Joint-Friendly)",
+                    "muscle_focus": "Upper Body Push & Core (Home)",
                     "routine": [
-                        {"exercise_name": "Box Squats", "sets": 4, "reps": "12-15", "rest_seconds": 60, "form_cue": "Sit back onto box to reduce patellar knee stress."},
-                        {"exercise_name": "Glute Bridges", "sets": 3, "reps": "15", "rest_seconds": 60, "form_cue": "Squeeze glutes at top without hyperextending lower back."}
+                        {"exercise_name": "Standard / Diamond Push-Ups", "sets": 4, "reps": "12-15", "rest_seconds": 60, "form_cue": "Keep core tight and elbow tucked at 45 degrees."},
+                        {"exercise_name": "Pike Push-Ups (Shoulders)", "sets": 3, "reps": "8-10", "rest_seconds": 60, "form_cue": "Elevate hips high in V-shape and lower crown of head forward."},
+                        {"exercise_name": "Chair / Bed Edge Dips", "sets": 3, "reps": "12-15", "rest_seconds": 60, "form_cue": "Lower until 90 degree elbow bend, press up locking triceps."},
+                        {"exercise_name": "Plank with Shoulder Taps", "sets": 3, "reps": "20 taps", "rest_seconds": 45, "form_cue": "Brace core to prevent hip rotation."}
                     ]
                 },
                 {
                     "day_number": 2,
-                    "muscle_focus": "Upper Body Push & Pull",
+                    "muscle_focus": "Lower Body Power & Legs (Home)",
                     "routine": [
-                        {"exercise_name": "Incline Push-Ups", "sets": 3, "reps": "12-15", "rest_seconds": 60, "form_cue": "Maintain rigid core alignment throughout set."},
-                        {"exercise_name": "Seated Lat Pulldowns", "sets": 4, "reps": "12", "rest_seconds": 60, "form_cue": "Pull with elbows down towards chest."}
+                        {"exercise_name": "Tempo Bodyweight Squats", "sets": 4, "reps": "20", "rest_seconds": 60, "form_cue": "3 seconds eccentric descent with full depth below parallel."},
+                        {"exercise_name": "Bulgarian Split Squats (Couch/Chair)", "sets": 3, "reps": "12 per leg", "rest_seconds": 60, "form_cue": "Drive through front heel, keep front knee stacked."},
+                        {"exercise_name": "Single-Leg Glute Bridges", "sets": 3, "reps": "15 per leg", "rest_seconds": 45, "form_cue": "Squeeze glute at top for 2 seconds without lumbar arch."},
+                        {"exercise_name": "Calf Raises on Step Edge", "sets": 4, "reps": "25", "rest_seconds": 45, "form_cue": "Full ankle stretch at bottom, explosive rise onto toes."}
                     ]
                 },
                 {
                     "day_number": 3,
-                    "muscle_focus": "Active Recovery / Low-Impact Cardio",
+                    "muscle_focus": "Back Pull & Conditioning (Home)",
                     "routine": [
-                        {"exercise_name": "Stationary Cycling / Incline Walking", "sets": 1, "reps": "30 mins", "rest_seconds": 0, "form_cue": "Keep steady conversational pace to maximize fat oxidation."}
+                        {"exercise_name": "Doorframe / Towel Inverted Rows", "sets": 4, "reps": "12-15", "rest_seconds": 60, "form_cue": "Squeeze shoulder blades together at chest peak."},
+                        {"exercise_name": "Superman Back Holds", "sets": 3, "reps": "12 (3s hold)", "rest_seconds": 45, "form_cue": "Lift chest and thighs engaging spinal erectors."},
+                        {"exercise_name": "Mountain Climbers & Burpees Finisher", "sets": 3, "reps": "30 sec work", "rest_seconds": 60, "form_cue": "High intensity aerobic output."}
                     ]
                 },
                 {
                     "day_number": 4,
-                    "muscle_focus": "Full Body Conditioning",
+                    "muscle_focus": "Active Recovery & Mobility",
                     "routine": [
-                        {"exercise_name": "Step-ups on Low Box", "sets": 3, "reps": "10 per leg", "rest_seconds": 60, "form_cue": "Drive through front heel, avoid pushing off back toe."},
-                        {"exercise_name": "Standing Overhead Cable / Band Press", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Press vertically while bracing abdominal wall."}
+                        {"exercise_name": "Full Body Mobility & Yoga Flow", "sets": 1, "reps": "25 mins", "rest_seconds": 0, "form_cue": "Breathe deeply into tight hamstrings and hips."}
                     ]
                 },
                 {
                     "day_number": 5,
-                    "muscle_focus": "Rest & Mobility",
+                    "muscle_focus": "Full Body Calisthenics Mastery",
                     "routine": [
-                        {"exercise_name": "Dynamic Hip & Hamstring Mobility Stretch", "sets": 1, "reps": "20 mins", "rest_seconds": 0, "form_cue": "Breathe deeply into stretches without bouncing."}
+                        {"exercise_name": "Decline Push-Ups (Feet Elevated)", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Target upper clavicular chest fibres."},
+                        {"exercise_name": "Jump Squats (Explosive)", "sets": 4, "reps": "12", "rest_seconds": 60, "form_cue": "Land softly absorbing impact with bent knees."},
+                        {"exercise_name": "Hollow Body Holds & Russian Twists", "sets": 3, "reps": "45s / 20 reps", "rest_seconds": 45, "form_cue": "Keep lower back pressed flat into floor."}
                     ]
                 }
             ]
-        elif 'fast metabolism' in enriched_baseline.lower() or 'ecto' in bt or 'skinny' in bt or 'lean' in bt:
-            overview = "High-yield compound hypertrophy program designed to maximize muscle mass and preserve energy."
+        elif is_db:
+            overview = f"Dumbbell & Home Gym Routine focused on progressive overload for {body_type.upper()} build."
             schedule = [
                 {
                     "day_number": 1,
-                    "muscle_focus": "Lower Body Power",
+                    "muscle_focus": "Dumbbell Push (Chest, Shoulders, Triceps)",
                     "routine": [
-                        {"exercise_name": "Barbell / Heavy Goblet Squats", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Break parallel with chest high and knees tracking toes."},
-                        {"exercise_name": "Romanian Deadlifts", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Hinge at hips with flat back until stretch in hamstrings."}
+                        {"exercise_name": "Flat / Floor Dumbbell Press", "sets": 4, "reps": "10-12", "rest_seconds": 75, "form_cue": "Control descent and push weights together over sternum."},
+                        {"exercise_name": "Standing Dumbbell Shoulder Press", "sets": 3, "reps": "10", "rest_seconds": 75, "form_cue": "Press overhead without arching lower spine."},
+                        {"exercise_name": "Dumbbell Lateral Raises", "sets": 3, "reps": "12-15", "rest_seconds": 60, "form_cue": "Lead with elbows for optimal medial delt activation."},
+                        {"exercise_name": "Overhead Dumbbell Tricep Extension", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Keep elbows tucked forward near ears."}
                     ]
                 },
                 {
                     "day_number": 2,
-                    "muscle_focus": "Upper Body Heavy Compounds",
+                    "muscle_focus": "Dumbbell Pull (Back, Biceps, Rear Delts)",
                     "routine": [
-                        {"exercise_name": "Flat Bench Press", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Tuck elbows slightly and touch lower sternum."},
-                        {"exercise_name": "Weighted Pull-ups", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Full extension at bottom, pull chin over bar."}
+                        {"exercise_name": "Bent-over Dumbbell Rows", "sets": 4, "reps": "10-12", "rest_seconds": 75, "form_cue": "Pull dumbbells back toward hips squeezing lats."},
+                        {"exercise_name": "Dumbbell Bicep Curls", "sets": 3, "reps": "10-12", "rest_seconds": 60, "form_cue": "Full supination at top of curl."},
+                        {"exercise_name": "Dumbbell Hammer Curls", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Neutral grip to build brachialis and forearm thickness."},
+                        {"exercise_name": "Dumbbell Shrugs & Rear Delt Flyes", "sets": 3, "reps": "15", "rest_seconds": 60, "form_cue": "Squeeze upper traps and upper back at top."}
                     ]
                 },
                 {
                     "day_number": 3,
-                    "muscle_focus": "Rest & Hypertrophy Recovery",
+                    "muscle_focus": "Dumbbell Legs & Core",
                     "routine": [
-                        {"exercise_name": "Caloric Surplus Rest & Recovery", "sets": 0, "reps": "Rest", "rest_seconds": 0, "form_cue": "Prioritize sleep and protein intake."}
+                        {"exercise_name": "Dumbbell Goblet Squats", "sets": 4, "reps": "10-12", "rest_seconds": 90, "form_cue": "Hold dumbbell vertically at chest, break parallel."},
+                        {"exercise_name": "Dumbbell Romanian Deadlifts", "sets": 4, "reps": "10", "rest_seconds": 90, "form_cue": "Hinge at hips feeling deep hamstring stretch."},
+                        {"exercise_name": "Dumbbell Walking Lunges", "sets": 3, "reps": "10 per leg", "rest_seconds": 75, "form_cue": "Step forward with tall chest, drive through heel."},
+                        {"exercise_name": "Dumbbell Russian Twists", "sets": 3, "reps": "20", "rest_seconds": 45, "form_cue": "Rotate torso holding light dumbbell."}
                     ]
                 },
                 {
                     "day_number": 4,
-                    "muscle_focus": "Shoulders & Back Hypertrophy",
+                    "muscle_focus": "Active Recovery & Mobility",
                     "routine": [
-                        {"exercise_name": "Overhead Barbell Press", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Squeeze glutes and press overhead without leaning back."},
-                        {"exercise_name": "Bent-over Dumbbell Rows", "sets": 4, "reps": "8", "rest_seconds": 90, "form_cue": "Pull dumbbell to hip, squeezing lats."}
+                        {"exercise_name": "Active Walk & Full Body Stretching", "sets": 1, "reps": "30 mins", "rest_seconds": 0, "form_cue": "Enhance blood flow and muscle repair."}
                     ]
                 },
                 {
                     "day_number": 5,
-                    "muscle_focus": "Arms & Core Accessory",
+                    "muscle_focus": "Dumbbell Conditioning & Thrusters",
                     "routine": [
-                        {"exercise_name": "Incline Dumbbell Bicep Curls", "sets": 3, "reps": "10-12", "rest_seconds": 90, "form_cue": "Keep upper arms stationary and isolate bicep peak."},
-                        {"exercise_name": "Triceps Skullcrushers", "sets": 3, "reps": "10-12", "rest_seconds": 90, "form_cue": "Lower bar towards forehead keeping elbows elbowed."}
-                    ]
-                }
-            ]
-        elif 'moderate body fat, low underlying' in enriched_baseline.lower() or 'skinnyfat' in bt or 'skinny_fat' in bt:
-            overview = "Body recomposition protocol balancing strength overload with progressive metabolic conditioning."
-            schedule = [
-                {
-                    "day_number": 1,
-                    "muscle_focus": "Push / Strength Recomp",
-                    "routine": [
-                        {"exercise_name": "Barbell Bench Press", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Drive feet into floor and maintain arched upper back."},
-                        {"exercise_name": "Standing Overhead Dumbbell Press", "sets": 3, "reps": "10", "rest_seconds": 90, "form_cue": "Lock out shoulders overhead on every rep."}
-                    ]
-                },
-                {
-                    "day_number": 2,
-                    "muscle_focus": "Pull / Back & Core",
-                    "routine": [
-                        {"exercise_name": "Barbell Rows", "sets": 4, "reps": "10", "rest_seconds": 90, "form_cue": "Keep torso at 45 degree angle and pull to belly button."},
-                        {"exercise_name": "Hanging Leg Raises", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Raise legs using lower abs without momentum."}
-                    ]
-                },
-                {
-                    "day_number": 3,
-                    "muscle_focus": "Legs & Recomp Cardio",
-                    "routine": [
-                        {"exercise_name": "Barbell Back Squats", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Push through middle of foot and keep chest tall."},
-                        {"exercise_name": "Kettlebell Swing Finisher", "sets": 3, "reps": "15", "rest_seconds": 60, "form_cue": "Snap hips forward forcefully."}
-                    ]
-                },
-                {
-                    "day_number": 4,
-                    "muscle_focus": "Rest & Active Walk",
-                    "routine": [
-                        {"exercise_name": "Brisk Outdoor Walk", "sets": 1, "reps": "40 mins", "rest_seconds": 0, "form_cue": "Promote blood flow and non-exercise physical activity."}
+                        {"exercise_name": "Dumbbell Thrusters (Squat to Press)", "sets": 4, "reps": "10", "rest_seconds": 75, "form_cue": "Explode upward out of squat into overhead press."},
+                        {"exercise_name": "Dumbbell Renegade Rows", "sets": 3, "reps": "8 per arm", "rest_seconds": 60, "form_cue": "Maintain rigid plank while rowing dumbbell to ribcage."},
+                        {"exercise_name": "Dumbbell Farmer's Carries", "sets": 3, "reps": "45 sec carry", "rest_seconds": 60, "form_cue": "Brace core and walk with perfect upright posture."}
                     ]
                 }
             ]
         else:
-            overview = "Advanced Push/Pull/Legs volume accumulation program for athletic conditioning and muscle density."
+            # Full Commercial Gym
+            overview = f"Commercial Gym Compound Program maximizing hypertrophy and strength for {body_type.upper()} build."
             schedule = [
                 {
                     "day_number": 1,
-                    "muscle_focus": "Push Split",
+                    "muscle_focus": "Push (Chest, Shoulders, Triceps)",
                     "routine": [
-                        {"exercise_name": "Barbell Bench Press", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Control 2-second eccentric phase."},
-                        {"exercise_name": "Incline Dumbbell Press", "sets": 3, "reps": "10-12", "rest_seconds": 75, "form_cue": "Focus on upper chest stretch."}
+                        {"exercise_name": "Barbell Bench Press", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Retract scapulae and press bar with controlled tempo."},
+                        {"exercise_name": "Incline Dumbbell Press", "sets": 3, "reps": "10-12", "rest_seconds": 75, "form_cue": "Stretch upper chest at bottom."},
+                        {"exercise_name": "Cable Lateral Raises", "sets": 3, "reps": "12-15", "rest_seconds": 60, "form_cue": "Continuous tension throughout movement."},
+                        {"exercise_name": "Tricep Rope Pushdowns", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Flare rope apart at bottom lockout."}
                     ]
                 },
                 {
                     "day_number": 2,
-                    "muscle_focus": "Pull Split",
+                    "muscle_focus": "Pull (Back, Biceps, Rear Delts)",
                     "routine": [
-                        {"exercise_name": "Barbell Deadlifts", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Pull slack out of bar before lifting."},
-                        {"exercise_name": "Weighted Pull-ups", "sets": 4, "reps": "8", "rest_seconds": 90, "form_cue": "Drive elbows down to side ribs."}
+                        {"exercise_name": "Barbell Deadlifts / Lat Pulldowns", "sets": 4, "reps": "6-8", "rest_seconds": 120, "form_cue": "Drive floor away, lock out hips at top."},
+                        {"exercise_name": "Seated Cable Rows", "sets": 4, "reps": "10", "rest_seconds": 75, "form_cue": "Pull to lower abdomen squeezing rhomboids."},
+                        {"exercise_name": "EZ-Bar / Cable Bicep Curls", "sets": 3, "reps": "10-12", "rest_seconds": 60, "form_cue": "Pin elbows to ribs and isolate biceps."},
+                        {"exercise_name": "Face Pulls", "sets": 3, "reps": "15", "rest_seconds": 60, "form_cue": "Pull rope to forehead for rear delt health."}
                     ]
                 },
                 {
                     "day_number": 3,
-                    "muscle_focus": "Legs Split",
+                    "muscle_focus": "Legs & Core Power",
                     "routine": [
-                        {"exercise_name": "Barbell Back Squats", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Spread floor with feet to engage glutes."},
-                        {"exercise_name": "Bulgarian Split Squats", "sets": 3, "reps": "10 per leg", "rest_seconds": 75, "form_cue": "Keep front shin vertical."}
+                        {"exercise_name": "Barbell Back Squats", "sets": 4, "reps": "8-10", "rest_seconds": 90, "form_cue": "Chest up, break parallel with knee tracking."},
+                        {"exercise_name": "Leg Press Machine", "sets": 3, "reps": "12", "rest_seconds": 75, "form_cue": "Control eccentric phase without bouncing."},
+                        {"exercise_name": "Lying Leg Curls / RDLs", "sets": 3, "reps": "10-12", "rest_seconds": 75, "form_cue": "Direct hamstring overload."},
+                        {"exercise_name": "Hanging Leg Raises", "sets": 3, "reps": "12", "rest_seconds": 60, "form_cue": "Curl pelvis upward to engage lower abdominals."}
                     ]
                 },
                 {
                     "day_number": 4,
-                    "muscle_focus": "Conditioning & Rest",
+                    "muscle_focus": "Active Recovery & Cardio",
                     "routine": [
-                        {"exercise_name": "Sprint Intervals", "sets": 5, "reps": "30 sec sprint", "rest_seconds": 60, "form_cue": "Maximum effort output on bike or track."}
+                        {"exercise_name": "Incline Treadmill Walk / Rowing", "sets": 1, "reps": "30 mins", "rest_seconds": 0, "form_cue": "Steady-state aerobic recovery."}
+                    ]
+                },
+                {
+                    "day_number": 5,
+                    "muscle_focus": "Upper Body Hypertrophy & Arms",
+                    "routine": [
+                        {"exercise_name": "Overhead Barbell Press", "sets": 4, "reps": "8", "rest_seconds": 90, "form_cue": "Tight glutes and core throughout press."},
+                        {"exercise_name": "Chest Fly Machine (Pec Deck)", "sets": 3, "reps": "12-15", "rest_seconds": 60, "form_cue": "Squeeze pectorals for 1 second peak hold."},
+                        {"exercise_name": "Dips (Bodyweight or Weighted)", "sets": 3, "reps": "10-12", "rest_seconds": 75, "form_cue": "Lean forward slightly for chest focus."}
                     ]
                 }
             ]
@@ -560,10 +594,10 @@ def extract_section(markdown_text: str, header: str) -> str:
     return '\n'.join(section_lines).strip()
 
 
-def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Optional[str] = None) -> list:
+def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym") -> list:
     """
     Fallback parser that converts markdown text into a structured 7-day plan
-    (Monday through Sunday) when AI JSON extraction is unavailable or fails.
+    (Monday through Sunday) respecting the player's equipment access.
     """
     import re
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -588,7 +622,7 @@ def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Option
     if current_day:
         day_blocks.append(current_day)
         
-    t_name = target_name or "Character"
+    t_name = target_name or "Hunter"
     days = []
     
     if day_blocks:
@@ -649,158 +683,275 @@ def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Option
                     ]
                 })
     else:
-        default_splits = [
-            {'focus': f'{t_name} Upper Body Power', 'is_rest': False, 'exercises': [{'name': f'{t_name} Push-ups', 'sets': 4, 'reps': '15', 'notes': 'Chest & shoulders'}, {'name': f'{t_name} Pull-ups', 'sets': 3, 'reps': '8', 'notes': 'Back & arms'}, {'name': 'Dips', 'sets': 3, 'reps': '12', 'notes': 'Triceps & chest'}]},
-            {'focus': f'{t_name} Lower Body & Legs', 'is_rest': False, 'exercises': [{'name': f'{t_name} Squats', 'sets': 4, 'reps': '20', 'notes': 'Leg power'}, {'name': 'Lunges', 'sets': 3, 'reps': '12', 'notes': 'Quads & glutes'}, {'name': 'Calf Raises', 'sets': 4, 'reps': '20', 'notes': 'Calf endurance'}]},
-            {'focus': f'{t_name} Active Recovery', 'is_rest': True, 'exercises': []},
-            {'focus': f'{t_name} Core & Agility', 'is_rest': False, 'exercises': [{'name': f'{t_name} Planks', 'sets': 3, 'reps': '60 sec', 'notes': 'Core stability'}, {'name': 'Russian Twists', 'sets': 3, 'reps': '20', 'notes': 'Obliques'}, {'name': 'Mountain Climbers', 'sets': 3, 'reps': '30 sec', 'notes': 'Agility'}]},
-            {'focus': f'{t_name} Full Body Conditioning', 'is_rest': False, 'exercises': [{'name': f'{t_name} Burpees', 'sets': 4, 'reps': '10', 'notes': 'Stamina'}, {'name': 'Jumping Jacks', 'sets': 3, 'reps': '30', 'notes': 'Cardio'}, {'name': 'Pike Push-ups', 'sets': 3, 'reps': '10', 'notes': 'Shoulders'}]},
-            {'focus': f'{t_name} Master Trial Workout', 'is_rest': False, 'exercises': [{'name': f'{t_name} Diamond Push-ups', 'sets': 3, 'reps': '12', 'notes': 'Tricep focus'}, {'name': 'Jump Squats', 'sets': 3, 'reps': '15', 'notes': 'Explosive legs'}, {'name': 'V-Ups', 'sets': 3, 'reps': '12', 'notes': 'Abs'}]},
-            {'focus': f'{t_name} Rest & Reset Day', 'is_rest': True, 'exercises': []}
-        ]
-        
-        for idx in range(7):
-            split = default_splits[idx]
-            days.append({
-                'day_of_week': idx,
-                'day_label': day_names[idx],
-                'focus': split['focus'],
-                'is_rest': split['is_rest'],
-                'exercises': split['exercises']
-            })
+        # Generate default split directly matching target character and equipment
+        _, days = generate_character_equipment_split(t_name, equipment)
             
     return days
 
 
-    def generate_weekly_workout_json(self, body_type: str) -> Dict:
-        """
-        Generate a weekly workout plan strictly as a JSON array tailored to enriched body type.
-        
-        Strict System Prompt:
-        Act as an elite strength and conditioning coach. Generate a weekly workout plan for a new client.
-        The client's current physical baseline is: [Insert Enriched Body Type Variable].
-        You must tailor the exercise selection, volume, and cardio recommendations to optimize results for this specific baseline.
-        Output the routine strictly as a JSON array containing day of the week, exercise name, sets, reps, and rest periods. Do not include introductory text or disclaimers.
-        """
-        import json
-        enriched_baseline = enrich_body_type(body_type)
-        
-        prompt = f"""Act as an elite strength and conditioning coach. Generate a weekly workout plan for a new client.
-The client's current physical baseline is: {enriched_baseline}
-You must tailor the exercise selection, volume, and cardio recommendations to optimize results for this specific baseline.
-Output the routine strictly as a JSON array containing day of the week, exercise name, sets, reps, and rest periods. Do not include introductory text or disclaimers."""
+def generate_character_equipment_split(target_name: str, equipment: str, body_type: str = "mesomorph", injuries: str = "None") -> tuple:
+    """
+    Generates an authentic character training split and gamified Quest Log markdown
+    adapted strictly to the specified equipment access (Home, Dumbbells, Gym).
+    """
+    t_name = target_name or "Shadow Hunter"
+    t_lower = t_name.lower()
+    eq = (equipment or "Full Commercial Gym").lower()
+    is_db = 'dumbbell' in eq
+    is_home = not is_db and ('home' in eq or 'bodyweight' in eq or 'calisthenics' in eq or 'none' in eq)
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-        if not self.is_configured():
-            fallback_routine = self._generate_fallback_json_routine(body_type, enriched_baseline)
-            return {
-                'success': True,
-                'body_type': body_type,
-                'enriched_baseline': enriched_baseline,
-                'routine': fallback_routine,
-                'is_fallback': True
-            }
-
-        try:
-            response = self.client.models.generate_content(
-                model=MODEL_NAME,
-                contents=[prompt]
-            )
-            raw_text = response.text or ""
-            clean_text = raw_text.strip()
-            if clean_text.startswith("```json"):
-                clean_text = clean_text[7:]
-            if clean_text.startswith("```"):
-                clean_text = clean_text[3:]
-            if clean_text.endswith("```"):
-                clean_text = clean_text[:-3]
-            clean_text = clean_text.strip()
-            
-            routine_json = json.loads(clean_text)
-            return {
-                'success': True,
-                'body_type': body_type,
-                'enriched_baseline': enriched_baseline,
-                'routine': routine_json,
-                'is_fallback': False
-            }
-        except Exception as e:
-            fallback_routine = self._generate_fallback_json_routine(body_type, enriched_baseline)
-            return {
-                'success': True,
-                'body_type': body_type,
-                'enriched_baseline': enriched_baseline,
-                'routine': fallback_routine,
-                'is_fallback': True,
-                'notice': f'AI generation notice: {str(e)}'
-            }
-
-    def _generate_fallback_json_routine(self, body_type: str, enriched_baseline: str) -> list:
-        """
-        Generate deterministic JSON array fallback routine adhering to enriched body type rules:
-        - Lean/Skinny: Hypertrophy, heavy compound lifts, minimal cardio, longer rest periods (90-120s)
-        - Skinny-Fat: Body recomposition, progressive overload, moderate metabolic conditioning (60-90s)
-        - Overweight: Fat loss, joint-friendly variations (box squats, incline pushups), higher cardio, 60s rest
-        - Athletic: Advanced Push/Pull/Legs split, volume accumulation, specialized accessory work
-        """
-        bt = str(body_type).lower()
-        if 'overweight' in enriched_baseline.lower() or 'joint' in enriched_baseline.lower() or 'endo' in bt:
-            return [
-                {"day_of_week": "Monday", "exercise_name": "Box Squats (Joint-Friendly)", "sets": 4, "reps": "12-15", "rest_period": "60s"},
-                {"day_of_week": "Monday", "exercise_name": "Incline Push-Ups", "sets": 3, "reps": "12-15", "rest_period": "60s"},
-                {"day_of_week": "Monday", "exercise_name": "Stationary Bike / Incline Walking Cardio", "sets": 1, "reps": "25 mins", "rest_period": "60s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Seated Resistance Cable / Band Rows", "sets": 4, "reps": "15", "rest_period": "60s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Step-ups on Low Box", "sets": 3, "reps": "12 per leg", "rest_period": "60s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Rowing Machine / Low-Impact Cardio", "sets": 1, "reps": "20 mins", "rest_period": "60s"},
-                {"day_of_week": "Wednesday", "exercise_name": "Active Recovery Stretch & Mobility", "sets": 1, "reps": "30 mins", "rest_period": "None"},
-                {"day_of_week": "Thursday", "exercise_name": "Glute Bridges & Hamstring Curls", "sets": 4, "reps": "15", "rest_period": "60s"},
-                {"day_of_week": "Thursday", "exercise_name": "Dumbbell Overhead Press (Seated)", "sets": 3, "reps": "12", "rest_period": "60s"},
-                {"day_of_week": "Thursday", "exercise_name": "Water Aerobics / Elliptical Cardio", "sets": 1, "reps": "25 mins", "rest_period": "60s"},
-                {"day_of_week": "Friday", "exercise_name": "Wall Sits & Standing Calf Raises", "sets": 3, "reps": "45 sec hold / 20 reps", "rest_period": "60s"},
-                {"day_of_week": "Friday", "exercise_name": "Lat Pulldowns / Assisted Pulls", "sets": 4, "reps": "12", "rest_period": "60s"},
-                {"day_of_week": "Saturday", "exercise_name": "Brisk Walking & Core Stabilization", "sets": 1, "reps": "35 mins", "rest_period": "60s"},
-                {"day_of_week": "Sunday", "exercise_name": "Full Rest & Recovery Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
+    if 'jin-woo' in t_lower or 'jinwoo' in t_lower or 'sung' in t_lower:
+        if is_home:
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Shadow Daily Trial (Push & Core)", 'is_rest': False, 'exercises': [
+                    {'name': 'Diamond Push-ups', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Tricep and chest power for dagger thrusts'},
+                    {'name': 'Decline Push-ups', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Upper chest development'},
+                    {'name': 'Chair / Bench Dips', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Tricep power lockout'},
+                    {'name': 'Hollow Body Hold', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 45, 'notes': 'Shadow Monarch core brace'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Monarch Agility & Back", 'is_rest': False, 'exercises': [
+                    {'name': 'Doorframe / Towel Inverted Rows', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Lat development with zero gear'},
+                    {'name': 'Superman Back Extensions', 'sets': 3, 'reps': '15', 'rest_seconds': 45, 'notes': 'Spinal erector and posterior chain'},
+                    {'name': 'Mountain Climber Sprints', 'sets': 4, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Speed and quick reflexes'},
+                    {'name': 'Bicycle Crunches', 'sets': 3, 'reps': '25', 'rest_seconds': 45, 'notes': 'Rotational core power'}
+                ]},
+                {'focus': f"🛌 {t_name}: Shadow Realm Rest & Recovery", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Ruler's Hand Leg Power", 'is_rest': False, 'exercises': [
+                    {'name': 'Explosive Jump Squats', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Explosive leap and landing deceleration'},
+                    {'name': 'Bulgarian Split Squats (Chair)', 'sets': 3, 'reps': '12 per leg', 'rest_seconds': 60, 'notes': 'Unilateral quad balance'},
+                    {'name': 'Single-Leg Calf Raises', 'sets': 4, 'reps': '20', 'rest_seconds': 45, 'notes': 'Sprint springiness'},
+                    {'name': 'Wall Sits', 'sets': 3, 'reps': '60 sec', 'notes': 'Isometric leg endurance'}
+                ]},
+                {'focus': f"⚔️ {t_name}: 100x Daily Quest Trial", 'is_rest': False, 'exercises': [
+                    {'name': 'Standard Push-ups', 'sets': 4, 'reps': '25', 'rest_seconds': 60, 'notes': 'System daily quest target (100 pushups)'},
+                    {'name': 'Bodyweight Squats', 'sets': 4, 'reps': '25', 'rest_seconds': 60, 'notes': 'System daily quest target (100 squats)'},
+                    {'name': 'Abdominal Crunches', 'sets': 4, 'reps': '25', 'rest_seconds': 45, 'notes': 'System daily quest target (100 situps)'},
+                    {'name': 'High-Knee Sprint in Place', 'sets': 4, 'reps': '60 sec', 'rest_seconds': 60, 'notes': '10km run conditioning equivalent'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Dungeon Boss Trial", 'is_rest': False, 'exercises': [
+                    {'name': 'Archer Push-ups', 'sets': 3, 'reps': '8 per arm', 'rest_seconds': 75, 'notes': 'Single-arm strength balance'},
+                    {'name': 'Pike Push-ups', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Vertical pressing deltoid power'},
+                    {'name': 'Burpees', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Full-body combat endurance'},
+                    {'name': 'Plank Hold', 'sets': 3, 'reps': '60 sec', 'rest_seconds': 45, 'notes': 'Unbreakable core shield'}
+                ]},
+                {'focus': f"🛌 {t_name}: System Full Recovery", 'is_rest': True, 'exercises': []}
             ]
-        elif 'fast metabolism' in enriched_baseline.lower() or 'ecto' in bt or 'skinny' in bt or 'lean' in bt:
-            return [
-                {"day_of_week": "Monday", "exercise_name": "Barbell / Heavy Goblet Squats", "sets": 4, "reps": "6-8", "rest_period": "120s"},
-                {"day_of_week": "Monday", "exercise_name": "Flat Bench Press", "sets": 4, "reps": "6-8", "rest_period": "120s"},
-                {"day_of_week": "Monday", "exercise_name": "Weighted Dips", "sets": 3, "reps": "8-10", "rest_period": "90s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Barbell / Heavy Dumbbell Deadlifts", "sets": 4, "reps": "5", "rest_period": "120s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Weighted Pull-ups", "sets": 4, "reps": "6-8", "rest_period": "120s"},
-                {"day_of_week": "Wednesday", "exercise_name": "Hypertrophy Caloric Rest & Recovery", "sets": 0, "reps": "Rest", "rest_period": "None"},
-                {"day_of_week": "Thursday", "exercise_name": "Overhead Shoulder Press", "sets": 4, "reps": "6-8", "rest_period": "120s"},
-                {"day_of_week": "Thursday", "exercise_name": "Incline Dumbbell Press", "sets": 3, "reps": "8-10", "rest_period": "90s"},
-                {"day_of_week": "Friday", "exercise_name": "Romanian Deadlifts & Hamstring Curls", "sets": 4, "reps": "8-10", "rest_period": "90s"},
-                {"day_of_week": "Friday", "exercise_name": "Heavy Dumbbell Rows", "sets": 4, "reps": "8", "rest_period": "90s"},
-                {"day_of_week": "Saturday", "exercise_name": "Barbell Bicep Curls & Skullcrushers", "sets": 3, "reps": "10-12", "rest_period": "90s"},
-                {"day_of_week": "Sunday", "exercise_name": "Full Muscle Growth Rest Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
-            ]
-        elif 'moderate body fat, low underlying' in enriched_baseline.lower() or 'skinnyfat' in bt or 'skinny_fat' in bt:
-            return [
-                {"day_of_week": "Monday", "exercise_name": "Barbell Squats", "sets": 4, "reps": "8-10", "rest_period": "90s"},
-                {"day_of_week": "Monday", "exercise_name": "Push-Ups / Bench Press", "sets": 4, "reps": "10-12", "rest_period": "90s"},
-                {"day_of_week": "Monday", "exercise_name": "Kettlebell Swing Conditioning", "sets": 3, "reps": "15", "rest_period": "60s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Bent-over Barbell Rows", "sets": 4, "reps": "10", "rest_period": "90s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Bulgarian Split Squats", "sets": 3, "reps": "10 per leg", "rest_period": "60s"},
-                {"day_of_week": "Wednesday", "exercise_name": "Active Recovery Walk & Stretching", "sets": 1, "reps": "30 mins", "rest_period": "None"},
-                {"day_of_week": "Thursday", "exercise_name": "Dumbbell Shoulder Press", "sets": 4, "reps": "10", "rest_period": "90s"},
-                {"day_of_week": "Thursday", "exercise_name": "Bodyweight Dips & Chin-ups", "sets": 3, "reps": "10", "rest_period": "60s"},
-                {"day_of_week": "Friday", "exercise_name": "Romanian Deadlifts", "sets": 4, "reps": "10", "rest_period": "90s"},
-                {"day_of_week": "Friday", "exercise_name": "HIIT Bodyweight Circuit", "sets": 4, "reps": "45 sec work", "rest_period": "45s"},
-                {"day_of_week": "Saturday", "exercise_name": "Core Recomp (Planks & Russian Twists)", "sets": 4, "reps": "60s hold / 20 reps", "rest_period": "60s"},
-                {"day_of_week": "Sunday", "exercise_name": "Recomposition Rest & Recovery Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
+        elif is_db:
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Dumbbell Chest & Delts", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Floor Press', 'sets': 4, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Heavy dagger push strength'},
+                    {'name': 'Standing Dumbbell Shoulder Press', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Shoulder deltoid mass'},
+                    {'name': 'Dumbbell Lateral Raises', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': '3D hunter shoulder width'},
+                    {'name': 'Dumbbell Russian Twists', 'sets': 3, 'reps': '20', 'rest_seconds': 45, 'notes': 'Core rotation stability'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Shadow Extract Back Pull", 'is_rest': False, 'exercises': [
+                    {'name': 'Bent-over Dumbbell Rows', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Lats and upper back thickness'},
+                    {'name': 'Dumbbell Romanian Deadlifts', 'sets': 4, 'reps': '10', 'rest_seconds': 90, 'notes': 'Hamstring and glute hinge'},
+                    {'name': 'Dumbbell Hammer Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Forearm and bicep grip power'},
+                    {'name': 'Plank with Dumbbell Pull-Through', 'sets': 3, 'reps': '12', 'rest_seconds': 45, 'notes': 'Anti-rotational core'}
+                ]},
+                {'focus': f"🛌 {t_name}: Rest & Stat Point Allocation", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Dumbbell Leg Domination", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Goblet Squats', 'sets': 4, 'reps': '12', 'rest_seconds': 90, 'notes': 'Deep quad power'},
+                    {'name': 'Dumbbell Walking Lunges', 'sets': 3, 'reps': '10 per leg', 'rest_seconds': 75, 'notes': 'Single-leg balance and speed'},
+                    {'name': 'Dumbbell Calf Raises', 'sets': 4, 'reps': '20', 'rest_seconds': 45, 'notes': 'Explosive ankle drive'},
+                    {'name': 'Dumbbell Romanian Deadlifts', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Posterior chain reinforcement'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Monarch Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Thrusters', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Full body explosive power'},
+                    {'name': 'Dumbbell Renegade Rows', 'sets': 3, 'reps': '8 per arm', 'rest_seconds': 60, 'notes': 'Core and back synergy'},
+                    {'name': 'Push-ups to Floor', 'sets': 3, 'reps': '20', 'rest_seconds': 60, 'notes': 'Chest burnout'},
+                    {'name': 'Dumbbell Swings', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Hip snap stamina'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Dungeon Boss Finisher", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Incline/Floor Press', 'sets': 3, 'reps': '12', 'rest_seconds': 75, 'notes': 'Upper chest focus'},
+                    {'name': 'Dumbbell Bicep Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Arm hypertrophy'},
+                    {'name': 'Jump Squats', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Fast-twitch power'},
+                    {'name': 'Hollow Body Hold', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 45, 'notes': 'Core endurance'}
+                ]},
+                {'focus': f"🛌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
             ]
         else:
-            return [
-                {"day_of_week": "Monday", "exercise_name": "Push: Barbell Bench Press", "sets": 4, "reps": "8-10", "rest_period": "90s"},
-                {"day_of_week": "Monday", "exercise_name": "Push: Overhead Dumbbell Press", "sets": 4, "reps": "10", "rest_period": "90s"},
-                {"day_of_week": "Monday", "exercise_name": "Push: Incline Chest Flyes & Dips", "sets": 3, "reps": "12", "rest_period": "60s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Pull: Barbell Deadlifts", "sets": 4, "reps": "6-8", "rest_period": "120s"},
-                {"day_of_week": "Tuesday", "exercise_name": "Pull: Weighted Pull-ups & Cable Rows", "sets": 4, "reps": "8-10", "rest_period": "90s"},
-                {"day_of_week": "Wednesday", "exercise_name": "Legs: Barbell Back Squats", "sets": 4, "reps": "8-10", "rest_period": "90s"},
-                {"day_of_week": "Wednesday", "exercise_name": "Legs: Romanian Deadlifts & Walking Lunges", "sets": 4, "reps": "10", "rest_period": "90s"},
-                {"day_of_week": "Thursday", "exercise_name": "Active Recovery & Mobility Work", "sets": 1, "reps": "30 mins", "rest_period": "None"},
-                {"day_of_week": "Friday", "exercise_name": "Hypertrophy Upper Body Accessories", "sets": 4, "reps": "12-15", "rest_period": "60s"},
-                {"day_of_week": "Saturday", "exercise_name": "Athletic Conditioning & Sprint Intervals", "sets": 5, "reps": "30s sprint", "rest_period": "60s"},
-                {"day_of_week": "Sunday", "exercise_name": "Advanced Athlete Rest & Reset Day", "sets": 0, "reps": "Rest", "rest_period": "None"}
+            # Full Commercial Gym
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Monarch Heavy Push (Chest & Shoulders)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Bench Press', 'sets': 4, 'reps': '8-10', 'rest_seconds': 90, 'notes': 'Heavy compound chest drive'},
+                    {'name': 'Overhead Barbell Press', 'sets': 4, 'reps': '8', 'rest_seconds': 90, 'notes': 'Deltoid shoulder mass'},
+                    {'name': 'Incline Dumbbell Press', 'sets': 3, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Clavicular chest definition'},
+                    {'name': 'Cable Lateral Raises', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': '3D side delts'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Shadow Pull (Lats & Deadlifts)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Deadlifts', 'sets': 4, 'reps': '6', 'rest_seconds': 120, 'notes': 'Total posterior chain power'},
+                    {'name': 'Lat Pulldowns', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Latissimus dorsi V-taper'},
+                    {'name': 'Seated Cable Rows', 'sets': 3, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Rhomboid and mid-back density'},
+                    {'name': 'Cable Bicep Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Bicep peak contraction'}
+                ]},
+                {'focus': f"🛌 {t_name}: Shadow Realm Rest", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Monarch Leg Power (Squats)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Back Squats', 'sets': 4, 'reps': '8', 'rest_seconds': 120, 'notes': 'Heavy quad and glute strength'},
+                    {'name': 'Leg Press', 'sets': 3, 'reps': '12', 'rest_seconds': 90, 'notes': 'Quad hypertrophy volume'},
+                    {'name': 'Lying Hamstring Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Hamstring flexor isolation'},
+                    {'name': 'Standing Calf Machine', 'sets': 4, 'reps': '15', 'rest_seconds': 45, 'notes': 'Calf endurance and definition'}
+                ]},
+                {'focus': f"⚔️ {t_name}: S-Rank Arms & Core", 'is_rest': False, 'exercises': [
+                    {'name': 'Dips (Weighted)', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Tricep and lower chest power'},
+                    {'name': 'Tricep Rope Pushdowns', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Tricep lateral head isolation'},
+                    {'name': 'EZ-Bar Bicep Curls', 'sets': 3, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Bicep thickness'},
+                    {'name': 'Hanging Leg Raises', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Lower abdominal compression'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Dungeon Speed & Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Incline Treadmill Sprints', 'sets': 5, 'reps': '30s sprint', 'rest_seconds': 60, 'notes': 'Fast-twitch speed recovery'},
+                    {'name': 'Rowing Machine Intervals', 'sets': 3, 'reps': '500m', 'rest_seconds': 90, 'notes': 'Cardiovascular endurance'},
+                    {'name': 'Kettlebell Swings', 'sets': 3, 'reps': '20', 'rest_seconds': 60, 'notes': 'Hip snap explosiveness'}
+                ]},
+                {'focus': f"🛌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
             ]
+    else:
+        # General character / Custom / Photo build split adapted to equipment
+        if is_home:
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Upper Body Calisthenics", 'is_rest': False, 'exercises': [
+                    {'name': 'Standard Push-ups', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Upper body pushing foundation'},
+                    {'name': 'Pike Push-ups', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Shoulder deltoid strength'},
+                    {'name': 'Chair / Bench Dips', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Tricep lockout power'},
+                    {'name': 'Plank Hold', 'sets': 3, 'reps': '60 sec', 'rest_seconds': 45, 'notes': 'Core stability'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Back Pull & Agility", 'is_rest': False, 'exercises': [
+                    {'name': 'Doorframe / Towel Inverted Rows', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Back pulling without equipment'},
+                    {'name': 'Superman Extensions', 'sets': 3, 'reps': '15', 'rest_seconds': 45, 'notes': 'Posterior chain stabilizer'},
+                    {'name': 'Mountain Climbers', 'sets': 3, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Agility conditioning'}
+                ]},
+                {'focus': f"🛌 {t_name}: Active Recovery & Mobility", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Lower Body Calisthenics", 'is_rest': False, 'exercises': [
+                    {'name': 'Bodyweight Squats', 'sets': 4, 'reps': '20', 'rest_seconds': 60, 'notes': 'Leg power foundation'},
+                    {'name': 'Bulgarian Split Squats', 'sets': 3, 'reps': '12 per leg', 'rest_seconds': 60, 'notes': 'Unilateral quad balance'},
+                    {'name': 'Glute Bridges', 'sets': 3, 'reps': '15', 'rest_seconds': 45, 'notes': 'Glute and hamstring activation'},
+                    {'name': 'Calf Raises', 'sets': 4, 'reps': '20', 'rest_seconds': 45, 'notes': 'Calf endurance'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Full Body Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Burpees', 'sets': 4, 'reps': '10', 'rest_seconds': 60, 'notes': 'Metabolic conditioning'},
+                    {'name': 'Diamond Push-ups', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Tricep and chest focus'},
+                    {'name': 'Jump Squats', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Explosive power'},
+                    {'name': 'Russian Twists', 'sets': 3, 'reps': '20', 'rest_seconds': 45, 'notes': 'Rotational core'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Core Mastery & Stretch", 'is_rest': False, 'exercises': [
+                    {'name': 'Bicycle Crunches', 'sets': 3, 'reps': '20', 'rest_seconds': 45, 'notes': 'Abdominal conditioning'},
+                    {'name': 'Side Planks', 'sets': 3, 'reps': '30s per side', 'rest_seconds': 45, 'notes': 'Oblique strength'},
+                    {'name': 'Full Body Mobility Flow', 'sets': 1, 'reps': '20 mins', 'rest_seconds': 0, 'notes': 'Flexibility and recovery'}
+                ]},
+                {'focus': f"🛌 {t_name}: Rest & Growth Day", 'is_rest': True, 'exercises': []}
+            ]
+        elif is_db:
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Dumbbell Push (Chest & Shoulders)", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Floor / Bench Press', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Chest strength builder'},
+                    {'name': 'Dumbbell Shoulder Press', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Overhead shoulder power'},
+                    {'name': 'Dumbbell Lateral Raises', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Deltoid isolation'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Dumbbell Pull (Back & Biceps)", 'is_rest': False, 'exercises': [
+                    {'name': 'Bent-over Dumbbell Rows', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Back thickness and lat power'},
+                    {'name': 'Dumbbell Bicep Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Arm hypertrophy'},
+                    {'name': 'Dumbbell Romanian Deadlifts', 'sets': 3, 'reps': '10', 'rest_seconds': 90, 'notes': 'Hamstring hinge'}
+                ]},
+                {'focus': f"🛌 {t_name}: Rest & Recovery", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Dumbbell Legs & Core", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Goblet Squats', 'sets': 4, 'reps': '12', 'rest_seconds': 90, 'notes': 'Leg power and depth'},
+                    {'name': 'Dumbbell Walking Lunges', 'sets': 3, 'reps': '10 per leg', 'rest_seconds': 75, 'notes': 'Unilateral balance'},
+                    {'name': 'Dumbbell Russian Twists', 'sets': 3, 'reps': '20', 'rest_seconds': 45, 'notes': 'Core stability'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Dumbbell Full Body Thrusters", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Thrusters', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Full body explosive output'},
+                    {'name': 'Push-ups', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Chest volume'},
+                    {'name': 'Dumbbell Hammer Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Forearm strength'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Core & Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Plank with Dumbbell Pull-Through', 'sets': 3, 'reps': '12', 'rest_seconds': 45, 'notes': 'Anti-rotational core'},
+                    {'name': 'Jump Squats', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Fast-twitch power'}
+                ]},
+                {'focus': f"🛌 {t_name}: Rest & Growth Day", 'is_rest': True, 'exercises': []}
+            ]
+        else:
+            # Full Commercial Gym
+            split_days = [
+                {'focus': f"⚔️ {t_name}: Gym Push (Chest & Delts)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Bench Press', 'sets': 4, 'reps': '8-10', 'rest_seconds': 90, 'notes': 'Chest compound mass'},
+                    {'name': 'Overhead Barbell Press', 'sets': 3, 'reps': '8', 'rest_seconds': 90, 'notes': 'Shoulder strength'},
+                    {'name': 'Incline Dumbbell Press', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Upper chest'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Gym Pull (Back & Biceps)", 'is_rest': False, 'exercises': [
+                    {'name': 'Lat Pulldowns', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Lat width and V-taper'},
+                    {'name': 'Seated Cable Rows', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Mid-back density'},
+                    {'name': 'Cable Bicep Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Bicep hypertrophy'}
+                ]},
+                {'focus': f"🛌 {t_name}: Rest & Recovery", 'is_rest': True, 'exercises': []},
+                {'focus': f"⚔️ {t_name}: Gym Legs (Squats & Machines)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Back Squats', 'sets': 4, 'reps': '8-10', 'rest_seconds': 90, 'notes': 'Quad and glute power'},
+                    {'name': 'Leg Press Machine', 'sets': 3, 'reps': '12', 'rest_seconds': 75, 'notes': 'Leg volume'},
+                    {'name': 'Lying Hamstring Curls', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Hamstring flexor isolation'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Arms & Core Hypertrophy", 'is_rest': False, 'exercises': [
+                    {'name': 'Dips (Weighted)', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Tricep power'},
+                    {'name': 'Tricep Rope Pushdowns', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Tricep isolation'},
+                    {'name': 'Hanging Leg Raises', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Lower ab compression'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Speed & Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Incline Treadmill Sprints', 'sets': 5, 'reps': '30s sprint', 'rest_seconds': 60, 'notes': 'High-intensity conditioning'},
+                    {'name': 'Rowing Machine Intervals', 'sets': 3, 'reps': '500m', 'rest_seconds': 90, 'notes': 'Cardio stamina'}
+                ]},
+                {'focus': f"🛌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
+            ]
+
+    # Structure all 7 days with day_of_week indices
+    structured_days = []
+    for idx, day_info in enumerate(split_days[:7]):
+        structured_days.append({
+            'day_of_week': idx,
+            'day_label': day_names[idx],
+            'focus': day_info['focus'],
+            'is_rest': day_info['is_rest'],
+            'exercises': day_info.get('exercises', [])
+        })
+
+    # Build formatted markdown
+    markdown_lines = [
+        f"# 🎭 Quest Log: Becoming {t_name} ({equipment})",
+        "",
+        "## Physique Breakdown",
+        f"- **Archetype**: {t_name} Physical Standard",
+        f"- **Training Location**: {equipment}",
+        f"- **Physical Baseline**: {body_type.upper()}",
+        "- **Focus**: Aesthetic muscle definition, explosive power, and functional conditioning adapted specifically to your available equipment.",
+        "",
+        "## Daily Dailies",
+        "- 💧 Drink at least 3-4 liters of water daily.",
+        "- 🥩 Prioritize high-protein nutrition (1.6 - 2.2g per kg bodyweight).",
+        "- 😴 Target 7.5 - 9 hours of restorative sleep.",
+        "",
+        "## Main Story Quests",
+        f"Your 7-day training split tailored to {equipment}:",
+        ""
+    ]
+
+    for d in structured_days:
+        markdown_lines.append(f"### {d['day_label']}: {d['focus']}")
+        if d['is_rest']:
+            markdown_lines.append("- *Scheduled Rest & Muscle Recovery Day*")
+        else:
+            for ex in d['exercises']:
+                markdown_lines.append(f"- **{ex['name']}**: {ex['sets']} sets x {ex['reps']} reps ({ex.get('notes', 'Part of daily routine')})")
+        markdown_lines.append("")
+
+    markdown_lines.extend([
+        "## Side Quests",
+        f"- ⚡ **Level 1 Challenge**: Complete all 7 days of the {equipment} split with 100% adherence.",
+        f"- 🏆 **Monarch's Trial**: Beat at least one exercise repetition PR each week.",
+        "",
+        "## Level Up Milestones",
+        "- 🌟 **Milestone 1**: 7-Day Consistency Streak unlocked.",
+        "- 🌟 **Milestone 2**: +5 to all Core Attributes (Strength, Endurance, Agility, Vitality).",
+        "- 🌟 **Milestone 3**: Visible muscle density and V-taper aesthetic transformation."
+    ])
+
+    markdown_text = "\n".join(markdown_lines)
+    return markdown_text, structured_days

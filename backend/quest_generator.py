@@ -16,35 +16,94 @@ class AIQuestGenerator:
     def __init__(self, db):
         self.db = db
         
-        # Exercise categories and variations
-        self.exercise_pool = {
-            'strength': {
-                'upper_body': [
-                    'push_ups', 'pull_ups', 'dips', 'diamond_push_ups',
-                    'wide_push_ups', 'pike_push_ups', 'archer_push_ups',
-                    'decline_push_ups', 'clapping_push_ups', 'handstand_push_ups'
-                ],
-                'core': [
-                    'crunches', 'planks', 'side_planks', 'russian_twists',
-                    'bicycle_crunches', 'leg_raises', 'mountain_climbers',
-                    'flutter_kicks', 'v_ups', 'hollow_body_holds'
-                ],
-                'lower_body': [
-                    'squats', 'lunges', 'jump_squats', 'pistol_squats',
-                    'bulgarian_splits', 'calf_raises', 'wall_sits',
-                    'step_ups', 'glute_bridges', 'single_leg_deadlifts'
-                ]
+        # Comprehensive Equipment-Aware Exercise Pools
+        self.exercise_pools = {
+            'bodyweight': {
+                'strength': {
+                    'upper_body': [
+                        'push_ups', 'diamond_push_ups', 'wide_push_ups', 'pike_push_ups',
+                        'archer_push_ups', 'decline_push_ups', 'dips', 'handstand_push_ups',
+                        'incline_push_ups', 'doorframe_towel_rows', 'pull_ups'
+                    ],
+                    'core': [
+                        'crunches', 'planks', 'side_planks', 'russian_twists',
+                        'bicycle_crunches', 'leg_raises', 'mountain_climbers',
+                        'flutter_kicks', 'v_ups', 'hollow_body_holds', 'deadbugs'
+                    ],
+                    'lower_body': [
+                        'squats', 'lunges', 'jump_squats', 'pistol_squats',
+                        'bulgarian_splits', 'calf_raises', 'wall_sits',
+                        'step_ups', 'glute_bridges', 'single_leg_deadlifts'
+                    ]
+                },
+                'cardio': {
+                    'running': ['sprints', 'jog', 'interval_run', 'high_knees'],
+                    'bodyweight': ['burpees', 'jumping_jacks', 'butt_kicks', 'mountain_climbers'],
+                    'other': ['shadow_boxing', 'stair_climbing', 'lateral_hops']
+                },
+                'flexibility': {
+                    'stretching': ['yoga', 'dynamic_stretches', 'static_stretches', 'cobra_stretch'],
+                    'mobility': ['hip_circles', 'arm_circles', 'neck_rolls', 'world_greatest_stretch']
+                }
             },
-            'cardio': {
-                'running': ['sprints', 'jog', 'interval_run', 'hill_sprints'],
-                'bodyweight': ['burpees', 'jumping_jacks', 'high_knees', 'butt_kicks'],
-                'other': ['jump_rope', 'shadow_boxing', 'stair_climbing']
+            'dumbbells': {
+                'strength': {
+                    'upper_body': [
+                        'dumbbell_bench_press', 'dumbbell_shoulder_press', 'dumbbell_rows',
+                        'dumbbell_bicep_curls', 'dumbbell_lateral_raises', 'dumbbell_hammer_curls',
+                        'overhead_dumbbell_tricep_extension', 'dumbbell_floor_flyes', 'renegade_rows', 'push_ups'
+                    ],
+                    'core': [
+                        'dumbbell_russian_twists', 'weighted_planks', 'dumbbell_woodchoppers',
+                        'dumbbell_side_bends', 'bicycle_crunches', 'leg_raises'
+                    ],
+                    'lower_body': [
+                        'goblet_squats', 'dumbbell_romanian_deadlifts', 'dumbbell_walking_lunges',
+                        'dumbbell_bulgarian_splits', 'dumbbell_calf_raises', 'dumbbell_step_ups',
+                        'dumbbell_sumo_squats'
+                    ]
+                },
+                'cardio': {
+                    'running': ['sprints', 'jog', 'interval_run'],
+                    'bodyweight': ['dumbbell_thrusters', 'dumbbell_swings', 'burpees', 'jumping_jacks'],
+                    'other': ['jump_rope', 'shadow_boxing', 'stair_climbing']
+                },
+                'flexibility': {
+                    'stretching': ['yoga', 'dynamic_stretches', 'static_stretches'],
+                    'mobility': ['hip_circles', 'arm_circles', 'shoulder_dislocations']
+                }
             },
-            'flexibility': {
-                'stretching': ['yoga', 'dynamic_stretches', 'static_stretches'],
-                'mobility': ['hip_circles', 'arm_circles', 'neck_rolls']
+            'gym': {
+                'strength': {
+                    'upper_body': [
+                        'barbell_bench_press', 'incline_dumbbell_press', 'lat_pulldowns',
+                        'seated_cable_rows', 'overhead_barbell_press', 'cable_lateral_raises',
+                        'tricep_rope_pushdowns', 'cable_bicep_curls', 'chest_fly_machine', 'dips'
+                    ],
+                    'core': [
+                        'hanging_leg_raises', 'cable_woodchoppers', 'cable_crunches',
+                        'ab_wheel_rollouts', 'weighted_planks', 'captain_chair_knee_raises'
+                    ],
+                    'lower_body': [
+                        'barbell_back_squats', 'leg_press', 'romanian_deadlifts',
+                        'leg_extensions', 'lying_leg_curls', 'standing_calf_machine',
+                        'bulgarian_splits', 'barbell_lunges'
+                    ]
+                },
+                'cardio': {
+                    'running': ['treadmill_incline_sprints', 'jog', 'interval_run'],
+                    'bodyweight': ['rowing_machine', 'assault_bike', 'stairmaster', 'burpees'],
+                    'other': ['kettlebell_swings', 'jump_rope', 'battle_ropes']
+                },
+                'flexibility': {
+                    'stretching': ['yoga', 'dynamic_stretches', 'static_stretches', 'foam_rolling'],
+                    'mobility': ['hip_circles', 'shoulder_band_dislocations', 'hip_opener_stretch']
+                }
             }
         }
+        
+        # Backward-compatible default pool
+        self.exercise_pool = self.exercise_pools['bodyweight']
         
         # Rest and recovery indicators
         self.recovery_metrics = {
@@ -53,6 +112,16 @@ class AIQuestGenerator:
             'high_intensity': 1.5,
             'very_high_intensity': 2.0
         }
+    
+    def get_exercise_pool(self, equipment: str = "Full Commercial Gym") -> Dict:
+        """Return the exercise pool matching the user's location/equipment access"""
+        eq = (equipment or '').lower()
+        if 'dumbbell' in eq:
+            return self.exercise_pools['dumbbells']
+        elif 'home' in eq or 'bodyweight' in eq or 'calisthenics' in eq or 'none' in eq:
+            return self.exercise_pools['bodyweight']
+        else:
+            return self.exercise_pools['gym']
     
     def calculate_difficulty_level(self, user_id: int) -> int:
         """Calculate user's current difficulty level based on stats and history"""
@@ -82,7 +151,7 @@ class AIQuestGenerator:
     
     def generate_daily_quest(self, user_id: int, goals: List[Dict],
                             primary_focus_areas: List[str] = None) -> Dict:
-        """Generate a personalized daily quest based on goals and stats"""
+        """Generate a personalized daily quest based on goals, equipment, and stats"""
         from models import PlayerStats, ExerciseManager, WeeklyPlanManager
         
         stats_manager = PlayerStats(self.db)
@@ -92,6 +161,7 @@ class AIQuestGenerator:
         stats = stats_manager.get_player_stats(user_id)
         exercises = exercise_manager.get_user_exercises(user_id)
         difficulty = self.calculate_difficulty_level(user_id)
+        user_equipment = stats.get('equipment', 'Full Commercial Gym') if stats else 'Full Commercial Gym'
         
         todays_plan = weekly_plan_manager.get_plan_for_today(user_id)
         if todays_plan is None:
@@ -100,7 +170,8 @@ class AIQuestGenerator:
                 from physique_analyzer import parse_weekly_plan_from_markdown
                 fallback_days = parse_weekly_plan_from_markdown(
                     active_physique.get('quest_log_markdown', ''),
-                    active_physique.get('target_name')
+                    active_physique.get('target_name'),
+                    equipment=user_equipment
                 )
                 weekly_plan_manager.save_weekly_plan(user_id, active_physique['id'], fallback_days)
                 todays_plan = weekly_plan_manager.get_plan_for_today(user_id)
@@ -129,18 +200,19 @@ class AIQuestGenerator:
             'date': datetime.now().strftime('%Y-%m-%d'),
             'title': self.generate_quest_title(difficulty, focus_areas),
             'difficulty': difficulty,
+            'equipment': user_equipment,
             'exercises': [],
             'exp_reward': self.calculate_exp_reward(difficulty),
             'completion_bonus': self.calculate_exp_reward(difficulty) // 2,
             'focus_areas': focus_areas
         }
         
-        # Generate exercises based on focus areas
-        exercise_count = self.get_exercise_count(difficulty, stats['endurance'])
+        # Generate exercises based on focus areas and user equipment
+        exercise_count = self.get_exercise_count(difficulty, stats['endurance'] if stats else 10)
         
         for i in range(exercise_count):
             exercise = self.generate_exercise_task(
-                user_id, focus_areas, difficulty, exercises, i
+                user_id, focus_areas, difficulty, exercises, i, equipment=user_equipment
             )
             quest['exercises'].append(exercise)
         
@@ -306,8 +378,11 @@ class AIQuestGenerator:
     
     def get_weekly_schedule(self, user_id: int) -> Dict:
         """Get the full 7-day planned quest schedule for the user (Monday through Sunday)"""
-        from models import WeeklyPlanManager
+        from models import WeeklyPlanManager, PlayerStats
         weekly_plan_manager = WeeklyPlanManager(self.db)
+        stats_manager = PlayerStats(self.db)
+        user_stats = stats_manager.get_player_stats(user_id) if stats_manager else {}
+        user_equipment = user_stats.get('equipment', 'Full Commercial Gym') if user_stats else 'Full Commercial Gym'
         
         active_physique = self.get_active_physique_quest(user_id)
         target_name = active_physique.get('target_name') if active_physique else None
@@ -323,7 +398,8 @@ class AIQuestGenerator:
             from physique_analyzer import parse_weekly_plan_from_markdown
             fallback_days = parse_weekly_plan_from_markdown(
                 active_physique.get('quest_log_markdown', ''),
-                active_physique.get('target_name')
+                active_physique.get('target_name'),
+                equipment=user_equipment
             )
             weekly_plan_manager.save_weekly_plan(user_id, active_physique['id'], fallback_days)
             plan_days = weekly_plan_manager.get_all_days(user_id)
@@ -351,7 +427,7 @@ class AIQuestGenerator:
                     'quest': quest_data
                 })
         else:
-            # Algorithmic 7-day schedule based on primary objective path / goals
+            # Algorithmic 7-day schedule based on primary objective path / goals and equipment
             for w_day in range(7):
                 is_today = (w_day == today_weekday)
                 is_rest = (w_day == 6)  # Default Sunday rest day
@@ -365,8 +441,9 @@ class AIQuestGenerator:
                         'date': datetime.now().strftime('%Y-%m-%d'),
                         'title': f"⚔️ Daily Trial: Day {w_day+1}",
                         'difficulty': difficulty,
+                        'equipment': user_equipment,
                         'exercises': [
-                            self.generate_exercise_task(user_id, focus_areas, difficulty, [], i)
+                            self.generate_exercise_task(user_id, focus_areas, difficulty, [], i, equipment=user_equipment)
                             for i in range(min(3 + difficulty // 10, 6))
                         ],
                         'exp_reward': self.calculate_exp_reward(difficulty),
@@ -386,6 +463,7 @@ class AIQuestGenerator:
         return {
             'has_active_build_goal': len(plan_days) > 0,
             'target_name': target_name,
+            'equipment': user_equipment,
             'physique_quest_id': physique_quest_id,
             'quest_log_markdown': quest_log_markdown,
             'schedule': schedule
@@ -493,11 +571,16 @@ class AIQuestGenerator:
     
     def generate_exercise_task(self, user_id: int, focus_areas: List[str],
                                difficulty: int, existing_exercises: List[Dict],
-                               exercise_index: int) -> Dict:
-        """Generate a single exercise task"""
-        from models import ExerciseManager
+                               exercise_index: int, equipment: str = None) -> Dict:
+        """Generate a single exercise task adapted to equipment access"""
+        from models import ExerciseManager, PlayerStats
         
         exercise_manager = ExerciseManager(self.db)
+        if equipment is None:
+            stats = PlayerStats(self.db).get_player_stats(user_id)
+            equipment = stats.get('equipment', 'Full Commercial Gym') if stats else 'Full Commercial Gym'
+            
+        pool = self.get_exercise_pool(equipment)
         
         # Select category based on focus and rotation
         if exercise_index == 0:
@@ -509,14 +592,14 @@ class AIQuestGenerator:
         
         # Get exercise name
         if category == 'strength':
-            subcategory = random.choice(list(self.exercise_pool['strength'].keys()))
-            exercise_name = random.choice(self.exercise_pool['strength'][subcategory])
+            subcategory = random.choice(list(pool['strength'].keys()))
+            exercise_name = random.choice(pool['strength'][subcategory])
         elif category == 'cardio':
-            subcategory = random.choice(list(self.exercise_pool['cardio'].keys()))
-            exercise_name = random.choice(self.exercise_pool['cardio'][subcategory])
+            subcategory = random.choice(list(pool['cardio'].keys()))
+            exercise_name = random.choice(pool['cardio'][subcategory])
         else:
-            subcategory = random.choice(list(self.exercise_pool['flexibility'].keys()))
-            exercise_name = random.choice(self.exercise_pool['flexibility'][subcategory])
+            subcategory = random.choice(list(pool['flexibility'].keys()))
+            exercise_name = random.choice(pool['flexibility'][subcategory])
         
         # Get user's history with this exercise
         exercise_record = exercise_manager.get_exercise_by_name(user_id, exercise_name)
@@ -556,7 +639,19 @@ class AIQuestGenerator:
         beginner_targets = {
             'push_ups': 10, 'pull_ups': 3, 'squats': 15, 'lunges': 10,
             'planks': 30, 'crunches': 15, 'burpees': 8, 'jumping_jacks': 20,
-            'sprints': 30, 'jog': 300, 'mountain_climbers': 15
+            'sprints': 30, 'jog': 300, 'mountain_climbers': 15,
+            'diamond_push_ups': 8, 'wide_push_ups': 12, 'pike_push_ups': 8,
+            'archer_push_ups': 6, 'decline_push_ups': 10, 'dips': 8,
+            'handstand_push_ups': 3, 'incline_push_ups': 12, 'doorframe_towel_rows': 12,
+            'barbell_bench_press': 8, 'incline_dumbbell_press': 10, 'lat_pulldowns': 10,
+            'seated_cable_rows': 10, 'overhead_barbell_press': 8, 'cable_lateral_raises': 12,
+            'tricep_rope_pushdowns': 12, 'cable_bicep_curls': 12, 'chest_fly_machine': 12,
+            'barbell_back_squats': 8, 'leg_press': 12, 'romanian_deadlifts': 8,
+            'leg_extensions': 12, 'lying_leg_curls': 12, 'standing_calf_machine': 15,
+            'dumbbell_bench_press': 10, 'dumbbell_shoulder_press': 10, 'dumbbell_rows': 10,
+            'dumbbell_bicep_curls': 10, 'dumbbell_lateral_raises': 12, 'goblet_squats': 12,
+            'dumbbell_romanian_deadlifts': 10, 'dumbbell_walking_lunges': 12, 'dumbbell_thrusters': 10,
+            'dumbbell_swings': 15, 'jump_squats': 12, 'pistol_squats': 5, 'wall_sits': 45
         }
         
         base = beginner_targets.get(exercise_name, 10)
@@ -574,15 +669,42 @@ class AIQuestGenerator:
     def get_exercise_description(self, exercise_name: str) -> str:
         """Get motivational description for exercise"""
         descriptions = {
-            'push_ups': 'Build upper body strength and core stability',
-            'pull_ups': 'Ultimate back and bicep developer',
-            'squats': 'Leg power and explosive strength',
-            'burpees': 'Full-body conditioning and stamina',
-            'planks': 'Core strength and endurance',
-            'sprints': 'Speed and explosive power training'
+            'push_ups': 'Build upper body pushing power and core stability',
+            'pull_ups': 'Ultimate back width and bicep pulling developer',
+            'squats': 'Lower body foundation for raw leg power',
+            'burpees': 'Full-body conditioning and metabolic stamina',
+            'planks': 'Core isometric strength and pelvic endurance',
+            'sprints': 'Speed and explosive hunter power training',
+            'diamond_push_ups': 'Tricep overload and inner chest definition',
+            'pike_push_ups': 'Shoulder strength and vertical push progression',
+            'dips': 'Chest and tricep power builder',
+            'doorframe_towel_rows': 'Home back pulling movement with zero equipment',
+            'barbell_bench_press': 'Gold standard chest, anterior delt, and tricep compound strength',
+            'barbell_back_squats': 'King of leg exercises for quadriceps, glutes, and full-body mass',
+            'romanian_deadlifts': 'Hamstring and posterior chain developer for athletic posture',
+            'lat_pulldowns': 'Latissimus dorsi builder for hunter V-taper',
+            'seated_cable_rows': 'Mid-back thickness and postural stability',
+            'leg_press': 'Heavy leg quad and glute overload with lower spinal stress',
+            'leg_extensions': 'Quadricep isolation and knee joint reinforcement',
+            'lying_leg_curls': 'Direct hamstring flexor isolation and stability',
+            'overhead_barbell_press': 'Raw shoulder power and overhead lockout',
+            'cable_lateral_raises': 'Deltoid isolation for wide 3D shoulders',
+            'tricep_rope_pushdowns': 'Peak contraction tricep isolation',
+            'cable_bicep_curls': 'Constant tension bicep builder',
+            'chest_fly_machine': 'Pectoral stretch and contraction focus',
+            'dumbbell_bench_press': 'Independent chest strength and stabilizer recruitment',
+            'dumbbell_shoulder_press': 'Deltoid mass and overhead shoulder stability',
+            'dumbbell_rows': 'Unilateral lat development and grip strength',
+            'dumbbell_bicep_curls': 'Arm hypertrophy and bicep peak development',
+            'dumbbell_lateral_raises': 'Side delt sculpting for V-taper aesthetics',
+            'goblet_squats': 'Core bracing and deep quad power',
+            'dumbbell_romanian_deadlifts': 'Posterior chain hinge with dumbbell load',
+            'dumbbell_walking_lunges': 'Unilateral leg stamina and balance',
+            'jump_squats': 'Explosive vertical jump and fast-twitch leg power',
+            'pistol_squats': 'Elite single-leg balance, mobility, and strength'
         }
         
-        return descriptions.get(exercise_name, 'Progress your skills and power!')
+        return descriptions.get(exercise_name, 'Progress your skills and hunter power!')
     
     def generate_bonus_task(self, user_id: int, difficulty: int) -> Dict:
         """Generate optional bonus task for extra rewards"""
