@@ -202,7 +202,7 @@ class TestFlaskEquipmentEndpoints(unittest.TestCase):
         self.assertEqual(data['equipment'], 'Dumbbells & Home Setup')
         print("Endpoint switched to Dumbbells. New Quest:", data['quest']['title'], [e['name'] for e in data['quest']['exercises']])
 
-        # 3. Change equipment to Calisthenics
+        # 3. Change equipment to Calisthenics without injury (Success)
         res = self.client.post('/api/player/change-equipment', json={
             'equipment': 'Calisthenics'
         })
@@ -211,6 +211,32 @@ class TestFlaskEquipmentEndpoints(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['equipment'], 'Calisthenics')
         print("Endpoint switched to Calisthenics. New Quest:", data['quest']['title'], [e['name'] for e in data['quest']['exercises']])
+
+        # 4. User registers fatal shoulder injury and attempts to switch to Calisthenics (Rejected 403)
+        from models import Database, PlayerStats
+        db = Database()
+        stats_mgr = PlayerStats(db)
+        stats_mgr.update_player_stats_settings(self.user_id, injuries='Shoulder Discomfort (Rotator Cuff)')
+
+        res = self.client.post('/api/player/change-equipment', json={
+            'equipment': 'Calisthenics'
+        })
+        self.assertEqual(res.status_code, 403)
+        data = res.get_json()
+        self.assertFalse(data['success'])
+        self.assertTrue(data['blocked_by_injury'])
+        self.assertIn('Shoulder Discomfort', data['injury_detected'])
+        print("Injury Lock Rejection Verified:", data['message'])
+
+        # 5. User forces safe override (Success)
+        res = self.client.post('/api/player/change-equipment', json={
+            'equipment': 'Calisthenics',
+            'force_override': True
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        print("Force Safe Override Verified. New Quest:", data['quest']['title'])
 
 
 if __name__ == '__main__':
