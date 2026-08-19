@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Body Sync Fitness - Hunter Training System</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260819_01">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@400;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -627,22 +627,30 @@
                     </div>
                 </div>
 
-                <div id="quest-completion-modal" class="modal">
+                <!-- Quest Completion Celebration Modal -->
+                <div id="quest-completion-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeModal()">
                     <div class="modal-content celebration">
-                        <h2>🎉 QUEST COMPLETED!</h2>
+                        <div style="font-size: 3.5rem; margin-bottom: 12px; filter: drop-shadow(0 0 15px rgba(234, 179, 8, 0.6));">🎉</div>
+                        <h2>QUEST COMPLETED!</h2>
                         <div id="completion-rewards"></div>
-                        <button class="btn btn-primary" onclick="closeModal()">Continue Training</button>
+                        <div style="margin-top: 24px;">
+                            <button class="btn btn-primary btn-large" onclick="closeModal()" style="font-weight: 800; min-width: 200px;">
+                                Continue Training
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Active Character Quest Log Modal -->
-                <div id="active-quest-log-modal" class="modal">
-                    <div class="modal-content quest-log-modal-content">
-                        <div class="modal-header">
-                            <h2 id="active-quest-log-modal-title">📜 Full Character Quest Log</h2>
-                            <button class="btn btn-small btn-secondary" onclick="closeModal()" style="float: right;">✕ Close</button>
+                <div id="active-quest-log-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeModal()">
+                    <div class="modal-content quest-log-modal-content" style="max-width: 820px; max-height: 85vh; display: flex; flex-direction: column;">
+                        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 14px; margin-bottom: 15px;">
+                            <h2 id="active-quest-log-modal-title" style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 1.25rem; color: #60a5fa;">
+                                📜 Full Character Quest Log
+                            </h2>
+                            <button class="modal-close-btn" onclick="closeModal()">✕</button>
                         </div>
-                        <div id="active-quest-log-modal-body" class="quest-log-markdown" style="margin-top: 15px;"></div>
+                        <div id="active-quest-log-modal-body" class="quest-log-markdown custom-scrollbar" style="flex: 1; overflow-y: auto; padding-right: 8px;"></div>
                     </div>
                 </div>
             </div>
@@ -754,9 +762,12 @@
             </div>
 
             <!-- Add Goal Modal -->
-            <div id="add-goal-modal" class="modal">
-                <div class="modal-content">
-                    <h2>➕ Create New Goal</h2>
+            <div id="add-goal-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeModal()">
+                <div class="modal-content" style="max-width: 520px;">
+                    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 15px;">
+                        <h2 style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: #60a5fa;">➕ Create New Goal</h2>
+                        <button class="modal-close-btn" onclick="closeModal()">✕</button>
+                    </div>
                     <div class="form-group">
                         <label>Goal Type</label>
                         <select id="goal-type">
@@ -779,7 +790,7 @@
                         <label>Deadline (Optional)</label>
                         <input type="date" id="goal-deadline">
                     </div>
-                    <div class="modal-actions">
+                    <div class="modal-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
                         <button class="btn btn-primary" onclick="addGoal()">Create Goal</button>
                         <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                     </div>
@@ -1835,6 +1846,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="/static/js/app.js?v=20260812_19"></script>
+    <script src="/static/js/app.js?v=20260819_02"></script>
 </body>
 </html>

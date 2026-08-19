@@ -457,13 +457,13 @@ function updatePlayerCard(stats) {
 }
 
 function getRankFromLevel(level) {
-    if (level < 5) return 'E-Rank Hunter';
-    if (level < 10) return 'D-Rank Hunter';
-    if (level < 20) return 'C-Rank Hunter';
-    if (level < 35) return 'B-Rank Hunter';
-    if (level < 50) return 'A-Rank Hunter';
-    if (level < 70) return 'S-Rank Hunter';
-    return 'SS-Rank Hunter';
+    if (level >= 100) return 'SS-Rank Hunter';
+    if (level >= 80) return 'S-Rank Hunter';
+    if (level >= 60) return 'A-Rank Hunter';
+    if (level >= 40) return 'B-Rank Hunter';
+    if (level >= 25) return 'C-Rank Hunter';
+    if (level >= 10) return 'D-Rank Hunter';
+    return 'E-Rank Hunter';
 }
 
 async function allocateStatPoint(stat) {
@@ -987,13 +987,13 @@ async function loadTodaysQuest() {
 }
 
 function getQuestRankLetter(difficulty) {
-    if (difficulty < 5) return 'E';
-    if (difficulty < 10) return 'D';
-    if (difficulty < 20) return 'C';
-    if (difficulty < 35) return 'B';
-    if (difficulty < 50) return 'A';
-    if (difficulty < 70) return 'S';
-    return 'SS';
+    if (difficulty >= 100) return 'SS';
+    if (difficulty >= 80) return 'S';
+    if (difficulty >= 60) return 'A';
+    if (difficulty >= 40) return 'B';
+    if (difficulty >= 25) return 'C';
+    if (difficulty >= 10) return 'D';
+    return 'E';
 }
 
 function displayFullQuest(quest) {
@@ -1317,26 +1317,26 @@ async function completeQuest() {
 function showQuestCompletionModal(result) {
     const modal = document.getElementById('quest-completion-modal');
     const rewards = document.getElementById('completion-rewards');
+    if (!modal) return;
     
     let rewardHTML = `
-        <div style="font-size: 3rem; margin: 20px 0;">🎉</div>
-        <p style="font-size: 1.2rem; margin-bottom: 20px;">
-            You gained <strong>${result.exp_gained} EXP</strong>!
+        <p style="font-size: 1.25rem; margin-bottom: 15px; color: #f8fafc; font-weight: 700;">
+            You gained <strong style="color: #38bdf8; font-size: 1.4rem;">+${result.exp_gained} EXP</strong>!
         </p>
     `;
     
-    if (result.level_result.leveled_up) {
+    if (result.level_result && result.level_result.leveled_up) {
         rewardHTML += `
-            <div style="background: var(--success-gradient); padding: 20px; border-radius: 12px; margin: 20px 0;">
-                <h3 style="font-size: 2rem;">⬆️ LEVEL UP!</h3>
-                <p style="font-size: 1.5rem;">Level ${result.level_result.new_level}</p>
-                <p>You gained ${result.level_result.levels_gained} level(s) and 
-                   ${result.level_result.stat_points} stat points!</p>
+            <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%); border: 1.5px solid #10b981; padding: 18px; border-radius: 14px; margin: 15px 0; box-shadow: 0 0 25px rgba(16, 185, 129, 0.3);">
+                <h3 style="font-size: 1.6rem; color: #34d399; font-family: 'Orbitron', sans-serif; margin-bottom: 6px;">⬆️ LEVEL UP!</h3>
+                <p style="font-size: 1.3rem; font-weight: 800; color: #ffffff; margin-bottom: 4px;">Level ${result.level_result.new_level}</p>
+                <p style="color: #cbd5e1; font-size: 0.9rem;">You gained ${result.level_result.levels_gained} level(s) and <strong style="color: #fbbf24;">+${result.level_result.stat_points} stat points</strong>!</p>
             </div>
         `;
     }
     
-    rewards.innerHTML = rewardHTML;
+    if (rewards) rewards.innerHTML = rewardHTML;
+    modal.style.display = 'flex';
     modal.classList.add('active');
 }
 
@@ -1677,7 +1677,11 @@ async function completeGoal(goalId) {
 }
 
 function showAddGoalModal() {
-    document.getElementById('add-goal-modal').classList.add('active');
+    const modal = document.getElementById('add-goal-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    }
 }
 
 async function addGoal() {
@@ -2651,6 +2655,7 @@ function openActiveQuestLogModal() {
         bodyEl.innerHTML = '<p class="no-data">No Quest Log markdown available. Select or analyze a character target in "Become Like..." to generate one.</p>';
     }
     
+    modal.style.display = 'flex';
     modal.classList.add('active');
 }
 
@@ -3009,14 +3014,15 @@ function showToast(message) {
 }
 
 function closeModal() {
-    document.querySelectorAll('.modal').forEach(modal => {
+    document.querySelectorAll('.modal, .modal-overlay').forEach(modal => {
         modal.classList.remove('active');
+        modal.style.display = 'none';
     });
 }
 
-// Close modals when clicking outside
+// Close modals when clicking outside modal content
 document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal')) {
+    if (e.target.classList.contains('modal') || e.target.classList.contains('modal-overlay')) {
         closeModal();
     }
 });
