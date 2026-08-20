@@ -443,10 +443,9 @@ function updatePlayerCard(stats) {
     const questExpText = document.getElementById('quest-exp-text');
     if (questExpText) questExpText.textContent = `${stats.exp} / ${stats.exp_to_next_level}`;
     
-    // Show stat points banner & upgrade buttons if available
+    // Show stat points section if available
     const statPointsSec = document.getElementById('stat-points-section');
     const availablePoints = stats.stat_points || 0;
-    const upgradeBtns = document.querySelectorAll('.stat-upgrade-btn');
     
     if (statPointsSec) {
         if (availablePoints > 0) {
@@ -457,18 +456,6 @@ function updatePlayerCard(stats) {
             statPointsSec.style.display = 'none';
         }
     }
-    
-    upgradeBtns.forEach(btn => {
-        if (availablePoints > 0) {
-            btn.disabled = false;
-            btn.classList.remove('disabled-btn');
-            btn.classList.add('active-upgrade');
-        } else {
-            btn.disabled = true;
-            btn.classList.add('disabled-btn');
-            btn.classList.remove('active-upgrade');
-        }
-    });
     
     // Sync equipment UI buttons and badges
     syncEquipmentUI(stats.equipment || 'Full Commercial Gym');
@@ -2930,49 +2917,30 @@ async function loadWeeklyActivity() {
             if (percentTextEl) percentTextEl.textContent = `${consistencyPct}% (${activeDays}/7 Days)`;
             if (consistencyFillEl) consistencyFillEl.style.width = `${consistencyPct}%`;
             
-            // Render 7 high-tech day pillars
+            // Render 7 clean round day bubbles
             grid.innerHTML = (data.week_days || []).map(day => {
                 const isCompleted = day.completed || (day.count && day.count > 0);
                 const isToday = day.is_today;
-                const isFuture = day.is_future;
                 
-                let pillarClass = 'weekly-day-pillar';
-                let icon = '🛌';
-                let statusText = 'Rest';
-                let statusColor = '#64748b';
-                
+                let bubbleClass = 'day-bubble-clean';
                 if (isCompleted) {
-                    pillarClass += ' completed-day';
-                    icon = '⚔️';
-                    statusText = 'Done';
-                    statusColor = '#34d399';
-                } else if (isToday) {
-                    pillarClass += ' today-day';
-                    icon = '⚡';
-                    statusText = 'Today';
-                    statusColor = '#38bdf8';
-                } else if (isFuture) {
-                    pillarClass += ' future-day';
-                    icon = '🔒';
-                    statusText = 'Soon';
-                    statusColor = '#475569';
+                    bubbleClass += ' workout-active';
                 } else {
-                    pillarClass += ' rest-day';
-                    icon = '🛌';
-                    statusText = 'Rest';
-                    statusColor = '#64748b';
+                    bubbleClass += ' inactive-day';
                 }
                 
-                const dayLabel = day.day_name || day.day_code || '';
-                const dayNum = day.day_number || '';
-                const tooltip = `${day.date}: ${day.count || 0} workout(s) • ${day.exp_earned || 0} EXP ${isCompleted ? '(Completed)' : (isToday ? '(Active Today)' : '')}`;
+                if (isToday) {
+                    bubbleClass += ' today-ring';
+                }
+                
+                const dayLabel = day.day_code || (day.day_name ? day.day_name.slice(0, 2) : 'Su');
+                const tooltip = `${day.date}: ${day.count || 0} workout(s) • ${day.exp_earned || 0} EXP ${isCompleted ? '(Workout Completed)' : (isToday ? '(Today)' : '')}`;
                 
                 return `
-                    <div class="${pillarClass}" title="${tooltip}" onclick="showToast('${tooltip}')">
-                        <div class="day-code-label">${dayLabel}</div>
-                        <div class="day-num-badge">${dayNum}</div>
-                        <div class="day-icon-status">${icon}</div>
-                        <div class="day-status-pill" style="color: ${statusColor};">${statusText}</div>
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
+                        <div class="${bubbleClass}" title="${tooltip}" onclick="showToast('${tooltip}')">
+                            ${dayLabel}
+                        </div>
                     </div>
                 `;
             }).join('');
