@@ -1891,7 +1891,7 @@ async function loadLeaderboard() {
             if (!p || !p.id || seenIds.has(p.id)) return false;
             seenIds.add(p.id);
             return true;
-        });
+        }).slice(0, 10);
 
         let podiumsHTML = '';
         if (playersList.length >= 3 && scope === 'global') {

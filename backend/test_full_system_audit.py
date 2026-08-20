@@ -200,7 +200,7 @@ def run_audit():
     except Exception as e:
         log_test("GET /api/hunter-card/data", False, str(e))
 
-    # 11. Test Leaderboard De-duplication API (Global & Friends)
+    # 11. Test Leaderboard De-duplication & Top 10 Limit API (Global & Friends)
     try:
         req_lb = urllib.request.Request(f"{BASE_URL}/api/leaderboard?scope=global")
         with opener.open(req_lb) as resp:
@@ -208,7 +208,8 @@ def run_audit():
             lb = data.get('leaderboard', [])
             ids = [p['id'] for p in lb]
             has_duplicates = len(ids) != len(set(ids))
-            log_test("GET /api/leaderboard (No Duplicates)", not has_duplicates, f"Total {len(lb)} unique entries, duplicates: {len(ids) - len(set(ids))}")
+            is_top_10 = len(lb) <= 10
+            log_test("GET /api/leaderboard (Top 10 & No Duplicates)", (not has_duplicates) and is_top_10, f"Total {len(lb)} entries (max 10), duplicates: {len(ids) - len(set(ids))}")
     except Exception as e:
         log_test("GET /api/leaderboard", False, str(e))
 

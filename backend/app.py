@@ -1808,7 +1808,7 @@ def get_leaderboard():
                 SELECT user_id FROM friends WHERE friend_id = ? AND status = 'accepted'
             ) OR ps.user_id = ?
             ORDER BY ps.level DESC, ps.exp DESC
-            LIMIT 50
+            LIMIT 10
         ''', (user_id, user_id, user_id, user_id, user_id, user_id, user_id))
     else:
         cursor.execute('''
@@ -1830,7 +1830,7 @@ def get_leaderboard():
             JOIN users u ON (ps.user_id = u.id)
             WHERE COALESCE(u.is_admin, 0) = 0
             ORDER BY ps.level DESC, ps.exp DESC
-            LIMIT 100
+            LIMIT 10
         ''', (user_id, user_id, user_id, user_id))
     
     seen_ids = set()
@@ -1840,10 +1840,12 @@ def get_leaderboard():
         if row_dict['id'] not in seen_ids:
             seen_ids.add(row_dict['id'])
             leaderboard.append(row_dict)
+            if len(leaderboard) >= 10:
+                break
             
     conn.close()
     
-    return jsonify({'leaderboard': leaderboard})
+    return jsonify({'leaderboard': leaderboard[:10]})
 
 
 @app.route('/api/user/<int:user_id>/profile', methods=['GET'])
