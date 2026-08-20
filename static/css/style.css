@@ -822,13 +822,13 @@ input[type="checkbox"] {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
-    margin-top: 12px;
+    margin-top: 14px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 680px) {
     .stat-allocation {
         grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
+        gap: 10px;
     }
 }
 
@@ -836,18 +836,20 @@ input[type="checkbox"] {
     background: rgba(30, 41, 59, 0.7);
     border: 1px solid rgba(99, 102, 241, 0.3);
     color: #f8fafc;
-    font-weight: 700;
-    font-size: 0.88rem;
-    padding: 10px 12px;
+    padding: 10px 14px;
     border-radius: 12px;
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: 'Orbitron', sans-serif;
     user-select: none;
+    white-space: nowrap;
+    min-height: 44px;
+    box-sizing: border-box;
 }
 
 .stat-alloc-pill:hover {
@@ -864,7 +866,29 @@ input[type="checkbox"] {
 .stat-alloc-pill .alloc-plus {
     color: #38bdf8;
     font-weight: 900;
-    font-size: 1rem;
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-alloc-pill .alloc-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-alloc-pill .alloc-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #f8fafc;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Quick Stats - Clean Fitness Style */

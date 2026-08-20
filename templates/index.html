@@ -470,16 +470,24 @@
                         </h4>
                         <div class="stat-allocation">
                             <button type="button" class="stat-alloc-pill" onclick="allocateStatPoint('strength')">
-                                <span class="alloc-plus">+</span> 💪 Strength
+                                <span class="alloc-plus">+</span>
+                                <span class="alloc-icon">💪</span>
+                                <span class="alloc-name">Strength</span>
                             </button>
                             <button type="button" class="stat-alloc-pill" onclick="allocateStatPoint('endurance')">
-                                <span class="alloc-plus">+</span> 🏃 Endurance
+                                <span class="alloc-plus">+</span>
+                                <span class="alloc-icon">🏃</span>
+                                <span class="alloc-name">Endurance</span>
                             </button>
                             <button type="button" class="stat-alloc-pill" onclick="allocateStatPoint('agility')">
-                                <span class="alloc-plus">+</span> ⚡ Agility
+                                <span class="alloc-plus">+</span>
+                                <span class="alloc-icon">⚡</span>
+                                <span class="alloc-name">Agility</span>
                             </button>
                             <button type="button" class="stat-alloc-pill" onclick="allocateStatPoint('vitality')">
-                                <span class="alloc-plus">+</span> ❤️ Vitality
+                                <span class="alloc-plus">+</span>
+                                <span class="alloc-icon">❤️</span>
+                                <span class="alloc-name">Vitality</span>
                             </button>
                         </div>
                     </div>
@@ -735,15 +743,6 @@
                         </div>
                     </div>
 
-                    <!-- Weekly Consistency Progress Bar -->
-                    <div style="background: rgba(15, 23, 42, 0.5); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-                        <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;">
-                            Weekly Consistency: <strong id="weekly-percent-text" style="color: #38bdf8;">0%</strong>
-                        </div>
-                        <div style="flex: 1; min-width: 120px; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
-                            <div id="weekly-consistency-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #6366f1 0%, #38bdf8 50%, #10b981 100%); transition: width 0.5s ease; border-radius: 4px;"></div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Medium Progress Graph Card -->
@@ -1943,6 +1942,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="/static/js/app.js?v=20260820_04"></script>
+    <script src="/static/js/app.js?v=20260820_06"></script>
 </body>
 </html>

@@ -2901,21 +2901,15 @@ async function loadWeeklyActivity() {
             const streakValEl = document.getElementById('weekly-streak-val');
             const expValEl = document.getElementById('weekly-exp-val');
             const rankupsValEl = document.getElementById('weekly-rankups-val');
-            const percentTextEl = document.getElementById('weekly-percent-text');
-            const consistencyFillEl = document.getElementById('weekly-consistency-fill');
-            
             const activeDays = data.weekly_active_days || 0;
             const streak = data.active_streak || 0;
             const weeklyExp = data.weekly_exp_earned || 0;
             const rankUps = data.rank_ups || 0;
-            const consistencyPct = Math.round((activeDays / 7) * 100);
             
             if (activeCountEl) activeCountEl.textContent = `${activeDays}/7 Days Active`;
             if (streakValEl) streakValEl.textContent = `${streak} Day${streak === 1 ? '' : 's'}`;
             if (expValEl) expValEl.textContent = `+${weeklyExp} EXP`;
             if (rankupsValEl) rankupsValEl.textContent = `${rankUps}`;
-            if (percentTextEl) percentTextEl.textContent = `${consistencyPct}% (${activeDays}/7 Days)`;
-            if (consistencyFillEl) consistencyFillEl.style.width = `${consistencyPct}%`;
             
             // Render 7 clean round day bubbles
             grid.innerHTML = (data.week_days || []).map(day => {
