@@ -443,16 +443,32 @@ function updatePlayerCard(stats) {
     const questExpText = document.getElementById('quest-exp-text');
     if (questExpText) questExpText.textContent = `${stats.exp} / ${stats.exp_to_next_level}`;
     
-    // Show stat points if available
+    // Show stat points banner & upgrade buttons if available
     const statPointsSec = document.getElementById('stat-points-section');
+    const availablePoints = stats.stat_points || 0;
+    const upgradeBtns = document.querySelectorAll('.stat-upgrade-btn');
+    
     if (statPointsSec) {
-        if (stats.stat_points > 0) {
+        if (availablePoints > 0) {
             statPointsSec.style.display = 'block';
-            document.getElementById('available-points').textContent = stats.stat_points;
+            const ptsEl = document.getElementById('available-points');
+            if (ptsEl) ptsEl.textContent = availablePoints;
         } else {
             statPointsSec.style.display = 'none';
         }
     }
+    
+    upgradeBtns.forEach(btn => {
+        if (availablePoints > 0) {
+            btn.disabled = false;
+            btn.classList.remove('disabled-btn');
+            btn.classList.add('active-upgrade');
+        } else {
+            btn.disabled = true;
+            btn.classList.add('disabled-btn');
+            btn.classList.remove('active-upgrade');
+        }
+    });
     
     // Sync equipment UI buttons and badges
     syncEquipmentUI(stats.equipment || 'Full Commercial Gym');
@@ -468,12 +484,17 @@ function getRankFromLevel(level) {
     return 'E-Rank Hunter';
 }
 
-async function allocateStatPoint(stat) {
+async function allocateStatPoint(stat, points = 1) {
+    if (!currentStats || (currentStats.stat_points || 0) < points) {
+        showToast('No available stat points!');
+        return;
+    }
+    
     const allocation = {
-        strength: stat === 'strength' ? 1 : 0,
-        endurance: stat === 'endurance' ? 1 : 0,
-        agility: stat === 'agility' ? 1 : 0,
-        vitality: stat === 'vitality' ? 1 : 0
+        strength: stat === 'strength' ? points : 0,
+        endurance: stat === 'endurance' ? points : 0,
+        agility: stat === 'agility' ? points : 0,
+        vitality: stat === 'vitality' ? points : 0
     };
     
     try {
@@ -486,13 +507,62 @@ async function allocateStatPoint(stat) {
         
         const data = await response.json();
         
-        if (response.ok) {
+        if (response.ok && data.success) {
             currentStats = data.stats;
             updatePlayerCard(currentStats);
-            showToast('Stat point allocated!');
+            const statCapitalized = stat.charAt(0).toUpperCase() + stat.slice(1);
+            showToast(`⚡ +${points} allocated to ${statCapitalized}! (${currentStats.stat_points} remaining)`);
+        } else {
+            showToast(data.error || 'Failed to allocate stat point');
         }
     } catch (error) {
         console.error('Failed to allocate stat:', error);
+        showToast('Failed to allocate stat point. Try again.');
+    }
+}
+
+async function distributeStatPointsEvenly() {
+    if (!currentStats || !currentStats.stat_points || currentStats.stat_points <= 0) {
+        showToast('No available stat points to distribute!');
+        return;
+    }
+    
+    const totalPoints = currentStats.stat_points;
+    const perStat = Math.floor(totalPoints / 4);
+    const remainder = totalPoints % 4;
+    
+    if (perStat <= 0) {
+        // Less than 4 points available, allocate 1 point to each available stat
+        await allocateStatPoint('strength', 1);
+        return;
+    }
+    
+    const allocation = {
+        strength: perStat + (remainder > 0 ? 1 : 0),
+        endurance: perStat + (remainder > 1 ? 1 : 0),
+        agility: perStat + (remainder > 2 ? 1 : 0),
+        vitality: perStat
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/stats/allocate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(allocation),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            currentStats = data.stats;
+            updatePlayerCard(currentStats);
+            showToast(`⚖️ Distributed ${totalPoints} points evenly across all stats!`);
+        } else {
+            showToast(data.error || 'Failed to distribute points');
+        }
+    } catch (error) {
+        console.error('Failed to distribute stat points evenly:', error);
     }
 }
 
@@ -2830,7 +2900,6 @@ function getRankTitleFromLevel(level) {
 
 async function loadWeeklyActivity() {
     const grid = document.getElementById('weekly-bubbles-grid');
-    const rankUpsCountEl = document.getElementById('rank-ups-count');
     if (!grid) return;
     
     try {
@@ -2840,21 +2909,70 @@ async function loadWeeklyActivity() {
         const data = await response.json();
         
         if (response.ok && data.success) {
-            if (rankUpsCountEl) {
-                rankUpsCountEl.textContent = data.rank_ups || 0;
-            }
+            // Update top badges & metric tiles
+            const activeCountEl = document.getElementById('weekly-active-count');
+            const streakValEl = document.getElementById('weekly-streak-val');
+            const expValEl = document.getElementById('weekly-exp-val');
+            const rankupsValEl = document.getElementById('weekly-rankups-val');
+            const percentTextEl = document.getElementById('weekly-percent-text');
+            const consistencyFillEl = document.getElementById('weekly-consistency-fill');
             
+            const activeDays = data.weekly_active_days || 0;
+            const streak = data.active_streak || 0;
+            const weeklyExp = data.weekly_exp_earned || 0;
+            const rankUps = data.rank_ups || 0;
+            const consistencyPct = Math.round((activeDays / 7) * 100);
+            
+            if (activeCountEl) activeCountEl.textContent = `${activeDays}/7 Days Active`;
+            if (streakValEl) streakValEl.textContent = `${streak} Day${streak === 1 ? '' : 's'}`;
+            if (expValEl) expValEl.textContent = `+${weeklyExp} EXP`;
+            if (rankupsValEl) rankupsValEl.textContent = `${rankUps}`;
+            if (percentTextEl) percentTextEl.textContent = `${consistencyPct}% (${activeDays}/7 Days)`;
+            if (consistencyFillEl) consistencyFillEl.style.width = `${consistencyPct}%`;
+            
+            // Render 7 high-tech day pillars
             grid.innerHTML = (data.week_days || []).map(day => {
-                const count = day.count || 0;
+                const isCompleted = day.completed || (day.count && day.count > 0);
                 const isToday = day.is_today;
-                const activeClass = count > 0 ? 'workout-active-fill' : 'rest-hollow-circle';
-                const todayClass = isToday ? 'today-active-ring' : '';
+                const isFuture = day.is_future;
+                
+                let pillarClass = 'weekly-day-pillar';
+                let icon = '🛌';
+                let statusText = 'Rest';
+                let statusColor = '#64748b';
+                
+                if (isCompleted) {
+                    pillarClass += ' completed-day';
+                    icon = '⚔️';
+                    statusText = 'Done';
+                    statusColor = '#34d399';
+                } else if (isToday) {
+                    pillarClass += ' today-day';
+                    icon = '⚡';
+                    statusText = 'Today';
+                    statusColor = '#38bdf8';
+                } else if (isFuture) {
+                    pillarClass += ' future-day';
+                    icon = '🔒';
+                    statusText = 'Soon';
+                    statusColor = '#475569';
+                } else {
+                    pillarClass += ' rest-day';
+                    icon = '🛌';
+                    statusText = 'Rest';
+                    statusColor = '#64748b';
+                }
+                
+                const dayLabel = day.day_name || day.day_code || '';
+                const dayNum = day.day_number || '';
+                const tooltip = `${day.date}: ${day.count || 0} workout(s) • ${day.exp_earned || 0} EXP ${isCompleted ? '(Completed)' : (isToday ? '(Active Today)' : '')}`;
                 
                 return `
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
-                        <div class="day-bubble ${activeClass} ${todayClass}" title="${day.date}: ${count} workout(s) ${count > 0 ? '(Completed)' : '(Rest Day)'}">
-                            ${day.day_code}
-                        </div>
+                    <div class="${pillarClass}" title="${tooltip}" onclick="showToast('${tooltip}')">
+                        <div class="day-code-label">${dayLabel}</div>
+                        <div class="day-num-badge">${dayNum}</div>
+                        <div class="day-icon-status">${icon}</div>
+                        <div class="day-status-pill" style="color: ${statusColor};">${statusText}</div>
                     </div>
                 `;
             }).join('');
@@ -3068,6 +3186,7 @@ async function updateCharts() {
 async function loadProgressData() {
     try {
         updateStatusTabCard();
+        await loadWeeklyActivity();
         await updateCharts();
     } catch (error) {
         console.error('Failed to load progress data:', error);

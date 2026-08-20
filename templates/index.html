@@ -432,44 +432,78 @@
                         </div>
                     </div>
 
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-icon">💪</div>
-                            <div class="stat-info">
-                                <div class="stat-label">Strength</div>
-                                <div class="stat-value" id="stat-strength">10</div>
+                    <!-- Unassigned Stat Points System Banner -->
+                    <div id="stat-points-section" class="stat-points-banner" style="display: none; margin: 18px 0 14px 0; padding: 14px 18px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%); border: 1.5px solid rgba(245, 158, 11, 0.5); border-radius: 16px; box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.6rem; animation: pulseUpgradeBtn 2s infinite;">✨</span>
+                                <div>
+                                    <div style="font-size: 0.72rem; font-weight: 800; color: #fbbf24; text-transform: uppercase; letter-spacing: 1px; font-family: 'Orbitron', sans-serif;">UNASSIGNED REWARD POINTS</div>
+                                    <div style="font-size: 1.25rem; font-weight: 800; color: #ffffff; font-family: 'Orbitron', sans-serif;">
+                                        <span id="available-points" style="color: #fbbf24; font-size: 1.4rem;">0</span> Points Available
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-icon">🏃</div>
-                            <div class="stat-info">
-                                <div class="stat-label">Endurance</div>
-                                <div class="stat-value" id="stat-endurance">10</div>
-                            </div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-icon">⚡</div>
-                            <div class="stat-info">
-                                <div class="stat-label">Agility</div>
-                                <div class="stat-value" id="stat-agility">10</div>
-                            </div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-icon">❤️</div>
-                            <div class="stat-info">
-                                <div class="stat-label">Vitality</div>
-                                <div class="stat-value" id="stat-vitality">10</div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button type="button" class="btn-distribute-even" onclick="distributeStatPointsEvenly()" title="Distribute available points equally across all 4 stats">
+                                    ⚖️ Even Split
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="stat-points-section" id="stat-points-section" style="display: none;">
-                        <h4>Available Stat Points: <span id="available-points">0</span></h4>
-                        <div class="stat-allocation">
-                            <button onclick="allocateStatPoint('strength')">+💪</button>
-                            <button onclick="allocateStatPoint('endurance')">+🏃</button>
-                            <button onclick="allocateStatPoint('agility')">+⚡</button>
-                            <button onclick="allocateStatPoint('vitality')">+❤️</button>
+                    <!-- 4 Physical Stat Items with Direct Upgrade Controls -->
+                    <div class="stats-grid">
+                        <div class="stat-item stat-strength-card">
+                            <div class="stat-icon-wrapper" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3);">
+                                <div class="stat-icon">💪</div>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label">Strength</div>
+                                <div class="stat-value" id="stat-strength">10</div>
+                            </div>
+                            <button class="stat-upgrade-btn" id="btn-upgrade-strength" onclick="allocateStatPoint('strength')" title="Add +1 to Strength">
+                                <span>+1</span>
+                            </button>
+                        </div>
+
+                        <div class="stat-item stat-endurance-card">
+                            <div class="stat-icon-wrapper" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);">
+                                <div class="stat-icon">🏃</div>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label">Endurance</div>
+                                <div class="stat-value" id="stat-endurance">10</div>
+                            </div>
+                            <button class="stat-upgrade-btn" id="btn-upgrade-endurance" onclick="allocateStatPoint('endurance')" title="Add +1 to Endurance">
+                                <span>+1</span>
+                            </button>
+                        </div>
+
+                        <div class="stat-item stat-agility-card">
+                            <div class="stat-icon-wrapper" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
+                                <div class="stat-icon">⚡</div>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label">Agility</div>
+                                <div class="stat-value" id="stat-agility">10</div>
+                            </div>
+                            <button class="stat-upgrade-btn" id="btn-upgrade-agility" onclick="allocateStatPoint('agility')" title="Add +1 to Agility">
+                                <span>+1</span>
+                            </button>
+                        </div>
+
+                        <div class="stat-item stat-vitality-card">
+                            <div class="stat-icon-wrapper" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3);">
+                                <div class="stat-icon">❤️</div>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label">Vitality</div>
+                                <div class="stat-value" id="stat-vitality">10</div>
+                            </div>
+                            <button class="stat-upgrade-btn" id="btn-upgrade-vitality" onclick="allocateStatPoint('vitality')" title="Add +1 to Vitality">
+                                <span>+1</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -686,21 +720,51 @@
                     </div>
                 </div>
 
-                <!-- Weekly Workout Activity & Statistics Card (Matching User Photo) -->
+                <!-- Weekly Workout Activity & Statistics Card (Futuristic System Protocol) -->
                 <div class="card weekly-activity-card" style="margin-bottom: 20px; padding: 22px; background: linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-                        <h2 style="font-family: 'Orbitron', sans-serif; font-size: 1.35rem; color: #f8fafc; margin: 0; font-weight: 800;">Statistics</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <div style="font-size: 0.72rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 1px; font-family: 'Orbitron', sans-serif;">SYSTEM PROTOCOL</div>
+                            <h2 style="font-family: 'Orbitron', sans-serif; font-size: 1.35rem; color: #f8fafc; margin: 0; font-weight: 800;">Weekly Activity & Streak</h2>
+                        </div>
+                        <div id="weekly-active-badge" class="badge" style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; font-weight: 800; font-size: 0.85rem; padding: 6px 14px; border-radius: 20px; display: flex; align-items: center; gap: 6px;">
+                            <span>🔥</span> <span id="weekly-active-count">0/7 Days Active</span>
+                        </div>
                     </div>
 
-                    <!-- Number of Rank Ups Header Row -->
-                    <div style="margin-bottom: 16px; padding: 0 4px;">
-                        <span style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; font-family: 'Orbitron', sans-serif; letter-spacing: 0.3px;">Number of Rank Ups</span>
+                    <!-- 3 Quick Stat Metric Tiles -->
+                    <div class="weekly-stats-metrics-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px;">
+                        <div class="weekly-stat-tile" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 10px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Streak</div>
+                            <div style="font-size: 1.3rem; font-weight: 800; color: #f59e0b; font-family: 'Orbitron', sans-serif; margin-top: 4px;" id="weekly-streak-val">0 Days</div>
+                            <div style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">Keep it alive</div>
+                        </div>
+                        <div class="weekly-stat-tile" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 10px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Weekly EXP</div>
+                            <div style="font-size: 1.3rem; font-weight: 800; color: #38bdf8; font-family: 'Orbitron', sans-serif; margin-top: 4px;" id="weekly-exp-val">+0 EXP</div>
+                            <div style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">Earned this week</div>
+                        </div>
+                        <div class="weekly-stat-tile" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 10px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Rank Ups</div>
+                            <div style="font-size: 1.3rem; font-weight: 800; color: #a855f7; font-family: 'Orbitron', sans-serif; margin-top: 4px;" id="weekly-rankups-val">0</div>
+                            <div style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">Total promotions</div>
+                        </div>
                     </div>
 
-                    <!-- 7-Day Weekly Bubble Container -->
-                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 18px 12px; margin-top: 10px;">
-                        <div id="weekly-bubbles-grid" style="display: flex; justify-content: space-between; align-items: center;">
+                    <!-- 7-Day Interactive Pillar Strip Container -->
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 14px 8px; margin-bottom: 14px;">
+                        <div id="weekly-bubbles-grid" class="weekly-pillars-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: stretch;">
                             <!-- Rendered dynamically by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Weekly Consistency Progress Bar -->
+                    <div style="background: rgba(15, 23, 42, 0.5); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                        <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;">
+                            Weekly Consistency: <strong id="weekly-percent-text" style="color: #38bdf8;">0%</strong>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                            <div id="weekly-consistency-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #6366f1 0%, #38bdf8 50%, #10b981 100%); transition: width 0.5s ease; border-radius: 4px;"></div>
                         </div>
                     </div>
                 </div>
@@ -1902,6 +1966,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="/static/js/app.js?v=20260819_09"></script>
+    <script src="/static/js/app.js?v=20260820_02"></script>
 </body>
 </html>

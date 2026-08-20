@@ -260,7 +260,134 @@ input[type="checkbox"] {
     color: #38bdf8;
 }
 
-/* Weekly Activity Bubbles (Matching User Image Reference) */
+/* Weekly Activity Pillars & High-Tech Tracker */
+.weekly-activity-card {
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.weekly-stat-tile {
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weekly-stat-tile:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.4) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.weekly-day-pillar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 4px;
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    min-height: 86px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    user-select: none;
+}
+
+.weekly-day-pillar:hover {
+    transform: translateY(-3px);
+    background: rgba(30, 41, 59, 0.7);
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+
+.weekly-day-pillar .day-code-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
+    color: #94a3b8;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.weekly-day-pillar .day-num-badge {
+    font-size: 0.85rem;
+    font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
+    color: #f8fafc;
+    margin: 2px 0;
+}
+
+.weekly-day-pillar .day-icon-status {
+    font-size: 1.15rem;
+    margin: 3px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.weekly-day-pillar .day-status-pill {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    font-family: 'Orbitron', sans-serif;
+}
+
+/* Completed Workout Day */
+.weekly-day-pillar.completed-day {
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.08) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.55);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+}
+
+.weekly-day-pillar.completed-day .day-code-label {
+    color: #34d399;
+}
+
+.weekly-day-pillar.completed-day .day-num-badge {
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+}
+
+/* Today Day - Pulsing Neon Focus */
+.weekly-day-pillar.today-day {
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.25) 0%, rgba(30, 41, 59, 0.8) 100%);
+    border: 1.5px solid #38bdf8;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+    animation: pulseTodayGlow 2.5s infinite ease-in-out;
+}
+
+.weekly-day-pillar.today-day .day-code-label {
+    color: #38bdf8;
+}
+
+.weekly-day-pillar.today-day .day-num-badge {
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+}
+
+/* Future Day */
+.weekly-day-pillar.future-day {
+    opacity: 0.6;
+    background: rgba(15, 23, 42, 0.4);
+}
+
+/* Rest Day */
+.weekly-day-pillar.rest-day {
+    background: rgba(15, 23, 42, 0.6);
+}
+
+@keyframes pulseTodayGlow {
+    0%, 100% {
+        box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+        border-color: #38bdf8;
+    }
+    50% {
+        box-shadow: 0 0 24px rgba(56, 189, 248, 0.7);
+        border-color: #7dd3fc;
+    }
+}
+
+/* Backward compatibility for old bubbles */
 .day-bubble {
     width: 42px;
     height: 42px;
@@ -275,9 +402,9 @@ input[type="checkbox"] {
 }
 
 .day-bubble.workout-active-fill {
-    background: linear-gradient(135deg, #6366f1 0%, #38bdf8 100%);
+    background: linear-gradient(135deg, #10b981 0%, #38bdf8 100%);
     color: #ffffff;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
 }
 
 .day-bubble.rest-hollow-circle {
@@ -697,56 +824,149 @@ input[type="checkbox"] {
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
+    gap: 14px;
+}
+
+@media (max-width: 600px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
 }
 
 .stat-item {
-    background: rgba(11, 17, 32, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    padding: 14px;
-    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 14px 16px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    transition: transform 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .stat-item:hover {
-    border-color: rgba(56, 189, 248, 0.3);
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
-.stat-item:nth-child(1) .stat-value { color: #f87171; }
-.stat-item:nth-child(2) .stat-value { color: #34d399; }
-.stat-item:nth-child(3) .stat-value { color: #fbbf24; }
-.stat-item:nth-child(4) .stat-value { color: #38bdf8; }
-
-.stat-icon {
-    font-size: 1.8rem;
+.stat-icon-wrapper {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
 }
+
+.stat-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.stat-item:nth-child(1) .stat-value { color: #f87171; text-shadow: 0 0 10px rgba(248, 113, 113, 0.3); }
+.stat-item:nth-child(2) .stat-value { color: #34d399; text-shadow: 0 0 10px rgba(52, 211, 153, 0.3); }
+.stat-item:nth-child(3) .stat-value { color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.3); }
+.stat-item:nth-child(4) .stat-value { color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
 
 .stat-label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: 'Orbitron', sans-serif;
 }
 
 .stat-value {
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: 800;
     font-family: 'Orbitron', sans-serif;
+    margin-top: 2px;
 }
 
-.stat-points-section {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 2px solid var(--card-border);
-    text-align: center;
-}
-
-.stat-allocation {
+.stat-upgrade-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #0f172a;
+    font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.92rem;
+    border: none;
+    cursor: pointer;
     display: flex;
-    gap: 10px;
+    align-items: center;
     justify-content: center;
-    margin-top: 15px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+    flex-shrink: 0;
+}
+
+.stat-upgrade-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.stat-upgrade-btn:active {
+    transform: scale(0.92);
+}
+
+.stat-upgrade-btn.disabled-btn,
+.stat-upgrade-btn:disabled {
+    opacity: 0.25;
+    pointer-events: none;
+    box-shadow: none;
+    background: #334155;
+    color: #94a3b8;
+}
+
+.stat-upgrade-btn.active-upgrade {
+    animation: pulseUpgradeBtn 2s infinite ease-in-out;
+}
+
+@keyframes pulseUpgradeBtn {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.9);
+        transform: scale(1.04);
+    }
+}
+
+.btn-distribute-even {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid #f59e0b;
+    color: #fbbf24;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    font-family: 'Orbitron', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-distribute-even:hover {
+    background: #f59e0b;
+    color: #0f172a;
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.5);
+}
+
+.stat-points-banner {
+    animation: fadeInBanner 0.3s ease-out;
+}
+
+@keyframes fadeInBanner {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Quick Stats - Clean Fitness Style */

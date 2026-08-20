@@ -223,7 +223,7 @@ def login():
 
 @app.route('/api/weekly-activity', methods=['GET'])
 def get_weekly_activity():
-    """Get 7-day weekly workout activity calendar data for Sunday to Saturday"""
+    """Get 7-day weekly workout activity calendar data with active streak, EXP, and completion metrics"""
     if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
         
@@ -236,27 +236,34 @@ def get_weekly_activity():
     sunday = today - timedelta(days=days_since_sunday)
     
     day_codes = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+    day_names_full = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
     week_days = []
+    weekly_active_days = 0
+    weekly_exp_earned = 0
     
     for i in range(7):
         current_date = sunday + timedelta(days=i)
         date_str = current_date.strftime('%Y-%m-%d')
         count = 0
+        day_exp = 0
         
         # 1. Check daily_quests for completed quests or logged sets
         cursor.execute('''
-            SELECT id, completed, quest_data FROM daily_quests 
+            SELECT id, completed, quest_data, exp_reward FROM daily_quests 
             WHERE user_id = ? AND (quest_date = ? OR DATE(completed_at) = ?)
         ''', (user_id, date_str, date_str))
         q_rows = cursor.fetchall()
         for qr in q_rows:
             if qr['completed']:
                 count += 1
+                day_exp += (qr['exp_reward'] or 50)
             else:
                 try:
                     q_data = json.loads(qr['quest_data']) if qr['quest_data'] else {}
-                    if len(q_data.get('completed_sets', [])) > 0:
+                    c_sets = len(q_data.get('completed_sets', []))
+                    if c_sets > 0:
                         count += 1
+                        day_exp += (c_sets * 10)
                 except Exception:
                     pass
                     
@@ -266,28 +273,65 @@ def get_weekly_activity():
                 SELECT COUNT(*) FROM quest_completions 
                 WHERE user_id = ? AND DATE(completed_at) = ?
             ''', (user_id, date_str))
-            count += (cursor.fetchone()[0] or 0)
+            c_comp = (cursor.fetchone()[0] or 0)
+            if c_comp > 0:
+                count += c_comp
+                day_exp += (c_comp * 10)
             
         # 3. Check workout_history
         if count == 0:
             cursor.execute('''
-                SELECT total_exercises FROM workout_history 
+                SELECT total_exercises, exp_gained FROM workout_history 
                 WHERE user_id = ? AND (workout_date = ? OR DATE(created_at) = ?)
             ''', (user_id, date_str, date_str))
             row = cursor.fetchone()
             if row and row[0]:
                 count += row[0]
+                day_exp += (row[1] or 50)
+                
+        is_completed = count > 0
+        if is_completed:
+            weekly_active_days += 1
+        weekly_exp_earned += day_exp
                 
         week_days.append({
             'day_code': day_codes[i],
+            'day_name': day_names_full[i],
+            'day_number': current_date.day,
             'date': date_str,
             'count': count,
-            'is_today': current_date == today
+            'completed': is_completed,
+            'is_today': current_date == today,
+            'is_past': current_date < today,
+            'is_future': current_date > today,
+            'exp_earned': day_exp
         })
         
     stats = stats_manager.get_player_stats(user_id)
     current_level = stats['level'] if stats else 1
     
+    # Calculate streak from workout_history and daily_quests
+    cursor.execute('''
+        SELECT DISTINCT workout_date FROM (
+            SELECT workout_date FROM workout_history WHERE user_id = ?
+            UNION
+            SELECT DATE(completed_at) as workout_date FROM daily_quests WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
+        ) ORDER BY workout_date DESC
+    ''', (user_id, user_id))
+    workout_dates = [r[0] for r in cursor.fetchall() if r[0]]
+    
+    streak = 0
+    curr_check = today
+    if workout_dates and workout_dates[0] != today.strftime('%Y-%m-%d'):
+        curr_check = today - timedelta(days=1)
+        
+    for w_date_str in workout_dates:
+        if w_date_str == curr_check.strftime('%Y-%m-%d'):
+            streak += 1
+            curr_check = curr_check - timedelta(days=1)
+        else:
+            break
+            
     cursor.execute('''
         SELECT COUNT(DISTINCT workout_date) FROM workout_history WHERE user_id = ?
     ''', (user_id,))
@@ -299,12 +343,17 @@ def get_weekly_activity():
     quest_days = cursor.fetchone()[0] or 0
     
     total_completed_days = max(hist_days, quest_days)
-    rank_ups = (current_level - 1) + total_completed_days
+    rank_ups = max(0, current_level - 1)
     conn.close()
     
     return jsonify({
         'success': True,
         'rank_ups': rank_ups,
+        'current_level': current_level,
+        'active_streak': streak,
+        'weekly_active_days': weekly_active_days,
+        'weekly_total_days': 7,
+        'weekly_exp_earned': weekly_exp_earned,
         'week_days': week_days
     })
 
