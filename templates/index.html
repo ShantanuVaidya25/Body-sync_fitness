@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Body Sync Fitness - Hunter Training System</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260819_01">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260820_16">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@400;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -17,336 +17,426 @@
     <div id="auth-screen" class="screen active">
         <div class="auth-container">
             <div class="logo-section">
-                <h1 class="main-title">⚔️ BODY SYNC FITNESS</h1>
+                <div class="auth-crest-glow">
+                    <span class="auth-crest-icon">⚔️</span>
+                </div>
+                <h1 class="main-title">BODY SYNC</h1>
+                <div class="auth-system-badge">⚡ HUNTER AWAKENING SYSTEM</div>
                 <p class="subtitle">Arise, Hunter. Your Journey Begins.</p>
             </div>
 
-            <!-- Login Form -->
-            <form id="login-form" class="auth-form" onsubmit="event.preventDefault(); login();">
-                <h2>🔐 Hunter Login</h2>
-                <div class="form-group">
-                    <label>Username or Email</label>
-                    <div class="input-group-custom">
-                        <span class="input-prefix-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                        </span>
-                        <input type="text" id="login-username" placeholder="Enter your username or email" required autocomplete="username">
-                    </div>
+            <!-- Auth Card -->
+            <div class="auth-card-wrapper">
+                <!-- Segmented Switcher Tabs -->
+                <div class="auth-tabs">
+                    <button type="button" class="auth-tab-btn active" id="auth-tab-login" onclick="showLogin()">
+                        <span>🔐 Hunter Login</span>
+                    </button>
+                    <button type="button" class="auth-tab-btn" id="auth-tab-register" onclick="showRegister()">
+                        <span>📝 New Hunter</span>
+                    </button>
                 </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <div class="input-group-custom">
-                        <span class="input-prefix-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        </span>
-                        <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
-                        <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('login-password', this)" title="Show/Hide Password">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        </button>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary" id="login-submit-btn" style="width: 100%;">Enter the System</button>
-                <p class="form-switch" style="margin-top: 15px;">New Hunter? <a href="#" onclick="showRegister()">Register Here</a></p>
-                <div id="login-error" class="error-message" style="margin-top: 10px; color: #ef4444; font-weight: bold;"></div>
-            </form>
 
-            <!-- Register Form -->
-            <form id="register-form" class="auth-form" style="display: none;" onsubmit="event.preventDefault(); register();">
-                <h2>📝 Hunter Registration</h2>
-                <div class="form-group">
-                    <label>Username</label>
-                    <div class="input-group-custom">
-                        <span class="input-prefix-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                        </span>
-                        <input type="text" id="register-username" placeholder="Choose a username" required autocomplete="username">
+                <!-- Login Form -->
+                <form id="login-form" class="auth-form" onsubmit="event.preventDefault(); login();">
+                    <div class="form-group">
+                        <label>Username or Email</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            </span>
+                            <input type="text" id="login-username" placeholder="Enter your username or email" required autocomplete="username">
+                        </div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <div class="input-group-custom">
-                        <span class="input-prefix-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                        </span>
-                        <input type="email" id="register-email" placeholder="Your email" required autocomplete="email">
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            </span>
+                            <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+                            <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('login-password', this)" title="Show/Hide Password">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <div class="input-group-custom">
-                        <span class="input-prefix-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        </span>
-                        <input type="password" id="register-password" placeholder="Create a password" required autocomplete="new-password">
-                        <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('register-password', this)" title="Show/Hide Password">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        </button>
+                    <button type="submit" class="btn btn-primary auth-submit-btn" id="login-submit-btn">
+                        <span>⚔️ Enter the System</span>
+                    </button>
+                    <div id="login-error" class="error-message" style="margin-top: 12px;"></div>
+                </form>
+
+                <!-- Register Form -->
+                <form id="register-form" class="auth-form" style="display: none;" onsubmit="event.preventDefault(); register();">
+                    <div class="form-group">
+                        <label>Hunter Username</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            </span>
+                            <input type="text" id="register-username" placeholder="Choose a hunter codename" required autocomplete="username">
+                        </div>
                     </div>
-                </div>
-                <button type="submit" class="btn btn-primary" id="register-submit-btn">Create Account</button>
-                <p class="form-switch">Already a Hunter? <a href="#" onclick="showLogin()">Login Here</a></p>
-                <div id="register-error" class="error-message" style="margin-top: 10px; color: #ef4444; font-weight: bold;"></div>
-            </form>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            </span>
+                            <input type="email" id="register-email" placeholder="Your hunter email" required autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Secure Password</label>
+                        <div class="input-group-custom">
+                            <span class="input-prefix-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            </span>
+                            <input type="password" id="register-password" placeholder="Create a strong password" required autocomplete="new-password">
+                            <button type="button" class="input-suffix-btn" onclick="togglePasswordVisibility('register-password', this)" title="Show/Hide Password">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary auth-submit-btn" id="register-submit-btn">
+                        <span>⚡ Awaken As Hunter</span>
+                    </button>
+                    <div id="register-error" class="error-message" style="margin-top: 12px;"></div>
+                </form>
+            </div>
         </div>
     </div>
 
-    <!-- Profile Setup Screen -->
+    <!-- Profile Setup Screen (System Initialization) -->
     <div id="setup-screen" class="screen">
         <div class="setup-container">
-            <h2>⚡ System Initialization</h2>
-            <p class="setup-intro">Before you begin your journey, we need to calibrate the system to your current stats.</p>
+            <div class="setup-header">
+                <div class="setup-system-tag">SYSTEM INITIALIZATION PROTOCOL</div>
+                <h2 class="setup-title">⚡ Hunter Calibration</h2>
+                <p class="setup-intro">Calibrate your physical vitals & starting build. The System will adapt your training volume and character transformation quests around your biology.</p>
+            </div>
             
             <div class="setup-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Age</label>
-                        <input type="number" id="setup-age" placeholder="Your age">
+                <!-- 01. Physical Vitals -->
+                <div class="setup-section-card">
+                    <div class="setup-section-title">
+                        <span class="step-num">01</span>
+                        <span>Physical Vitals</span>
                     </div>
-                    <div class="form-group">
-                        <label>Height (cm)</label>
-                        <input type="number" step="0.1" id="setup-height" placeholder="Your height">
+                    <div class="vitals-grid">
+                        <div class="vital-item">
+                            <label>🎂 Age</label>
+                            <div class="vital-input-wrap">
+                                <input type="number" id="setup-age" placeholder="19" min="10" max="100">
+                                <span class="vital-unit">yrs</span>
+                            </div>
+                        </div>
+                        <div class="vital-item">
+                            <label>📏 Height</label>
+                            <div class="vital-input-wrap">
+                                <input type="number" step="0.1" id="setup-height" placeholder="175">
+                                <span class="vital-unit">cm</span>
+                            </div>
+                        </div>
+                        <div class="vital-item">
+                            <label>⚖️ Weight</label>
+                            <div class="vital-input-wrap">
+                                <input type="number" step="0.1" id="setup-weight" placeholder="70">
+                                <span class="vital-unit">kg</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Weight (kg)</label>
-                        <input type="number" step="0.1" id="setup-weight" placeholder="Your weight">
-                    </div>
-                </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Target Height (cm) - Optional</label>
-                        <input type="number" step="0.1" id="setup-target-height" placeholder="Your target height">
-                    </div>
-                    <div class="form-group">
-                        <label>Target Weight (kg) - Optional</label>
-                        <input type="number" step="0.1" id="setup-target-weight" placeholder="Your target weight">
-                    </div>
-                </div>
-
-                <h3>🖼️ Select Your Starting Body Type</h3>
-                <p class="info-text">Choose your starting physique build. The System will adapt your workout volume, target sets/reps, and "Become Like..." character transformation plans around your body type.</p>
-
-                <div class="body-type-grid">
-                    <label class="body-type-card">
-                        <input type="radio" name="setup-body-type" value="ectomorph">
-                        <div class="body-type-card-inner">
-                            <img src="/static/images/body_type_ectomorph.png?v=2" alt="Slim & Lean Build" class="body-type-img">
-                            <div class="body-type-name">SLIM & LEAN</div>
-                            <div class="body-type-tag">Skinny / Lean Frame</div>
-                            <div class="body-type-desc">Fast metabolism, lower muscle mass. Focused on building muscle & hypertrophy.</div>
+                    <div class="vitals-targets-grid">
+                        <div class="vital-item">
+                            <label>🎯 Target Height <span class="opt-tag">(Optional)</span></label>
+                            <div class="vital-input-wrap">
+                                <input type="number" step="0.1" id="setup-target-height" placeholder="e.g. 180">
+                                <span class="vital-unit">cm</span>
+                            </div>
                         </div>
-                    </label>
-
-                    <label class="body-type-card">
-                        <input type="radio" name="setup-body-type" value="mesomorph" checked>
-                        <div class="body-type-card-inner">
-                            <img src="/static/images/body_type_mesomorph.png?v=2" alt="Athletic & Fit Build" class="body-type-img">
-                            <div class="body-type-name">ATHLETIC & FIT</div>
-                            <div class="body-type-tag">Naturally Athletic</div>
-                            <div class="body-type-desc">Balanced frame, gains muscle easily. Focused on strength overload & progressive intensity.</div>
+                        <div class="vital-item">
+                            <label>🎯 Target Weight <span class="opt-tag">(Optional)</span></label>
+                            <div class="vital-input-wrap">
+                                <input type="number" step="0.1" id="setup-target-weight" placeholder="e.g. 75">
+                                <span class="vital-unit">kg</span>
+                            </div>
                         </div>
-                    </label>
-
-                    <label class="body-type-card">
-                        <input type="radio" name="setup-body-type" value="endomorph">
-                        <div class="body-type-card-inner">
-                            <img src="/static/images/body_type_endomorph.png?v=2" alt="Overweight & Heavy Build" class="body-type-img">
-                            <div class="body-type-name">OVERWEIGHT / HEAVY</div>
-                            <div class="body-type-tag">Stocky / High Body Fat</div>
-                            <div class="body-type-desc">Solid frame carrying higher body fat. Focused on joint-friendly fat loss & stamina.</div>
-                        </div>
-                    </label>
-
-                    <label class="body-type-card">
-                        <input type="radio" name="setup-body-type" value="skinny_fat">
-                        <div class="body-type-card-inner">
-                            <img src="/static/images/body_type_skinnyfat.png?v=2" alt="Skinny-Fat Build" class="body-type-img">
-                            <div class="body-type-name">SKINNY-FAT</div>
-                            <div class="body-type-tag">Body Recomposition</div>
-                            <div class="body-type-desc">Slim frame carrying stomach fat. Focused on body recomposition & muscle tone.</div>
-                        </div>
-                    </label>
-
-                    <label class="body-type-card">
-                        <input type="radio" name="setup-body-type" value="muscular">
-                        <div class="body-type-card-inner">
-                            <img src="/static/images/body_type_muscular.png?v=2" alt="Muscular Build" class="body-type-img">
-                            <div class="body-type-name">MUSCULAR & STRONG</div>
-                            <div class="body-type-tag">Experienced Lifter</div>
-                            <div class="body-type-desc">Dense muscle base & high baseline strength. Focused on advanced splits & power.</div>
-                        </div>
-                    </label>
-                </div>
-
-                <h3>🎯 Primary Objective Path</h3>
-                <p class="info-text">Select everything you want to focus on — you can pick more than one. Your daily quests will be built around this combination.</p>
-
-                <div class="objective-path-grid">
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="strength">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">💪</div>
-                            <div class="objective-name">Strength</div>
-                        </div>
-                    </label>
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="muscle_gain">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">🏋️</div>
-                            <div class="objective-name">Muscle Gain</div>
-                        </div>
-                    </label>
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="weight_loss">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">🔥</div>
-                            <div class="objective-name">Weight Loss</div>
-                        </div>
-                    </label>
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="endurance">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">🏃</div>
-                            <div class="objective-name">Endurance & Stamina</div>
-                        </div>
-                    </label>
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="flexibility">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">🧘</div>
-                            <div class="objective-name">Flexibility & Mobility</div>
-                        </div>
-                    </label>
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="height_growth">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">📏</div>
-                            <div class="objective-name">Height Growth</div>
-                        </div>
-                    </label>
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="general_fitness">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">❤️</div>
-                            <div class="objective-name">General Fitness & Health</div>
-                        </div>
-                    </label>
-                    <label class="objective-card">
-                        <input type="checkbox" name="objective-path" value="athletic_performance">
-                        <div class="objective-card-content">
-                            <div class="objective-icon">⚡</div>
-                            <div class="objective-name">Sport / Athletic Performance</div>
-                        </div>
-                    </label>
-                </div>
-                <div id="objective-path-error" class="error-message"></div>
-
-                <h3>🏋️ Workout Location & Equipment Access</h3>
-                <p class="info-text">Select where you plan to train and what equipment you have access to. Your workout routines will only prescribe exercises you can actually perform.</p>
-
-                <div class="equipment-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 25px;">
-                    <label class="equipment-card" style="background: rgba(15, 23, 42, 0.7); border: 2px solid rgba(255, 255, 255, 0.08); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer;">
-                        <input type="radio" name="setup-equipment" value="Full Commercial Gym" checked>
-                        <div style="font-size: 1.5rem;">🏋️‍♂️</div>
-                        <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">Full Commercial Gym</div>
-                        <div style="font-size: 0.75rem; color: #94a3b8;">Barbells, dumbbells, cable machines, squat racks, and leg press.</div>
-                    </label>
-
-                    <label class="equipment-card" style="background: rgba(15, 23, 42, 0.7); border: 2px solid rgba(255, 255, 255, 0.08); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer;">
-                        <input type="radio" name="setup-equipment" value="Dumbbells Only">
-                        <div style="font-size: 1.5rem;">🧱</div>
-                        <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">Dumbbells & Home Setup</div>
-                        <div style="font-size: 0.75rem; color: #94a3b8;">Adjustable dumbbells, bench, pull-up bar, or resistance bands.</div>
-                    </label>
-
-                    <label class="equipment-card" style="background: rgba(15, 23, 42, 0.7); border: 2px solid rgba(255, 255, 255, 0.08); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer;">
-                        <input type="radio" name="setup-equipment" value="Home / Bodyweight">
-                        <div style="font-size: 1.5rem;">🏠</div>
-                        <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">Home / Bodyweight</div>
-                        <div style="font-size: 0.75rem; color: #94a3b8;">No equipment needed! Pure push-ups, squats, core & bodyweight floor moves.</div>
-                    </label>
-
-                    <label class="equipment-card" style="background: rgba(15, 23, 42, 0.7); border: 2px solid rgba(255, 255, 255, 0.08); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer;">
-                        <input type="radio" name="setup-equipment" value="Calisthenics">
-                        <div style="font-size: 1.5rem;">🤸‍♂️</div>
-                        <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">Calisthenics & Street Workout</div>
-                        <div style="font-size: 0.75rem; color: #94a3b8;">Pull-up bar, dips, muscle-ups, handstands, levers & gymnastic body mastery.</div>
-                    </label>
-                </div>
-
-                <div class="form-row" style="margin-top: 20px;">
-                    <div class="form-group">
-                        <label>Training Experience</label>
-                        <select id="setup-experience">
-                            <option value="beginner">Beginner (new to training)</option>
-                            <option value="intermediate">Intermediate (6+ months)</option>
-                            <option value="advanced">Advanced (2+ years)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Days Per Week You Can Train</label>
-                        <select id="setup-days-per-week">
-                            <option value="3">3 days</option>
-                            <option value="4">4 days</option>
-                            <option value="5" selected>5 days</option>
-                            <option value="6">6 days</option>
-                            <option value="7">7 days (with active recovery)</option>
-                        </select>
                     </div>
                 </div>
 
-                <h3>🏥 Joint Pain & Medical Conditions</h3>
-                <p class="info-text">Select any joint issues or medical conditions so the System adapts exercises to be 100% safe (e.g. box squats instead of heavy barbell squats).</p>
+                <!-- 02. Starting Physique Build -->
+                <div class="setup-section-card">
+                    <div class="setup-section-title">
+                        <span class="step-num">02</span>
+                        <span>Starting Physique Build</span>
+                    </div>
+                    <p class="section-desc">Select your current physical structure. Exercises and progression curves adapt to your body type.</p>
 
-                <div class="medical-conditions-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
-                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="setup-medical-condition" value="knee_pain">
-                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🦵 Knee Pain / Issues</span>
-                    </label>
-                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="setup-medical-condition" value="back_pain">
-                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🪵 Lower Back Pain</span>
-                    </label>
-                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="setup-medical-condition" value="shoulder_pain">
-                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🦾 Shoulder Discomfort</span>
-                    </label>
-                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="setup-medical-condition" value="wrist_elbow_pain">
-                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🖐️ Wrist / Elbow Pain</span>
-                    </label>
-                    <label class="medical-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="setup-medical-condition" value="asthma_cardio">
-                        <span style="font-size: 0.9rem; font-weight: 600; color: #f8fafc;">🫁 Asthma / Low Stamina</span>
-                    </label>
-                </div>
+                    <div class="body-type-grid">
+                        <label class="body-type-card">
+                            <input type="radio" name="setup-body-type" value="ectomorph">
+                            <div class="body-type-card-inner">
+                                <div class="body-type-avatar-wrap">
+                                    <img src="/static/images/body_type_ectomorph.png?v=2" alt="Slim & Lean" class="body-type-img">
+                                </div>
+                                <div class="body-type-name">SLIM & LEAN</div>
+                                <div class="body-type-tag">Skinny / Lean Frame</div>
+                                <div class="body-type-desc">Fast metabolism, lean muscle focus.</div>
+                            </div>
+                        </label>
 
-                <div class="form-group" style="margin-bottom: 25px;">
-                    <label style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; display: block;">Other Specific Injuries or Medical Notes (Optional)</label>
-                    <input type="text" id="setup-medical-notes" placeholder="e.g. Recovering from ankle sprain, high blood pressure, etc." style="width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: #fff;">
-                </div>
+                        <label class="body-type-card">
+                            <input type="radio" name="setup-body-type" value="mesomorph" checked>
+                            <div class="body-type-card-inner">
+                                <div class="body-type-avatar-wrap">
+                                    <img src="/static/images/body_type_mesomorph.png?v=2" alt="Athletic & Fit" class="body-type-img">
+                                </div>
+                                <div class="body-type-name">ATHLETIC & FIT</div>
+                                <div class="body-type-tag">Naturally Athletic</div>
+                                <div class="body-type-desc">Balanced build, strength overload focus.</div>
+                            </div>
+                        </label>
 
-                <h3>💪 Current Exercise Capabilities</h3>
-                <p class="info-text">Tell us what you can currently do. This helps us generate appropriate quests.</p>
-                
-                <div id="exercise-inputs">
-                    <div class="exercise-input-row">
-                        <select class="exercise-select">
-                            <option value="push_ups">Push-ups</option>
-                            <option value="pull_ups">Pull-ups</option>
-                            <option value="squats">Squats</option>
-                            <option value="sit_ups">Sit-ups</option>
-                            <option value="running">Running (minutes)</option>
-                        </select>
-                        <input type="number" class="exercise-reps" placeholder="Max reps or minutes">
-                        <button class="btn-small" onclick="addExerciseInput()">+</button>
+                        <label class="body-type-card">
+                            <input type="radio" name="setup-body-type" value="endomorph">
+                            <div class="body-type-card-inner">
+                                <div class="body-type-avatar-wrap">
+                                    <img src="/static/images/body_type_endomorph.png?v=2" alt="Overweight & Heavy" class="body-type-img">
+                                </div>
+                                <div class="body-type-name">OVERWEIGHT</div>
+                                <div class="body-type-tag">Stocky / High Body Fat</div>
+                                <div class="body-type-desc">Solid frame, joint-friendly fat loss focus.</div>
+                            </div>
+                        </label>
+
+                        <label class="body-type-card">
+                            <input type="radio" name="setup-body-type" value="skinny_fat">
+                            <div class="body-type-card-inner">
+                                <div class="body-type-avatar-wrap">
+                                    <img src="/static/images/body_type_skinnyfat.png?v=2" alt="Skinny-Fat" class="body-type-img">
+                                </div>
+                                <div class="body-type-name">SKINNY-FAT</div>
+                                <div class="body-type-tag">Body Recomposition</div>
+                                <div class="body-type-desc">Slim frame with belly fat, tone & recomp.</div>
+                            </div>
+                        </label>
+
+                        <label class="body-type-card">
+                            <input type="radio" name="setup-body-type" value="muscular">
+                            <div class="body-type-card-inner">
+                                <div class="body-type-avatar-wrap">
+                                    <img src="/static/images/body_type_muscular.png?v=2" alt="Muscular & Strong" class="body-type-img">
+                                </div>
+                                <div class="body-type-name">MUSCULAR</div>
+                                <div class="body-type-tag">Experienced Lifter</div>
+                                <div class="body-type-desc">Dense base, advanced power splits.</div>
+                            </div>
+                        </label>
                     </div>
                 </div>
 
-                <button class="btn btn-primary btn-large" onclick="setupProfile()">
-                    🚀 Begin My Journey
+                <!-- 03. Primary Objective Path -->
+                <div class="setup-section-card">
+                    <div class="setup-section-title">
+                        <span class="step-num">03</span>
+                        <span>Primary Objective Path</span>
+                    </div>
+                    <p class="section-desc">Choose your fitness goals (select one or multiple):</p>
+
+                    <div class="objective-path-grid">
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="strength">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">💪</div>
+                                <div class="objective-name">Strength</div>
+                            </div>
+                        </label>
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="muscle_gain">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">🏋️</div>
+                                <div class="objective-name">Muscle Gain</div>
+                            </div>
+                        </label>
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="weight_loss">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">🔥</div>
+                                <div class="objective-name">Weight Loss</div>
+                            </div>
+                        </label>
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="endurance">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">🏃</div>
+                                <div class="objective-name">Endurance</div>
+                            </div>
+                        </label>
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="flexibility">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">🧘</div>
+                                <div class="objective-name">Flexibility</div>
+                            </div>
+                        </label>
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="height_growth">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">📏</div>
+                                <div class="objective-name">Height Growth</div>
+                            </div>
+                        </label>
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="general_fitness">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">❤️</div>
+                                <div class="objective-name">General Health</div>
+                            </div>
+                        </label>
+                        <label class="objective-card">
+                            <input type="checkbox" name="objective-path" value="athletic_performance">
+                            <div class="objective-card-content">
+                                <div class="objective-icon">⚡</div>
+                                <div class="objective-name">Athletics</div>
+                            </div>
+                        </label>
+                    </div>
+                    <div id="objective-path-error" class="error-message"></div>
+                </div>
+
+                <!-- 04. Workout Location & Equipment Access -->
+                <div class="setup-section-card">
+                    <div class="setup-section-title">
+                        <span class="step-num">04</span>
+                        <span>Training Location & Equipment</span>
+                    </div>
+                    <p class="section-desc">Select where you plan to train. Workouts only prescribe exercises you have equipment for.</p>
+
+                    <div class="equipment-grid">
+                        <label class="equipment-card">
+                            <input type="radio" name="setup-equipment" value="Full Commercial Gym" checked>
+                            <div class="equipment-card-inner">
+                                <div class="eq-icon">🏋️‍♂️</div>
+                                <div class="eq-title">Commercial Gym</div>
+                                <div class="eq-desc">Barbells, cables, racks, machines.</div>
+                            </div>
+                        </label>
+
+                        <label class="equipment-card">
+                            <input type="radio" name="setup-equipment" value="Dumbbells Only">
+                            <div class="equipment-card-inner">
+                                <div class="eq-icon">🧱</div>
+                                <div class="eq-title">Dumbbells & Home</div>
+                                <div class="eq-desc">Adjustable dumbbells, bench, bands.</div>
+                            </div>
+                        </label>
+
+                        <label class="equipment-card">
+                            <input type="radio" name="setup-equipment" value="Home / Bodyweight">
+                            <div class="equipment-card-inner">
+                                <div class="eq-icon">🏠</div>
+                                <div class="eq-title">Home Bodyweight</div>
+                                <div class="eq-desc">Zero equipment, push-ups, floor moves.</div>
+                            </div>
+                        </label>
+
+                        <label class="equipment-card">
+                            <input type="radio" name="setup-equipment" value="Calisthenics">
+                            <div class="equipment-card-inner">
+                                <div class="eq-icon">🤸‍♂️</div>
+                                <div class="eq-title">Calisthenics</div>
+                                <div class="eq-desc">Pull-up bars, dips, levers, handstands.</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 05. Schedule & Safety -->
+                <div class="setup-section-card">
+                    <div class="setup-section-title">
+                        <span class="step-num">05</span>
+                        <span>Schedule & Joint Safety</span>
+                    </div>
+                    
+                    <div class="schedule-grid">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>🥋 Training Experience</label>
+                            <select id="setup-experience" class="custom-select">
+                                <option value="beginner">Beginner (New to training)</option>
+                                <option value="intermediate" selected>Intermediate (6+ months)</option>
+                                <option value="advanced">Advanced (2+ years)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>📅 Weekly Frequency</label>
+                            <select id="setup-days-per-week" class="custom-select">
+                                <option value="3">3 Days / Week</option>
+                                <option value="4">4 Days / Week</option>
+                                <option value="5" selected>5 Days / Week</option>
+                                <option value="6">6 Days / Week</option>
+                                <option value="7">7 Days (with Active Recovery)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <label style="font-size: 0.88rem; font-weight: 700; color: #94a3b8; display: block; margin: 18px 0 8px 0;">🏥 Joint Issues & Medical Safety</label>
+                    <div class="medical-conditions-grid">
+                        <label class="medical-card">
+                            <input type="checkbox" name="setup-medical-condition" value="knee_pain">
+                            <span>🦵 Knee Pain</span>
+                        </label>
+                        <label class="medical-card">
+                            <input type="checkbox" name="setup-medical-condition" value="back_pain">
+                            <span>🪵 Lower Back Pain</span>
+                        </label>
+                        <label class="medical-card">
+                            <input type="checkbox" name="setup-medical-condition" value="shoulder_pain">
+                            <span>🦾 Shoulder Discomfort</span>
+                        </label>
+                        <label class="medical-card">
+                            <input type="checkbox" name="setup-medical-condition" value="wrist_elbow_pain">
+                            <span>🖐️ Wrist / Elbow Pain</span>
+                        </label>
+                        <label class="medical-card">
+                            <input type="checkbox" name="setup-medical-condition" value="asthma_cardio">
+                            <span>🫁 Asthma / Low Stamina</span>
+                        </label>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 14px; margin-bottom: 0;">
+                        <label style="font-size: 0.8rem; color: #64748b;">Specific Injuries or Notes (Optional)</label>
+                        <input type="text" id="setup-medical-notes" placeholder="e.g. Recovering from ankle sprain" class="custom-text-input">
+                    </div>
+                </div>
+
+                <!-- 06. Baseline Capabilities (Optional) -->
+                <div class="setup-section-card">
+                    <div class="setup-section-title">
+                        <span class="step-num">06</span>
+                        <span>Baseline Capabilities <span class="opt-tag">(Optional)</span></span>
+                    </div>
+                    <p class="section-desc">Record initial rep maximums to calibrate starting set volume:</p>
+                    
+                    <div id="exercise-inputs">
+                        <div class="exercise-input-row">
+                            <select class="exercise-select custom-select">
+                                <option value="push_ups">Push-ups</option>
+                                <option value="pull_ups">Pull-ups</option>
+                                <option value="squats">Squats</option>
+                                <option value="sit_ups">Sit-ups</option>
+                                <option value="running">Running (minutes)</option>
+                            </select>
+                            <input type="number" class="exercise-reps custom-text-input" placeholder="Max reps">
+                            <button type="button" class="btn btn-secondary btn-add-ex" onclick="addExerciseInput()">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-primary setup-submit-btn" onclick="setupProfile()">
+                    <span>⚡ COMPLETE INITIALIZATION & ARISE</span>
                 </button>
-                <div id="setup-error" class="error-message"></div>
+                <div id="setup-error" class="error-message" style="margin-top: 14px;"></div>
             </div>
         </div>
     </div>
@@ -538,6 +628,7 @@
                     <button class="btn btn-primary" onclick="showTab('quest')">
                         View Full Quest →
                     </button>
+                </div>
             </div>
         </div>
 
@@ -858,28 +949,49 @@
                     </div>
                 </div>
 
-                <div class="card" id="api-key-card">
-                    <div class="card-header">
-                        <h2>🔑 Your AI API Key</h2>
+                <div class="card api-key-card" id="api-key-card">
+                    <div class="api-key-header">
+                        <div class="api-key-title-group">
+                            <span class="api-key-icon">🔑</span>
+                            <h2 style="margin: 0; font-size: 1.25rem;">AI API Key Configuration</h2>
+                        </div>
+                        <div id="api-key-status" class="api-key-status"></div>
                     </div>
-                    <p class="info-text">
-                        This app uses Google Gemini to power physique analysis. Get a free key at
-                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>
-                        and paste it here — it's encrypted before being stored, and only used for your 
-                        own requests.
+                    
+                    <p class="api-key-desc">
+                        Body Sync uses Google Gemini to power physique analysis. Get a free API key at
+                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="api-key-link">aistudio.google.com/apikey ↗</a>
+                        and paste it below. Keys are encrypted on the server and used only for your requests.
                     </p>
-                    <div id="api-key-status" class="api-key-status"></div>
-                    <div class="form-group">
-                        <label>Gemini API Key</label>
-                        <div class="api-key-input-row">
-                            <input type="password" id="api-key-input" placeholder="Paste your Gemini API key here">
-                            <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+
+                    <div class="api-key-form-wrap">
+                        <div class="api-key-input-box">
+                            <span class="api-key-input-prefix">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            </span>
+                            <input type="password" id="api-key-input" placeholder="Paste your Gemini API key (AIzaSy...)" autocomplete="off">
+                            <button type="button" class="api-key-eye-btn" onclick="togglePasswordVisibility('api-key-input', this)" title="Show/Hide API Key">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                        <div class="api-key-actions">
+                            <button type="button" class="btn btn-primary api-key-btn-save" onclick="saveApiKey()">
+                                <span>⚡ Save Key</span>
+                            </button>
+                            <button type="button" class="btn btn-danger api-key-btn-remove" id="remove-api-key-btn" onclick="removeApiKey()" style="display: none;">
+                                <span>🗑️ Remove Key</span>
+                            </button>
                         </div>
                     </div>
-                    <button class="btn btn-small btn-danger" id="remove-api-key-btn" onclick="removeApiKey()" style="display: none;">
-                        Remove My Key
-                    </button>
-                    <div id="api-key-error" class="error-message"></div>
+
+                    <div class="api-key-footer-note">
+                        <span>🔒 AES Encrypted</span>
+                        <span class="dot-sep">•</span>
+                        <span>Zero Logging</span>
+                        <span class="dot-sep">•</span>
+                        <span>Personal Quota Protection</span>
+                    </div>
+                    <div id="api-key-error" class="error-message" style="margin-top: 10px;"></div>
                 </div>
 
                 <div class="card">
@@ -1452,7 +1564,7 @@
                             <span id="card-quests-val" class="card-footer-val">0</span>
                         </div>
                         <div class="card-footer-item">
-                            <span class="card-lbl">ACHIEVEMENTS</span>
+                            <span class="card-lbl">ACTIVE STREAK</span>
                             <span id="card-achieve-val" class="card-footer-val">0</span>
                         </div>
                         <div class="card-footer-item">
@@ -1517,7 +1629,7 @@
                     </div>
                     <div class="hunter-card-footer">
                         <div class="card-footer-item"><span class="card-lbl">QUESTS CLEARED</span><span id="public-card-quests-val" class="card-footer-val">0</span></div>
-                        <div class="card-footer-item"><span class="card-lbl">ACHIEVEMENTS</span><span id="public-card-achieve-val" class="card-footer-val">0</span></div>
+                        <div class="card-footer-item"><span class="card-lbl">ACTIVE STREAK</span><span id="public-card-achieve-val" class="card-footer-val">0</span></div>
                     </div>
                 </div>
 
@@ -1843,6 +1955,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="/static/js/app.js?v=20260820_10"></script>
+    <script src="/static/js/app.js?v=20260820_16"></script>
 </body>
 </html>

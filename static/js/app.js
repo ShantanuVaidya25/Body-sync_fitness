@@ -49,13 +49,25 @@ function togglePasswordVisibility(inputId, btn) {
 }
 
 function showLogin() {
-    document.getElementById('login-form').style.display = 'block';
-    document.getElementById('register-form').style.display = 'none';
+    const loginForm = document.getElementById('login-form');
+    const regForm = document.getElementById('register-form');
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabReg = document.getElementById('auth-tab-register');
+    if (loginForm) loginForm.style.display = 'block';
+    if (regForm) regForm.style.display = 'none';
+    if (tabLogin) tabLogin.classList.add('active');
+    if (tabReg) tabReg.classList.remove('active');
 }
 
 function showRegister() {
-    document.getElementById('login-form').style.display = 'none';
-    document.getElementById('register-form').style.display = 'block';
+    const loginForm = document.getElementById('login-form');
+    const regForm = document.getElementById('register-form');
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabReg = document.getElementById('auth-tab-register');
+    if (loginForm) loginForm.style.display = 'none';
+    if (regForm) regForm.style.display = 'block';
+    if (tabLogin) tabLogin.classList.remove('active');
+    if (tabReg) tabReg.classList.add('active');
 }
 
 async function register() {
@@ -703,7 +715,7 @@ function renderAdminUsers(users) {
         return;
     }
 
-    tbody.innerHTML = users.map(u => {
+    tbody.innerHTML = users.map((u, idx) => {
         const isSelf = currentUser && currentUser.id === u.id;
         const isAdmin = Boolean(u.is_admin);
         const roleBadge = isAdmin
@@ -732,7 +744,7 @@ function renderAdminUsers(users) {
 
         return `
             <tr>
-                <td style="font-weight: 700; color: #94a3b8; font-family: 'Orbitron', sans-serif; font-size: 0.85rem;">#${u.id}</td>
+                <td style="font-weight: 700; color: #94a3b8; font-family: 'Orbitron', sans-serif; font-size: 0.85rem;">#${idx + 1}</td>
                 <td>
                     <div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; display: flex; align-items: center; gap: 8px;">
                         <span style="width: 28px; height: 28px; border-radius: 50%; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: #a5b4fc;">${(u.username || 'H')[0].toUpperCase()}</span>
@@ -1873,9 +1885,17 @@ async function loadLeaderboard() {
         const leaderboard = document.getElementById('leaderboard');
         if (!leaderboard) return;
         
+        const rawList = data.leaderboard || [];
+        const seenIds = new Set();
+        const playersList = rawList.filter(p => {
+            if (!p || !p.id || seenIds.has(p.id)) return false;
+            seenIds.add(p.id);
+            return true;
+        });
+
         let podiumsHTML = '';
-        if (data.leaderboard && data.leaderboard.length >= 3 && scope === 'global') {
-            const top3 = data.leaderboard.slice(0, 3);
+        if (playersList.length >= 3 && scope === 'global') {
+            const top3 = playersList.slice(0, 3);
             podiumsHTML = `
                 <div class="leaderboard-podium-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
                     ${top3.map((p, i) => {
@@ -1898,7 +1918,7 @@ async function loadLeaderboard() {
             `;
         }
 
-        const itemsHTML = data.leaderboard.map((player, index) => {
+        const itemsHTML = playersList.map((player, index) => {
             let actionBtn = '';
             if (currentUser && player.id === currentUser.id) {
                 actionBtn = `<span class="status-badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc;">You</span>`;
@@ -2369,8 +2389,7 @@ async function loadFriends() {
                         <div class="leaderboard-stats">Level ${friend.level || 1} • ${friend.exp || 0} EXP</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="status-badge status-active">Accepted</span>
-                        <button class="btn btn-small btn-secondary" onclick="removeFriend(${friend.id}, '${escapeHtml(friend.username)}')" style="padding: 2px 8px; font-size: 0.75rem;">
+                        <button class="btn btn-small btn-secondary" onclick="removeFriend(${friend.id}, '${escapeHtml(friend.username)}')" style="padding: 4px 10px; font-size: 0.78rem; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5;">
                             Unfriend
                         </button>
                     </div>
@@ -3344,7 +3363,7 @@ async function openHunterCardModal() {
         if (document.getElementById('card-vit-val')) document.getElementById('card-vit-val').textContent = h.stats.vitality;
 
         if (document.getElementById('card-quests-val')) document.getElementById('card-quests-val').textContent = h.quests_completed;
-        if (document.getElementById('card-achieve-val')) document.getElementById('card-achieve-val').textContent = h.achievements_count;
+        if (document.getElementById('card-achieve-val')) document.getElementById('card-achieve-val').textContent = (h.active_streak !== undefined ? h.active_streak : (h.streak || 0));
 
         const rankBadge = document.getElementById('card-rank-badge');
         if (rankBadge) {
@@ -3465,7 +3484,7 @@ async function openPublicHunterModal(identifier) {
         if (document.getElementById('public-card-vit-val')) document.getElementById('public-card-vit-val').textContent = h.stats.vitality;
 
         if (document.getElementById('public-card-quests-val')) document.getElementById('public-card-quests-val').textContent = h.quests_completed;
-        if (document.getElementById('public-card-achieve-val')) document.getElementById('public-card-achieve-val').textContent = h.achievements_count;
+        if (document.getElementById('public-card-achieve-val')) document.getElementById('public-card-achieve-val').textContent = (h.active_streak !== undefined ? h.active_streak : (h.streak || 0));
 
         const rankBadge = document.getElementById('public-card-rank-badge');
         if (rankBadge) {

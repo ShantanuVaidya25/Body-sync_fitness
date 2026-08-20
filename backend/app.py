@@ -1777,7 +1777,7 @@ def decline_friend():
 @app.route('/api/leaderboard', methods=['GET'])
 @login_required
 def get_leaderboard():
-    """Get global or friends leaderboard with friendship status"""
+    """Get global or friends leaderboard with friendship status (de-duplicated)"""
     user_id = session['user_id']
     scope = request.args.get('scope', 'global')
     
@@ -1788,39 +1788,59 @@ def get_leaderboard():
         cursor.execute('''
             SELECT u.id, u.username, ps.level, ps.exp, ps.strength, 
                    ps.endurance, ps.agility, ps.vitality,
-                   f_sub.status as friendship_status,
-                   f_sub.user_id as request_sender_id
+                   (
+                       SELECT f.status FROM friends f
+                       WHERE (f.user_id = ? AND f.friend_id = u.id) OR (f.user_id = u.id AND f.friend_id = ?)
+                       ORDER BY CASE WHEN f.status = 'accepted' THEN 1 WHEN f.status = 'pending' THEN 2 ELSE 3 END
+                       LIMIT 1
+                   ) as friendship_status,
+                   (
+                       SELECT f.user_id FROM friends f
+                       WHERE (f.user_id = ? AND f.friend_id = u.id) OR (f.user_id = u.id AND f.friend_id = ?)
+                       ORDER BY CASE WHEN f.status = 'accepted' THEN 1 WHEN f.status = 'pending' THEN 2 ELSE 3 END
+                       LIMIT 1
+                   ) as request_sender_id
             FROM player_stats ps
             JOIN users u ON (ps.user_id = u.id)
-            LEFT JOIN friends f_sub ON (
-                (f_sub.user_id = ? AND f_sub.friend_id = u.id) OR 
-                (f_sub.user_id = u.id AND f_sub.friend_id = ?)
-            )
-            WHERE ps.user_id IN (
-                SELECT friend_id FROM friends 
-                WHERE user_id = ? AND status = 'accepted'
+            WHERE u.id IN (
+                SELECT friend_id FROM friends WHERE user_id = ? AND status = 'accepted'
+                UNION
+                SELECT user_id FROM friends WHERE friend_id = ? AND status = 'accepted'
             ) OR ps.user_id = ?
             ORDER BY ps.level DESC, ps.exp DESC
             LIMIT 50
-        ''', (user_id, user_id, user_id, user_id))
+        ''', (user_id, user_id, user_id, user_id, user_id, user_id, user_id))
     else:
         cursor.execute('''
             SELECT u.id, u.username, ps.level, ps.exp, ps.strength,
                    ps.endurance, ps.agility, ps.vitality,
-                   f_sub.status as friendship_status,
-                   f_sub.user_id as request_sender_id
+                   (
+                       SELECT f.status FROM friends f
+                       WHERE (f.user_id = ? AND f.friend_id = u.id) OR (f.user_id = u.id AND f.friend_id = ?)
+                       ORDER BY CASE WHEN f.status = 'accepted' THEN 1 WHEN f.status = 'pending' THEN 2 ELSE 3 END
+                       LIMIT 1
+                   ) as friendship_status,
+                   (
+                       SELECT f.user_id FROM friends f
+                       WHERE (f.user_id = ? AND f.friend_id = u.id) OR (f.user_id = u.id AND f.friend_id = ?)
+                       ORDER BY CASE WHEN f.status = 'accepted' THEN 1 WHEN f.status = 'pending' THEN 2 ELSE 3 END
+                       LIMIT 1
+                   ) as request_sender_id
             FROM player_stats ps
             JOIN users u ON (ps.user_id = u.id)
-            LEFT JOIN friends f_sub ON (
-                (f_sub.user_id = ? AND f_sub.friend_id = u.id) OR 
-                (f_sub.user_id = u.id AND f_sub.friend_id = ?)
-            )
             WHERE COALESCE(u.is_admin, 0) = 0
             ORDER BY ps.level DESC, ps.exp DESC
             LIMIT 100
-        ''', (user_id, user_id))
+        ''', (user_id, user_id, user_id, user_id))
     
-    leaderboard = [dict(row) for row in cursor.fetchall()]
+    seen_ids = set()
+    leaderboard = []
+    for row in cursor.fetchall():
+        row_dict = dict(row)
+        if row_dict['id'] not in seen_ids:
+            seen_ids.add(row_dict['id'])
+            leaderboard.append(row_dict)
+            
     conn.close()
     
     return jsonify({'leaderboard': leaderboard})
