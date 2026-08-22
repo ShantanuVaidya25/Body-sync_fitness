@@ -1006,24 +1006,34 @@
 
                     <div id="physique-name-input" class="physique-input-section">
                         <div class="form-group">
-                            <label>Popular Character Build Presets</label>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
-                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Sung Jin-Woo')">⚔️ Jin-Woo</button>
-                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Toji Fushiguro')">🗡️ Toji</button>
-                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Garou')">🐉 Garou</button>
-                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Baki Hanma')">🥊 Baki</button>
-                                <button type="button" class="btn btn-small btn-secondary" onclick="selectPresetPhysique('Goku')">💥 Goku</button>
+                            <label class="physique-section-label">Popular Character Build Presets</label>
+                            <div class="physique-preset-buttons">
+                                <button type="button" class="physique-preset-btn" onclick="selectPresetPhysique('Sung Jin-Woo')">⚔️ Jin-Woo</button>
+                                <button type="button" class="physique-preset-btn" onclick="selectPresetPhysique('Toji Fushiguro')">🗡️ Toji</button>
+                                <button type="button" class="physique-preset-btn" onclick="selectPresetPhysique('Garou')">🐉 Garou</button>
+                                <button type="button" class="physique-preset-btn" onclick="selectPresetPhysique('Baki Hanma')">🥊 Baki</button>
+                                <button type="button" class="physique-preset-btn" onclick="selectPresetPhysique('Goku')">💥 Goku</button>
+                                <button type="button" class="physique-preset-btn" onclick="selectPresetPhysique('Saitama')">👊 Saitama</button>
                             </div>
-                            <label>Or Type Custom Character / Athlete Name</label>
-                            <input type="text" id="physique-target-name" 
-                                   placeholder="e.g., Levi Ackerman, Saitama, a specific athlete...">
+                            <label class="physique-section-label" style="margin-top: 14px;">Or Type Custom Character / Athlete Name</label>
+                            <div class="input-group-custom physique-input-wrapper">
+                                <span class="input-prefix-icon">🎯</span>
+                                <input type="text" id="physique-target-name" 
+                                       placeholder="e.g., Levi Ackerman, Saitama, Goku, Baki, Toji, Bruce Lee..."
+                                       autocomplete="off">
+                            </div>
                         </div>
                     </div>
 
                     <div id="physique-image-input" class="physique-input-section" style="display: none;">
                         <div class="form-group">
-                            <label>Upload Reference Photo</label>
-                            <input type="file" id="physique-image-file" accept="image/png,image/jpeg,image/webp">
+                            <label class="physique-section-label">Upload Reference Photo</label>
+                            <div class="physique-upload-box" onclick="document.getElementById('physique-image-file').click()">
+                                <div style="font-size: 2.2rem; margin-bottom: 8px;">📷</div>
+                                <div style="color: #38bdf8; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;">Click to select reference photo</div>
+                                <div style="color: #64748b; font-size: 0.8rem;">Supports JPG, PNG, or WEBP</div>
+                                <input type="file" id="physique-image-file" accept="image/png,image/jpeg,image/webp" style="display: none;">
+                            </div>
                             <div id="physique-image-preview"></div>
                         </div>
                     </div>

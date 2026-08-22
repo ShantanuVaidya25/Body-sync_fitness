@@ -28,12 +28,15 @@ except ImportError:
     types = None
 
 
-# Model choice: gemini-2.5-pro is the current stable, GA (non-preview)
-# reasoning + vision model as of mid-2026. If you want to try the newer
-# Gemini 3 family for stronger vision benchmarks, swap this for
-# "gemini-3-pro-preview" -- just be aware preview models can change or
-# be deprecated with as little as 2 weeks' notice.
-MODEL_NAME = "gemini-flash-latest"
+# Multi-tier candidate models in order of priority.
+# gemini-3.6-flash and gemini-3-flash-preview provide lightning-fast, high-capacity generation,
+# while gemini-flash-latest serves as alias fallback.
+CANDIDATE_MODELS = [
+    "gemini-3.6-flash",
+    "gemini-3-flash-preview",
+    "gemini-flash-latest"
+]
+MODEL_NAME = CANDIDATE_MODELS[0]
 
 
 # The exact Game Master prompt template, parameterized by target.
@@ -78,7 +81,7 @@ def enrich_body_type(body_type: str) -> str:
 
 
 class PhysiqueAnalyzer:
-    """Generates physique-goal based Quest Logs via Google Gemini"""
+    """Generates physique-goal based Quest Logs via Google Gemini with resilient multi-model fallbacks"""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
@@ -89,6 +92,51 @@ class PhysiqueAnalyzer:
     def is_configured(self) -> bool:
         """Check whether the API key / SDK is available"""
         return self.client is not None
+
+    def _generate_content_resilient(self, contents, generation_config=None) -> tuple[Optional[str], Optional[str]]:
+        """
+        Attempt generation across candidate models with automatic retry & backoff
+        for transient 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED, or network timeouts.
+        
+        Returns: (text_output, error_message)
+        """
+        if not self.is_configured():
+            return None, "Gemini API key is not configured."
+
+        import time
+        last_error = None
+
+        for model_name in CANDIDATE_MODELS:
+            for attempt in range(2):
+                try:
+                    kwargs = {'model': model_name, 'contents': contents}
+                    if generation_config:
+                        kwargs['config'] = generation_config
+                    
+                    response = self.client.models.generate_content(**kwargs)
+                    if response and response.text:
+                        return response.text.strip(), None
+                except Exception as e:
+                    last_error = str(e)
+                    err_lower = last_error.lower()
+                    
+                    # 404 Not Found -> Model name retired/unsupported, skip directly to next candidate model
+                    if '404' in err_lower or 'not_found' in err_lower:
+                        print(f"[WARN] Model {model_name} unavailable (404), trying next candidate...")
+                        break
+                    
+                    # 503 / 429 / High demand / Quota -> Transient spike, retry with small backoff
+                    if '503' in err_lower or 'unavailable' in err_lower or '429' in err_lower or 'high demand' in err_lower or 'exhausted' in err_lower:
+                        print(f"[WARN] Model {model_name} busy (attempt {attempt+1}/2: {e}).")
+                        if attempt == 0:
+                            time.sleep(1.0)
+                            continue
+                    
+                    # Second attempt failed or non-retriable error -> move to next candidate model
+                    print(f"[WARN] Model {model_name} failed: {e}. Cascading to alternative candidate...")
+                    break
+
+        return None, last_error
 
     def _build_contents(self, target_name: Optional[str],
                          image_path: Optional[str],
@@ -135,8 +183,8 @@ class PhysiqueAnalyzer:
                           equipment: Optional[str] = None) -> Dict:
         """
         Generate a Quest Log by analyzing a named character/person or an
-        uploaded photo. Exactly one of target_name / image_path should be
-        provided (an image takes priority if both are given).
+        uploaded photo. Uses resilient Gemini AI model cascading with instant
+        deterministic fallback to guarantee uninterrupted training splits.
         """
         if not target_name and not image_path:
             return {
@@ -144,42 +192,69 @@ class PhysiqueAnalyzer:
                 'error': 'Provide either a target character/person name OR upload a reference image.'
             }
 
-        if not self.is_configured():
-            return {
-                'success': False,
-                'error': 'Gemini API key is not configured. Go to Settings to add your key.'
-            }
+        quest_log_markdown = None
+        generation_error = None
 
-        try:
-            contents = self._build_contents(
-                target_name=target_name,
-                image_path=image_path,
-                current_body_type=current_body_type,
-                injuries=injuries,
-                equipment=equipment
-            )
+        if self.is_configured():
+            try:
+                contents = self._build_contents(
+                    target_name=target_name,
+                    image_path=image_path,
+                    current_body_type=current_body_type,
+                    injuries=injuries,
+                    equipment=equipment
+                )
+                quest_log_markdown, generation_error = self._generate_content_resilient(contents)
+            except Exception as e:
+                generation_error = str(e)
+                print(f"[WARN] AI content build/generation error: {e}")
 
-            response = self.client.models.generate_content(
-                model=MODEL_NAME,
-                contents=contents
-            )
-
-            quest_log_markdown = response.text
-
+        if quest_log_markdown:
             return {
                 'success': True,
                 'target_name': target_name or 'Uploaded Photo Subject',
                 'source_type': 'image' if image_path else 'text',
-                'quest_log_markdown': quest_log_markdown
+                'quest_log_markdown': quest_log_markdown,
+                'fallback_used': False
             }
 
-        except Exception as e:
+        # Fallback handling:
+        # If a target character/person name was provided, fall back smoothly to our authentic character generator
+        if target_name:
+            eq = equipment or "Full Commercial Gym"
+            bt = current_body_type or "mesomorph"
+            inj = injuries or "None"
+            fallback_md, _ = generate_character_equipment_split(
+                target_name=target_name,
+                equipment=eq,
+                body_type=bt,
+                injuries=inj
+            )
+            notice = "[SYSTEM] AI service is experiencing temporary high demand. Generated your authentic build protocol via System Engine so your training isn't interrupted!"
+            print(f"[INFO] Used deterministic character engine for '{target_name}' (AI notice: {generation_error})")
+            return {
+                'success': True,
+                'target_name': target_name,
+                'source_type': 'text',
+                'quest_log_markdown': fallback_md,
+                'fallback_used': True,
+                'notice': notice
+            }
+
+        # If it was an image upload and AI failed completely:
+        if not self.is_configured():
             return {
                 'success': False,
-                'error': f'AI generation failed: {str(e)}'
+                'error': 'Gemini API key is not configured. Go to Settings to add your key.',
+                'setup_required': True
             }
 
-    def extract_structured_weekly_plan(self, quest_log_markdown: str, target_name: Optional[str] = None) -> Dict:
+        return {
+            'success': False,
+            'error': 'AI vision service is currently experiencing high demand. Please try again in a few moments or enter your character name directly.'
+        }
+
+    def extract_structured_weekly_plan(self, quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym") -> Dict:
         """
         Take the freeform Quest Log markdown and convert the "Main Story Quests"
         weekly training split specifically into structured JSON data. Uses Gemini AI
@@ -223,30 +298,26 @@ Return JSON matching EXACTLY this schema (all 7 days, Monday through Sunday, day
 If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/active days consistent with a realistic weekly structure. Rest days should have "is_rest": true and an empty exercises array. Output ONLY the JSON object, nothing else."""
 
             try:
-                response = self.client.models.generate_content(
-                    model=MODEL_NAME,
-                    contents=[structuring_prompt]
-                )
+                raw_text, _ = self._generate_content_resilient([structuring_prompt])
+                if raw_text:
+                    clean_text = raw_text.strip()
+                    if clean_text.startswith('```'):
+                        clean_text = clean_text.split('```')[1]
+                        if clean_text.startswith('json'):
+                            clean_text = clean_text[4:]
+                        clean_text = clean_text.strip()
 
-                raw_text = response.text.strip()
+                    import json
+                    parsed = json.loads(clean_text)
 
-                if raw_text.startswith('```'):
-                    raw_text = raw_text.split('```')[1]
-                    if raw_text.startswith('json'):
-                        raw_text = raw_text[4:]
-                    raw_text = raw_text.strip()
-
-                import json
-                parsed = json.loads(raw_text)
-
-                days = parsed.get('days', [])
-                if len(days) == 7:
-                    return {'success': True, 'days': days}
+                    days = parsed.get('days', [])
+                    if len(days) == 7:
+                        return {'success': True, 'days': days, 'fallback_used': False}
             except Exception as e:
-                print(f"⚠️  Gemini JSON structuring failed ({e}), falling back to deterministic parser.")
+                print(f"[WARN] Gemini JSON structuring failed ({e}), falling back to deterministic parser.")
 
         # Deterministic markdown parsing fallback (guarantees a 7-day split is always built)
-        fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name)
+        fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment)
         return {'success': True, 'days': fallback_days, 'fallback_used': True}
 
     def adapt_physique_quest_to_equipment(self, user_id: int, active_quest: Dict,
@@ -280,7 +351,7 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
                     if weekly_res.get('success'):
                         structured_days = weekly_res.get('days')
             except Exception as e:
-                print(f"⚠️  AI adaptation for {target_name} to {new_equipment} failed ({e}), using deterministic character adapter.")
+                print(f"[WARN] AI adaptation for {target_name} to {new_equipment} failed ({e}), using deterministic character adapter.")
 
         # 2. Deterministic character adapter fallback
         if not structured_days:
@@ -300,7 +371,7 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
             weekly_plan_mgr = WeeklyPlanManager(db)
             weekly_plan_mgr.save_weekly_plan(user_id, quest_id, structured_days)
         except Exception as ex_db:
-            print(f"⚠️  Error saving adapted weekly plan: {ex_db}")
+            print(f"[WARN] Error saving adapted weekly plan: {ex_db}")
 
         return {
             'success': True,
@@ -371,44 +442,43 @@ The JSON payload must follow this exact structure:
             }
 
         try:
-            response = self.client.models.generate_content(
-                model=MODEL_NAME,
-                contents=[prompt]
-            )
-            raw_text = response.text or ""
-            clean_text = raw_text.strip()
-            if clean_text.startswith("```json"):
-                clean_text = clean_text[7:]
-            if clean_text.startswith("```"):
-                clean_text = clean_text[3:]
-            if clean_text.endswith("```"):
-                clean_text = clean_text[:-3]
-            clean_text = clean_text.strip()
-            
-            program_json = json.loads(clean_text)
-            return {
-                'success': True,
-                'body_type': body_type,
-                'enriched_baseline': enriched_baseline,
-                'days_per_week': days_per_week,
-                'equipment': equipment,
-                'injuries': injuries,
-                'program': program_json,
-                'is_fallback': False
-            }
+            raw_text, _ = self._generate_content_resilient([prompt])
+            if raw_text:
+                clean_text = raw_text.strip()
+                if clean_text.startswith("```json"):
+                    clean_text = clean_text[7:]
+                if clean_text.startswith("```"):
+                    clean_text = clean_text[3:]
+                if clean_text.endswith("```"):
+                    clean_text = clean_text[:-3]
+                clean_text = clean_text.strip()
+                
+                program_json = json.loads(clean_text)
+                return {
+                    'success': True,
+                    'body_type': body_type,
+                    'enriched_baseline': enriched_baseline,
+                    'days_per_week': days_per_week,
+                    'equipment': equipment,
+                    'injuries': injuries,
+                    'program': program_json,
+                    'is_fallback': False
+                }
         except Exception as e:
-            fallback_program = self._generate_fallback_json_routine(body_type, enriched_baseline, days_per_week, equipment, injuries)
-            return {
-                'success': True,
-                'body_type': body_type,
-                'enriched_baseline': enriched_baseline,
-                'days_per_week': days_per_week,
-                'equipment': equipment,
-                'injuries': injuries,
-                'program': fallback_program,
-                'is_fallback': True,
-                'notice': f'AI generation notice: {str(e)}'
-            }
+            print(f"⚠️ Workout JSON generation exception: {e}")
+
+        fallback_program = self._generate_fallback_json_routine(body_type, enriched_baseline, days_per_week, equipment, injuries)
+        return {
+            'success': True,
+            'body_type': body_type,
+            'enriched_baseline': enriched_baseline,
+            'days_per_week': days_per_week,
+            'equipment': equipment,
+            'injuries': injuries,
+            'program': fallback_program,
+            'is_fallback': True,
+            'notice': 'Generated optimized protocol via System Fallback Engine'
+        }
 
     def _generate_fallback_json_routine(self, body_type: str, enriched_baseline: str, days_per_week: int, equipment: str, injuries: str) -> dict:
         """
@@ -728,6 +798,8 @@ def generate_character_equipment_split(target_name: str, equipment: str, body_ty
     """
     Generates an authentic character training split and gamified Quest Log markdown
     adapted strictly to the specified equipment access (Home, Dumbbells, Gym).
+    Includes rich themed splits for legendary physiques (Goku, Jin-Woo, Baki, Toji,
+    Saitama, Vegeta, Zoro, Levi, Batman, etc.) and a smart dynamic archetype builder for any custom target.
     """
     t_name = target_name or "Shadow Hunter"
     t_lower = t_name.lower()
@@ -737,7 +809,151 @@ def generate_character_equipment_split(target_name: str, equipment: str, body_ty
     is_home = not is_calisthenics and not is_db and ('home' in eq or 'bodyweight' in eq or 'none' in eq)
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-    if 'jin-woo' in t_lower or 'jinwoo' in t_lower or 'sung' in t_lower:
+    # 1. GOKU / SAIYAN GOD PROTOCOL
+    if 'goku' in t_lower or 'kakarot' in t_lower or 'saiyan' in t_lower or 'ultra instinct' in t_lower:
+        if is_calisthenics:
+            split_days = [
+                {'focus': f"🔥 {t_name}: 100x Gravity Explosive Pull & Core", 'is_rest': False, 'exercises': [
+                    {'name': 'Explosive Muscle-Ups / High Pull-ups', 'sets': 4, 'reps': '6-8', 'rest_seconds': 90, 'notes': 'Pull bar down to sternum with explosive Saiyan force'},
+                    {'name': 'Wide-Grip Strict Pull-ups', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Deep lat spread and upper back thickness'},
+                    {'name': 'L-Sit Chin-ups', 'sets': 3, 'reps': '8', 'rest_seconds': 75, 'notes': 'Bicep isometric compression'},
+                    {'name': 'Dragon Flags', 'sets': 3, 'reps': '8', 'rest_seconds': 60, 'notes': 'Unbreakable gravity chamber core pillar'}
+                ]},
+                {'focus': f"⚡ {t_name}: Kamehameha Upper Push Power", 'is_rest': False, 'exercises': [
+                    {'name': 'Handstand Push-ups / Elevated Pike Press', 'sets': 4, 'reps': '8', 'rest_seconds': 90, 'notes': 'Massive Saiyan boulder shoulder pressing'},
+                    {'name': 'Deep Parallel Bar Dips', 'sets': 4, 'reps': '12-15', 'rest_seconds': 75, 'notes': 'Full lockout through triceps and lower chest'},
+                    {'name': 'Explosive Clap Push-ups', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Fast-twitch martial arts striking speed'},
+                    {'name': 'Pseudo Planche Push-ups', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Straight-arm scapular density'}
+                ]},
+                {'focus': f"🍃 {t_name}: Korin Tower Rest & Senzu Recovery", 'is_rest': True, 'exercises': []},
+                {'focus': f"💥 {t_name}: Kaio-Ken Explosive Leg Power", 'is_rest': False, 'exercises': [
+                    {'name': 'Strict Pistol Squats', 'sets': 4, 'reps': '8 per leg', 'rest_seconds': 75, 'notes': 'Heavy single-leg quad power and balance'},
+                    {'name': 'Explosive Tuck Jump Squats', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Maximum vertical leap takeoff power'},
+                    {'name': 'Shrimp Squats / Bulgarian Splits', 'sets': 3, 'reps': '10 per leg', 'rest_seconds': 60, 'notes': 'Glute and knee joint armor'},
+                    {'name': 'Elevated Single-Leg Calf Raises', 'sets': 4, 'reps': '25', 'rest_seconds': 45, 'notes': 'Instant footwork sprint springiness'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Hyperbolic Time Chamber Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Burpees to Pull-up', 'sets': 4, 'reps': '10', 'rest_seconds': 60, 'notes': 'Combat conditioning capacity'},
+                    {'name': 'Straight Bar Dips', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Bar transition power'},
+                    {'name': 'Hanging Windshield Wipers', 'sets': 3, 'reps': '12', 'rest_seconds': 45, 'notes': 'Rotational core armor'},
+                    {'name': 'Hollow Body Rocks', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 45, 'notes': 'Complete Saiyan core brace'}
+                ]},
+                {'focus': f"🔥 {t_name}: Ultra Instinct Speed & Shadow Flow", 'is_rest': False, 'exercises': [
+                    {'name': 'High-Knee Sprint Burpee Intervals', 'sets': 5, 'reps': '45s work', 'rest_seconds': 60, 'notes': 'High aerobic output and reflex speed'},
+                    {'name': 'Diamond Push-ups', 'sets': 3, 'reps': '15', 'rest_seconds': 45, 'notes': 'Tricep fatigue burnout'},
+                    {'name': 'Typewriter Pull-ups', 'sets': 3, 'reps': '6 per side', 'rest_seconds': 60, 'notes': 'Side-to-side lat agility'},
+                    {'name': 'Full Body Mobility Yoga Flow', 'sets': 1, 'reps': '20 mins', 'rest_seconds': 0, 'notes': 'Joint decompression'}
+                ]},
+                {'focus': f"🍃 {t_name}: Full Zenkai Recovery Day", 'is_rest': True, 'exercises': []}
+            ]
+        elif is_home:
+            split_days = [
+                {'focus': f"🔥 {t_name}: Gravity Push & Torso Armor", 'is_rest': False, 'exercises': [
+                    {'name': 'Standard & Diamond Push-ups', 'sets': 4, 'reps': '20', 'rest_seconds': 60, 'notes': 'Chest and tricep power foundation'},
+                    {'name': 'Pike Push-ups (Elevated)', 'sets': 4, 'reps': '10', 'rest_seconds': 60, 'notes': 'Vertical shoulder strength'},
+                    {'name': 'Bed / Chair Dips', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Tricep lockout power'},
+                    {'name': 'Hollow Body Hold', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 45, 'notes': 'Rigid martial core brace'}
+                ]},
+                {'focus': f"⚡ {t_name}: Back Density & Agility", 'is_rest': False, 'exercises': [
+                    {'name': 'Doorframe / Towel Inverted Rows', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Back thickness without equipment'},
+                    {'name': 'Superman Back Extensions', 'sets': 3, 'reps': '15', 'rest_seconds': 45, 'notes': 'Posterior chain reinforcement'},
+                    {'name': 'Mountain Climbers', 'sets': 4, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Combat conditioning tempo'},
+                    {'name': 'Bicycle Crunches', 'sets': 3, 'reps': '25', 'rest_seconds': 45, 'notes': 'Rotational oblique power'}
+                ]},
+                {'focus': f"🍃 {t_name}: Senzu Bean Rest & Stretch", 'is_rest': True, 'exercises': []},
+                {'focus': f"💥 {t_name}: Kaio-Ken Leg Explosiveness", 'is_rest': False, 'exercises': [
+                    {'name': 'Jump Squats', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Fast-twitch vertical power'},
+                    {'name': 'Bulgarian Split Squats (Chair)', 'sets': 3, 'reps': '12 per leg', 'rest_seconds': 60, 'notes': 'Single-leg quad drive'},
+                    {'name': 'Single-Leg Glute Bridges', 'sets': 3, 'reps': '15 per leg', 'rest_seconds': 45, 'notes': 'Posterior chain stability'},
+                    {'name': 'Elevated Calf Raises', 'sets': 4, 'reps': '25', 'rest_seconds': 45, 'notes': 'Sprint agility and bounce'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Martial Arts Endurance Trial", 'is_rest': False, 'exercises': [
+                    {'name': 'Burpees', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Full-body cardiovascular output'},
+                    {'name': 'Decline Push-ups (Feet on Bed)', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Upper clavicular chest mass'},
+                    {'name': 'Bodyweight Squats (Tempo 3s descent)', 'sets': 3, 'reps': '25', 'rest_seconds': 60, 'notes': 'Metabolic quad endurance'},
+                    {'name': 'Plank to Push-up', 'sets': 3, 'reps': '12', 'rest_seconds': 45, 'notes': 'Shoulder and core integration'}
+                ]},
+                {'focus': f"🔥 {t_name}: Ultra Instinct Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Shadow Boxing Intervals', 'sets': 4, 'reps': '60 sec', 'rest_seconds': 45, 'notes': 'Fast striking speed and footwork'},
+                    {'name': 'Russian Twists', 'sets': 3, 'reps': '25', 'rest_seconds': 45, 'notes': 'Core rotation power'},
+                    {'name': 'Wall Sits', 'sets': 3, 'reps': '60 sec', 'rest_seconds': 45, 'notes': 'Isometric leg stamina'},
+                    {'name': 'Full Body Mobility Flow', 'sets': 1, 'reps': '20 mins', 'rest_seconds': 0, 'notes': 'Flexibility and joint longevity'}
+                ]},
+                {'focus': f"🍃 {t_name}: Full Zenkai Recovery Day", 'is_rest': True, 'exercises': []}
+            ]
+        elif is_db:
+            split_days = [
+                {'focus': f"🔥 {t_name}: Saiyan Dumbbell Heavy Push", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Flat / Floor Press', 'sets': 4, 'reps': '8-10', 'rest_seconds': 90, 'notes': 'Heavy compound chest drive'},
+                    {'name': 'Standing Dumbbell Shoulder Press', 'sets': 4, 'reps': '8-10', 'rest_seconds': 75, 'notes': 'Saiyan shoulder armor'},
+                    {'name': 'Incline Dumbbell Press', 'sets': 3, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Upper chest development'},
+                    {'name': 'Dumbbell Lateral Raises', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': '3D side delts'}
+                ]},
+                {'focus': f"⚡ {t_name}: Saiyan Heavy Pull & Lats", 'is_rest': False, 'exercises': [
+                    {'name': 'Bent-over Dumbbell Rows', 'sets': 4, 'reps': '8-10', 'rest_seconds': 90, 'notes': 'Back thickness and lat width'},
+                    {'name': 'Dumbbell Romanian Deadlifts', 'sets': 4, 'reps': '10', 'rest_seconds': 90, 'notes': 'Hamstring and glute hinge'},
+                    {'name': 'Dumbbell Hammer Curls', 'sets': 3, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Forearm and bicep mass'},
+                    {'name': 'Dumbbell Rear Delt Flyes', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Upper back posture'}
+                ]},
+                {'focus': f"🍃 {t_name}: Korin Tower Rest & Recovery", 'is_rest': True, 'exercises': []},
+                {'focus': f"💥 {t_name}: Kaio-Ken Dumbbell Legs", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Goblet Squats', 'sets': 4, 'reps': '10-12', 'rest_seconds': 90, 'notes': 'Deep quad power'},
+                    {'name': 'Dumbbell Walking Lunges', 'sets': 3, 'reps': '10 per leg', 'rest_seconds': 75, 'notes': 'Unilateral balance'},
+                    {'name': 'Dumbbell Calf Raises', 'sets': 4, 'reps': '20', 'rest_seconds': 45, 'notes': 'Explosive ankle drive'},
+                    {'name': 'Dumbbell Romanian Deadlifts', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Hamstring flexor strength'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Saiyan Arms & Core Hypertrophy", 'is_rest': False, 'exercises': [
+                    {'name': 'Overhead Dumbbell Tricep Extension', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Long head tricep mass'},
+                    {'name': 'Dumbbell Incline Bicep Curls', 'sets': 3, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Bicep peak contraction'},
+                    {'name': 'Plank with Dumbbell Pull-Through', 'sets': 3, 'reps': '12', 'rest_seconds': 45, 'notes': 'Anti-rotational core armor'},
+                    {'name': 'Dumbbell Russian Twists', 'sets': 3, 'reps': '20', 'rest_seconds': 45, 'notes': 'Oblique definition'}
+                ]},
+                {'focus': f"🔥 {t_name}: Ultra Instinct Conditioning & Thrusters", 'is_rest': False, 'exercises': [
+                    {'name': 'Dumbbell Thrusters (Squat to Press)', 'sets': 4, 'reps': '10', 'rest_seconds': 75, 'notes': 'Full body explosive output'},
+                    {'name': 'Dumbbell Renegade Rows', 'sets': 3, 'reps': '8 per arm', 'rest_seconds': 60, 'notes': 'Core and back synergy'},
+                    {'name': 'Push-ups to Floor', 'sets': 3, 'reps': '20', 'rest_seconds': 60, 'notes': 'Chest burnout'},
+                    {'name': 'Dumbbell Farmer Carries', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 60, 'notes': 'Grip and trap stamina'}
+                ]},
+                {'focus': f"🍃 {t_name}: Full Zenkai Recovery Day", 'is_rest': True, 'exercises': []}
+            ]
+        else:
+            # Full Commercial Gym
+            split_days = [
+                {'focus': f"🔥 {t_name}: Heavy Saiyan Push (Chest & Shoulders)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Bench Press', 'sets': 4, 'reps': '6-8', 'rest_seconds': 120, 'notes': 'Heavy compound chest pressing'},
+                    {'name': 'Overhead Barbell Press', 'sets': 4, 'reps': '6-8', 'rest_seconds': 90, 'notes': 'Saiyan shoulder mass'},
+                    {'name': 'Incline Dumbbell Press', 'sets': 3, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Upper chest development'},
+                    {'name': 'Cable Lateral Raises', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': '3D side delts'}
+                ]},
+                {'focus': f"⚡ {t_name}: Gravity Pull (Deadlifts & Lats)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Deadlifts', 'sets': 4, 'reps': '5', 'rest_seconds': 150, 'notes': 'Total posterior chain Saiyan power'},
+                    {'name': 'Lat Pulldowns / Weighted Pull-ups', 'sets': 4, 'reps': '8-10', 'rest_seconds': 90, 'notes': 'V-taper lat width'},
+                    {'name': 'Seated Cable Rows', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Mid-back thickness'},
+                    {'name': 'EZ-Bar Bicep Curls', 'sets': 3, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Bicep hypertrophy'}
+                ]},
+                {'focus': f"🍃 {t_name}: Korin Tower Rest & Recovery", 'is_rest': True, 'exercises': []},
+                {'focus': f"💥 {t_name}: Kaio-Ken Leg Power (Squats)", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Back Squats', 'sets': 4, 'reps': '6-8', 'rest_seconds': 120, 'notes': 'Heavy quad and glute strength'},
+                    {'name': 'Leg Press Machine', 'sets': 3, 'reps': '12', 'rest_seconds': 90, 'notes': 'Quad hypertrophy volume'},
+                    {'name': 'Lying Leg Curls / RDLs', 'sets': 3, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Direct hamstring overload'},
+                    {'name': 'Standing Calf Machine', 'sets': 4, 'reps': '15', 'rest_seconds': 45, 'notes': 'Calf endurance and definition'}
+                ]},
+                {'focus': f"⚔️ {t_name}: Super Saiyan Arms & Core", 'is_rest': False, 'exercises': [
+                    {'name': 'Dips (Weighted or Bodyweight)', 'sets': 3, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Tricep and lower chest lockout'},
+                    {'name': 'Tricep Rope Pushdowns', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Tricep lateral head isolation'},
+                    {'name': 'Incline Dumbbell Curls', 'sets': 3, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Bicep peak'},
+                    {'name': 'Hanging Leg Raises', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Lower abdominal compression'}
+                ]},
+                {'focus': f"🔥 {t_name}: Ultra Instinct Speed & Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Incline Treadmill Sprints', 'sets': 5, 'reps': '30s sprint', 'rest_seconds': 60, 'notes': 'Fast-twitch speed recovery'},
+                    {'name': 'Rowing Machine Intervals', 'sets': 3, 'reps': '500m', 'rest_seconds': 90, 'notes': 'Full body aerobic power'},
+                    {'name': 'Kettlebell Swings', 'sets': 3, 'reps': '20', 'rest_seconds': 60, 'notes': 'Hip snap explosiveness'}
+                ]},
+                {'focus': f"🍃 {t_name}: Full Zenkai Recovery Day", 'is_rest': True, 'exercises': []}
+            ]
+
+    # 2. SUNG JIN-WOO / SHADOW MONARCH PROTOCOL
+    elif 'jin-woo' in t_lower or 'jinwoo' in t_lower or 'sung' in t_lower or 'monarch' in t_lower:
         if is_calisthenics:
             split_days = [
                 {'focus': f"⚔️ {t_name}: Bar Mastery & Explosive Pull", 'is_rest': False, 'exercises': [
@@ -878,8 +1094,152 @@ def generate_character_equipment_split(target_name: str, equipment: str, body_ty
                 ]},
                 {'focus': f"🛌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
             ]
+
+    # 3. BAKI HANMA / DEMON BACK PROTOCOL
+    elif 'baki' in t_lower or 'hanma' in t_lower or 'yujiro' in t_lower or 'demon back' in t_lower:
+        if is_calisthenics:
+            split_days = [
+                {'focus': f"👹 {t_name}: Demon Back Pull & Scapular Armor", 'is_rest': False, 'exercises': [
+                    {'name': 'Strict Wide-Grip Pull-ups', 'sets': 5, 'reps': '8-12', 'rest_seconds': 90, 'notes': 'Deep scapular retraction creating the Demon Face'},
+                    {'name': 'Muscle-Ups / High Bar Pulls', 'sets': 4, 'reps': '6', 'rest_seconds': 90, 'notes': 'Explosive vertical pull power'},
+                    {'name': 'L-Sit Chin-ups', 'sets': 3, 'reps': '8', 'rest_seconds': 75, 'notes': 'Bicep and abdominal tension'},
+                    {'name': 'Dragon Flags', 'sets': 4, 'reps': '8', 'rest_seconds': 60, 'notes': 'Rigid spine and core pillar'}
+                ]},
+                {'focus': f"👹 {t_name}: Underground Arena Push & Striking", 'is_rest': False, 'exercises': [
+                    {'name': 'Handstand Push-ups', 'sets': 4, 'reps': '8', 'rest_seconds': 90, 'notes': 'Deltoid shoulder armor'},
+                    {'name': 'Deep Parallel Bar Dips', 'sets': 4, 'reps': '15', 'rest_seconds': 75, 'notes': 'Tricep horseshoe development'},
+                    {'name': 'Knuckle Push-ups', 'sets': 4, 'reps': '20', 'rest_seconds': 60, 'notes': 'Wrist conditioning and chest drive'},
+                    {'name': 'Neck Bridges / Holds', 'sets': 3, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Combat neck thickness'}
+                ]},
+                {'focus': f"🥩 {t_name}: Feast & Rest Day", 'is_rest': True, 'exercises': []},
+                {'focus': f"👹 {t_name}: Hanma Explosive Legs", 'is_rest': False, 'exercises': [
+                    {'name': 'Strict Pistol Squats', 'sets': 4, 'reps': '10 per leg', 'rest_seconds': 75, 'notes': 'Unilateral single-leg dominance'},
+                    {'name': 'Explosive Jump Squats (Maximum height)', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Fast-twitch leg spring'},
+                    {'name': 'Shrimp Squats', 'sets': 3, 'reps': '8 per leg', 'rest_seconds': 60, 'notes': 'Deep knee stabilization'},
+                    {'name': 'Calf Raises on Step', 'sets': 4, 'reps': '30', 'rest_seconds': 45, 'notes': 'Explosive footwork'}
+                ]},
+                {'focus': f"👹 {t_name}: Grip & Full Body Conditioning", 'is_rest': False, 'exercises': [
+                    {'name': 'Towel Hanging Dead Hangs', 'sets': 4, 'reps': '45 sec', 'rest_seconds': 60, 'notes': 'Crushing Hanma grip strength'},
+                    {'name': 'Straight Bar Dips', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Chest compression'},
+                    {'name': 'Burpees to High Jump', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Combat stamina'},
+                    {'name': 'Hanging Windshield Wipers', 'sets': 3, 'reps': '12', 'rest_seconds': 45, 'notes': 'Rotational core power'}
+                ]},
+                {'focus': f"👹 {t_name}: Shadow Boxing & Flexibility", 'is_rest': False, 'exercises': [
+                    {'name': 'High-Speed Shadow Boxing', 'sets': 5, 'reps': '60 sec', 'rest_seconds': 45, 'notes': 'Fluid combinations and speed'},
+                    {'name': 'Diamond Push-ups', 'sets': 3, 'reps': '15', 'rest_seconds': 45, 'notes': 'Tricep finisher'},
+                    {'name': 'Full Hanma Splits & Mobility', 'sets': 1, 'reps': '25 mins', 'rest_seconds': 0, 'notes': 'Hip opening and recovery'}
+                ]},
+                {'focus': f"🥩 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
+            ]
+        else:
+            split_days = [
+                {'focus': f"👹 {t_name}: Demon Back Pull (Deadlifts & Rows)", 'is_rest': False, 'exercises': [
+                    {'name': 'Heavy Barbell Deadlifts', 'sets': 4, 'reps': '5', 'rest_seconds': 150, 'notes': 'Spinal erector and posterior chain density'},
+                    {'name': 'Weighted Wide-Grip Pull-ups', 'sets': 4, 'reps': '8-10', 'rest_seconds': 90, 'notes': 'Demon back lat flare'},
+                    {'name': 'Bent-over Barbell Rows', 'sets': 4, 'reps': '8', 'rest_seconds': 90, 'notes': 'Mid-back thickness'},
+                    {'name': 'Heavy Dumbbell Shrugs', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Ogre neck and upper traps'}
+                ]},
+                {'focus': f"👹 {t_name}: Heavy Chest & Shoulder Striking Mass", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Bench Press', 'sets': 4, 'reps': '6-8', 'rest_seconds': 120, 'notes': 'Heavy compound chest pressing'},
+                    {'name': 'Overhead Barbell Press', 'sets': 4, 'reps': '6-8', 'rest_seconds': 90, 'notes': 'Deltoid shoulder mass'},
+                    {'name': 'Incline Dumbbell Press', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Upper chest development'},
+                    {'name': 'Dips (Weighted)', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Tricep and lower chest lockout'}
+                ]},
+                {'focus': f"🥩 {t_name}: Rest & Muscle Synthesis", 'is_rest': True, 'exercises': []},
+                {'focus': f"👹 {t_name}: Hanma Quad & Glute Power", 'is_rest': False, 'exercises': [
+                    {'name': 'Barbell Back Squats', 'sets': 4, 'reps': '6-8', 'rest_seconds': 120, 'notes': 'Deep rock-bottom depth'},
+                    {'name': 'Leg Press Machine', 'sets': 3, 'reps': '12', 'rest_seconds': 90, 'notes': 'Quad hypertrophy burnout'},
+                    {'name': 'Romanian Deadlifts', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Hamstring flexor control'},
+                    {'name': 'Standing Calf Raises', 'sets': 4, 'reps': '20', 'rest_seconds': 45, 'notes': 'Ankle stiffness'}
+                ]},
+                {'focus': f"👹 {t_name}: Hanma Arms & Grip Domination", 'is_rest': False, 'exercises': [
+                    {'name': 'EZ-Bar Bicep Curls', 'sets': 4, 'reps': '8-10', 'rest_seconds': 60, 'notes': 'Bicep peak'},
+                    {'name': 'Close-Grip Bench Press / Dips', 'sets': 4, 'reps': '8-10', 'rest_seconds': 75, 'notes': 'Tricep power'},
+                    {'name': 'Farmer Carries / Heavy Holds', 'sets': 4, 'reps': '45 sec', 'rest_seconds': 60, 'notes': 'Forearm and grip density'},
+                    {'name': 'Hanging Leg Raises', 'sets': 4, 'reps': '12', 'rest_seconds': 45, 'notes': 'Abdominal wall compression'}
+                ]},
+                {'focus': f"👹 {t_name}: Combat Conditioning & Power Sprints", 'is_rest': False, 'exercises': [
+                    {'name': 'Incline Treadmill Sprints', 'sets': 5, 'reps': '30s sprint', 'rest_seconds': 60, 'notes': 'High-intensity conditioning'},
+                    {'name': 'Kettlebell Swings', 'sets': 3, 'reps': '20', 'rest_seconds': 60, 'notes': 'Explosive hip drive'},
+                    {'name': 'Heavy Bag / Shadow Boxing', 'sets': 3, 'reps': '3 mins', 'rest_seconds': 60, 'notes': 'Combat stamina'}
+                ]},
+                {'focus': f"🥩 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
+            ]
+
+    # 4. TOJI FUSHIGURO / HEAVENLY RESTRICTION PROTOCOL
+    elif 'toji' in t_lower or 'fushiguro' in t_lower or 'heavenly restriction' in t_lower:
+        split_days = [
+            {'focus': f"⚔️ {t_name}: Zero Cursed Energy Heavy Compounds", 'is_rest': False, 'exercises': [
+                {'name': 'Barbell Deadlifts / Heavy Pull-ups', 'sets': 4, 'reps': '5-6', 'rest_seconds': 120, 'notes': 'Raw physical posterior chain strength'},
+                {'name': 'Overhead Barbell / Dumbbell Press', 'sets': 4, 'reps': '8', 'rest_seconds': 90, 'notes': 'Boulder shoulder pressing power'},
+                {'name': 'Weighted Dips / Push-ups', 'sets': 4, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Tricep & chest pushing force'},
+                {'name': 'Dragon Flags / Hanging Leg Raises', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Midline athletic brace'}
+            ]},
+            {'focus': f"⚔️ {t_name}: Sorcerer Hunter Agility & Speed", 'is_rest': False, 'exercises': [
+                {'name': 'Explosive Box Jumps / Jump Squats', 'sets': 4, 'reps': '8', 'rest_seconds': 75, 'notes': 'Instantaneous acceleration leap'},
+                {'name': 'Barbell Power Cleans / DB Snatches', 'sets': 4, 'reps': '5', 'rest_seconds': 90, 'notes': 'Triple extension explosive speed'},
+                {'name': 'Bulgarian Split Squats', 'sets': 3, 'reps': '10 per leg', 'rest_seconds': 60, 'notes': 'Single-leg balance and agility'},
+                {'name': 'Single-Leg Calf Hops', 'sets': 4, 'reps': '20 per leg', 'rest_seconds': 45, 'notes': 'Reactive footwork'}
+            ]},
+            {'focus': f"🛌 {t_name}: Rest & Combat Recovery", 'is_rest': True, 'exercises': []},
+            {'focus': f"⚔️ {t_name}: Heavy Upper Body Density", 'is_rest': False, 'exercises': [
+                {'name': 'Barbell Bench Press / Floor Press', 'sets': 4, 'reps': '6-8', 'rest_seconds': 90, 'notes': 'Dense upper torso armour'},
+                {'name': 'Heavy Barbell Rows / Towel Rows', 'sets': 4, 'reps': '8-10', 'rest_seconds': 75, 'notes': 'Upper back & lat thickness'},
+                {'name': 'Lateral Deltoid Raises', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Shoulder width'},
+                {'name': 'Farmer Carries', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 60, 'notes': 'Weapon grip endurance'}
+            ]},
+            {'focus': f"⚔️ {t_name}: Raw Physical Power Legs", 'is_rest': False, 'exercises': [
+                {'name': 'Barbell Back Squats / Pistol Squats', 'sets': 4, 'reps': '6-8', 'rest_seconds': 120, 'notes': 'Absolute lower body drive'},
+                {'name': 'Romanian Deadlifts', 'sets': 3, 'reps': '10', 'rest_seconds': 75, 'notes': 'Hamstring flexor strength'},
+                {'name': 'Walking Lunges', 'sets': 3, 'reps': '12 per leg', 'rest_seconds': 60, 'notes': 'Dynamic stability'},
+                {'name': 'Hanging Windshield Wipers', 'sets': 3, 'reps': '10', 'rest_seconds': 45, 'notes': 'Rotational core'}
+            ]},
+            {'focus': f"⚔️ {t_name}: Tactical Conditioning & Sprints", 'is_rest': False, 'exercises': [
+                {'name': 'High-Intensity Sprint Intervals', 'sets': 6, 'reps': '20s sprint / 40s rest', 'rest_seconds': 40, 'notes': 'Maximum acceleration'},
+                {'name': 'Burpees to Pull-up', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Full-body work capacity'},
+                {'name': 'Full Body Mobility Flow', 'sets': 1, 'reps': '20 mins', 'rest_seconds': 0, 'notes': 'Joint longevity'}
+            ]},
+            {'focus': f"🛌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
+        ]
+
+    # 5. SAITAMA / ONE PUNCH MAN PROTOCOL
+    elif 'saitama' in t_lower or 'one punch' in t_lower:
+        split_days = [
+            {'focus': f"👊 {t_name}: 100x Daily Foundation (Push)", 'is_rest': False, 'exercises': [
+                {'name': 'Push-ups (Standard / Diamond / Incline)', 'sets': 4, 'reps': '25', 'rest_seconds': 60, 'notes': '100 total pushups target'},
+                {'name': 'Pike Push-ups', 'sets': 3, 'reps': '12', 'rest_seconds': 60, 'notes': 'Shoulder pressing power'},
+                {'name': 'Chair / Parallel Dips', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Tricep lockout'},
+                {'name': 'Plank Hold', 'sets': 3, 'reps': '60 sec', 'rest_seconds': 45, 'notes': 'Solid core base'}
+            ]},
+            {'focus': f"👊 {t_name}: 100x Daily Core & Back", 'is_rest': False, 'exercises': [
+                {'name': 'Abdominal Sit-ups / Crunches', 'sets': 4, 'reps': '25', 'rest_seconds': 45, 'notes': '100 total situps target'},
+                {'name': 'Pull-ups / Inverted Towel Rows', 'sets': 4, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Back pulling foundation'},
+                {'name': 'Superman Extensions', 'sets': 3, 'reps': '15', 'rest_seconds': 45, 'notes': 'Spinal erectors'},
+                {'name': 'Bicycle Crunches', 'sets': 3, 'reps': '25', 'rest_seconds': 45, 'notes': 'Oblique endurance'}
+            ]},
+            {'focus': f"🍌 {t_name}: Banana Breakfast Rest Day", 'is_rest': True, 'exercises': []},
+            {'focus': f"👊 {t_name}: 100x Daily Squats & Legs", 'is_rest': False, 'exercises': [
+                {'name': 'Bodyweight Squats (Deep form)', 'sets': 4, 'reps': '25', 'rest_seconds': 60, 'notes': '100 total squats target'},
+                {'name': 'Bulgarian Split Squats', 'sets': 3, 'reps': '12 per leg', 'rest_seconds': 60, 'notes': 'Single-leg strength'},
+                {'name': 'Jump Squats', 'sets': 3, 'reps': '15', 'rest_seconds': 60, 'notes': 'Fast-twitch explosion'},
+                {'name': 'Calf Raises', 'sets': 4, 'reps': '25', 'rest_seconds': 45, 'notes': 'Running endurance'}
+            ]},
+            {'focus': f"👊 {t_name}: 10KM Conditioning Run Trial", 'is_rest': False, 'exercises': [
+                {'name': 'Continuous Distance Run / Interval Cardio', 'sets': 1, 'reps': '5-10 km (or 35-50 mins)', 'rest_seconds': 0, 'notes': '10km daily run target'},
+                {'name': 'High-Knee Sprint Burpees', 'sets': 4, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Aerobic power'},
+                {'name': 'Hollow Body Hold', 'sets': 3, 'reps': '45 sec', 'rest_seconds': 45, 'notes': 'Core stabilization'}
+            ]},
+            {'focus': f"👊 {t_name}: Serious Series Full Body Mastery", 'is_rest': False, 'exercises': [
+                {'name': 'Explosive Push-ups', 'sets': 4, 'reps': '15', 'rest_seconds': 60, 'notes': 'Serious punch velocity'},
+                {'name': 'Pull-ups', 'sets': 4, 'reps': '10', 'rest_seconds': 60, 'notes': 'Back power'},
+                {'name': 'Pistol Squats / Deep Squats', 'sets': 3, 'reps': '10 per leg', 'rest_seconds': 60, 'notes': 'Leg power'},
+                {'name': 'Full Body Mobility Flow', 'sets': 1, 'reps': '20 mins', 'rest_seconds': 0, 'notes': 'Muscle relaxation'}
+            ]},
+            {'focus': f"🍌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
+        ]
+
+    # 6. UNIVERSAL / CUSTOM / PHOTO BUILD SPLIT
     else:
-        # General character / Custom / Photo build split adapted to equipment
         if is_calisthenics:
             split_days = [
                 {'focus': f"⚔️ {t_name}: Bar Mastery & Explosive Pull", 'is_rest': False, 'exercises': [

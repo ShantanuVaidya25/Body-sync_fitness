@@ -2420,6 +2420,14 @@ function setPhysiqueMode(mode) {
     document.getElementById('physique-image-input').style.display = mode === 'image' ? 'block' : 'none';
 }
 
+function selectPresetPhysique(name) {
+    const input = document.getElementById('physique-target-name');
+    if (input) {
+        input.value = name;
+        input.focus();
+    }
+}
+
 document.addEventListener('change', (e) => {
     if (e.target.id === 'physique-image-file') {
         const file = e.target.files[0];

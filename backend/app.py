@@ -1318,7 +1318,8 @@ def analyze_physique():
         # actual daily quests, not just a wall of text the user reads once.
         weekly_result = analyzer.extract_structured_weekly_plan(
             result['quest_log_markdown'],
-            target_name=result.get('target_name')
+            target_name=result.get('target_name'),
+            equipment=user_equipment
         )
         if weekly_result.get('success'):
             weekly_plan_manager.save_weekly_plan(user_id, physique_quest_id, weekly_result['days'])
@@ -1417,8 +1418,10 @@ def activate_physique_quest(quest_log_id):
     
     # Re-derive the structured weekly plan for the newly-activated goal so
     # daily quests immediately reflect it instead of the previous one.
+    user_stats = stats_manager.get_player_stats(user_id) or {}
+    user_eq = user_stats.get('equipment', 'Full Commercial Gym')
     analyzer = get_analyzer_for_user(user_id)
-    weekly_result = analyzer.extract_structured_weekly_plan(quest_log_markdown, target_name=target_name)
+    weekly_result = analyzer.extract_structured_weekly_plan(quest_log_markdown, target_name=target_name, equipment=user_eq)
     if weekly_result.get('success'):
         weekly_plan_manager.save_weekly_plan(user_id, quest_log_id, weekly_result['days'])
         try:
