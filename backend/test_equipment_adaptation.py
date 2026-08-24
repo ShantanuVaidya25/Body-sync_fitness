@@ -7,22 +7,30 @@ backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-from models import Database, PlayerStats, WeeklyPlanManager
+from models import Database, User, PlayerStats, WeeklyPlanManager
 from quest_generator import AIQuestGenerator
 from physique_analyzer import PhysiqueAnalyzer, generate_character_equipment_split
 
 class TestEquipmentAdaptation(unittest.TestCase):
-    def setUp(self):
-        self.db = Database('test_fitness.db')
-        self.stats_mgr = PlayerStats(self.db)
-        self.quest_gen = AIQuestGenerator(self.db)
-        self.analyzer = PhysiqueAnalyzer()
-        self.weekly_mgr = WeeklyPlanManager(self.db)
-        self.user_id = 999
+    @classmethod
+    def setUpClass(cls):
+        cls.db_path = 'test_adaptation_suite.db'
+        if os.path.exists(cls.db_path):
+            try:
+                os.remove(cls.db_path)
+            except Exception:
+                pass
+        cls.db = Database(cls.db_path)
+        cls.user_mgr = User(cls.db)
+        cls.stats_mgr = PlayerStats(cls.db)
+        cls.quest_gen = AIQuestGenerator(cls.db)
+        cls.analyzer = PhysiqueAnalyzer()
+        cls.weekly_mgr = WeeklyPlanManager(cls.db)
         
-        # Setup test player
-        self.stats_mgr.create_player_stats(
-            user_id=self.user_id,
+        # Setup test user and player
+        cls.user_id = cls.user_mgr.create_user('hunter_adaptation_test', 'adapt@hunter.com', 'Pass123!')
+        cls.stats_mgr.create_player_stats(
+            user_id=cls.user_id,
             age=22,
             height_cm=178,
             weight_kg=75,
@@ -31,10 +39,11 @@ class TestEquipmentAdaptation(unittest.TestCase):
             equipment='Full Commercial Gym'
         )
 
-    def tearDown(self):
-        if os.path.exists('test_fitness.db'):
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists('test_adaptation_suite.db'):
             try:
-                os.remove('test_fitness.db')
+                os.remove('test_adaptation_suite.db')
             except Exception:
                 pass
 

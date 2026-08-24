@@ -1165,34 +1165,68 @@ def add_goal():
 @app.route('/api/goals/<int:goal_id>/update', methods=['POST'])
 @login_required
 def update_goal(goal_id):
-    """Update goal progress"""
-    data = request.json
+    """Update goal progress safely with strict validation and static queries"""
+    data = request.json or {}
     user_id = session['user_id']
     
     conn = db.get_connection()
     cursor = conn.cursor()
     
-    updates = []
-    params = []
+    has_val = 'current_value' in data
+    has_status = 'status' in data
     
-    if 'current_value' in data:
-        updates.append('current_value = ?')
-        params.append(data['current_value'])
-    
-    if 'status' in data:
-        updates.append('status = ?')
-        params.append(data['status'])
-        if data['status'] == 'completed':
-            updates.append('completed_at = ?')
-            params.append(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    
-    params.extend([user_id, goal_id])
-    
-    cursor.execute(f'''
-        UPDATE goals 
-        SET {', '.join(updates)}
-        WHERE user_id = ? AND id = ?
-    ''', params)
+    val = None
+    if has_val:
+        try:
+            val = float(data['current_value'])
+        except (ValueError, TypeError):
+            conn.close()
+            return jsonify({'error': 'current_value must be a valid number'}), 400
+
+    status_val = None
+    if has_status:
+        status_val = str(data['status']).strip().lower()
+        if status_val not in ('active', 'completed', 'abandoned'):
+            conn.close()
+            return jsonify({'error': 'Invalid status'}), 400
+
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    if has_val and has_status:
+        if status_val == 'completed':
+            cursor.execute('''
+                UPDATE goals 
+                SET current_value = ?, status = ?, completed_at = ?
+                WHERE user_id = ? AND id = ?
+            ''', (val, status_val, now_str, user_id, goal_id))
+        else:
+            cursor.execute('''
+                UPDATE goals 
+                SET current_value = ?, status = ?
+                WHERE user_id = ? AND id = ?
+            ''', (val, status_val, user_id, goal_id))
+    elif has_val:
+        cursor.execute('''
+            UPDATE goals 
+            SET current_value = ?
+            WHERE user_id = ? AND id = ?
+        ''', (val, user_id, goal_id))
+    elif has_status:
+        if status_val == 'completed':
+            cursor.execute('''
+                UPDATE goals 
+                SET status = ?, completed_at = ?
+                WHERE user_id = ? AND id = ?
+            ''', (status_val, now_str, user_id, goal_id))
+        else:
+            cursor.execute('''
+                UPDATE goals 
+                SET status = ?
+                WHERE user_id = ? AND id = ?
+            ''', (status_val, user_id, goal_id))
+    else:
+        conn.close()
+        return jsonify({'error': 'No valid update fields provided'}), 400
     
     conn.commit()
     conn.close()
@@ -1578,8 +1612,9 @@ def search_users():
     if len(query) < 2:
         return jsonify({'users': []})
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
+    # Escape LIKE wildcards to prevent pattern injection
+    escaped_query = query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    search_param = f"%{escaped_query}%"
     
     cursor.execute('''
         SELECT u.id, u.username, ps.level,
@@ -1591,9 +1626,9 @@ def search_users():
             (f.user_id = ? AND f.friend_id = u.id) OR 
             (f.user_id = u.id AND f.friend_id = ?)
         )
-        WHERE u.username LIKE ? AND u.id != ? AND COALESCE(u.is_admin, 0) = 0
+        WHERE u.username LIKE ? ESCAPE '\\' AND u.id != ? AND COALESCE(u.is_admin, 0) = 0
         LIMIT 20
-    ''', (user_id, user_id, f'%{query}%', user_id))
+    ''', (user_id, user_id, search_param, user_id))
     
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()

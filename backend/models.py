@@ -23,7 +23,7 @@ class Database:
         self.init_database()
     
     def get_connection(self):
-        """Create a new database connection with high-performance PRAGMAs"""
+        """Create a new database connection with high-performance & security PRAGMAs"""
         conn = sqlite3.connect(self.db_path, timeout=15.0)
         conn.row_factory = sqlite3.Row
         try:
@@ -31,6 +31,8 @@ class Database:
             conn.execute("PRAGMA synchronous=NORMAL;")
             conn.execute("PRAGMA temp_store=MEMORY;")
             conn.execute("PRAGMA cache_size=-64000;")
+            conn.execute("PRAGMA busy_timeout=5000;")
+            conn.execute("PRAGMA foreign_keys=ON;")
         except Exception:
             pass
         return conn
@@ -533,19 +535,21 @@ class User:
         return user_id
 
     def get_all_users(self, search_query: Optional[str] = None) -> List[Dict]:
-        """Get all users with stats, rank, and admin status"""
+        """Get all users with stats, rank, and admin status with SQLi-safe search"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
         
         if search_query:
-            q = f"%{search_query.strip().lower()}%"
+            # Escape LIKE wildcards to prevent wildcard injection
+            escaped_q = search_query.strip().lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            q = f"%{escaped_q}%"
             cursor.execute('''
                 SELECT u.id, u.username, u.email, u.created_at, u.last_login, COALESCE(u.is_admin, 0) as is_admin,
                        ps.level, ps.exp, ps.exp_to_next_level, ps.stat_points,
                        ps.strength, ps.endurance, ps.agility, ps.vitality
                 FROM users u
                 LEFT JOIN player_stats ps ON u.id = ps.user_id
-                WHERE LOWER(u.username) LIKE ? OR LOWER(u.email) LIKE ?
+                WHERE (LOWER(u.username) LIKE ? ESCAPE '\\' OR LOWER(u.email) LIKE ? ESCAPE '\\')
                 ORDER BY u.id ASC
             ''', (q, q))
         else:
@@ -590,36 +594,32 @@ class User:
         return True
 
     def delete_user_cascade(self, user_id: int) -> bool:
-        """Completely delete user and clean up all related database tables"""
+        """Completely delete user and clean up all related database tables using static parameterized statements"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
-        tables = [
-            'player_stats', 'exercise_records', 'daily_quests', 'quest_completions',
-            'workout_history', 'goals', 'friends', 'achievements', 'rest_schedule',
-            'physique_quests', 'weekly_training_plan', 'user_settings'
-        ]
-        for tbl in tables:
-            # Explicit Whitelist Validation to satisfy Bandit B608
-            if tbl not in [
-                'player_stats', 'exercise_records', 'daily_quests', 'quest_completions',
-                'workout_history', 'goals', 'friends', 'achievements', 'rest_schedule',
-                'physique_quests', 'weekly_training_plan', 'user_settings'
-            ]:
-                raise ValueError("Unauthorized table name")
-            try:
-                cursor.execute(f'DELETE FROM {tbl} WHERE user_id = ?', (user_id,))
-            except sqlite3.OperationalError:
-                pass
-        
         try:
-            cursor.execute('DELETE FROM friends WHERE friend_id = ?', (user_id,))
-        except sqlite3.OperationalError:
-            pass
-
-        cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
-        conn.commit()
-        conn.close()
-        return True
+            cursor.execute('DELETE FROM player_stats WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM exercise_records WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM daily_quests WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM quest_completions WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM workout_history WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM goals WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM achievements WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM rest_schedule WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM physique_quests WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM weekly_training_plan WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM user_settings WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM custom_routines WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM penalty_quests WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM friends WHERE user_id = ? OR friend_id = ?', (user_id, user_id))
+            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[WARN] Error in delete_user_cascade: {e}")
+            return False
+        finally:
+            conn.close()
 
 
 class PlayerStats:
