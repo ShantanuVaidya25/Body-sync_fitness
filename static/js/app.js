@@ -245,7 +245,7 @@ function addExerciseInput() {
     const newRow = document.createElement('div');
     newRow.className = 'exercise-input-row';
     newRow.innerHTML = `
-        <select class="exercise-select">
+        <select class="exercise-select custom-select">
             <option value="push_ups">Push-ups</option>
             <option value="pull_ups">Pull-ups</option>
             <option value="squats">Squats</option>
@@ -253,8 +253,8 @@ function addExerciseInput() {
             <option value="plank">Plank (seconds)</option>
             <option value="running">Running (minutes)</option>
         </select>
-        <input type="number" class="exercise-reps" placeholder="Max reps or time">
-        <button class="btn-small" onclick="this.parentElement.remove()">-</button>
+        <input type="number" class="exercise-reps custom-text-input" placeholder="Max reps or time">
+        <button type="button" class="btn btn-danger btn-remove-ex" onclick="this.parentElement.remove()">-</button>
     `;
     container.appendChild(newRow);
 }

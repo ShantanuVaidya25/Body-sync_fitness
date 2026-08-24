@@ -22,6 +22,12 @@
     box-sizing: border-box;
 }
 
+html, body {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: #05070c;
@@ -614,6 +620,10 @@ h4 {
     padding: 20px 16px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     transition: border-color 0.3s ease;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .setup-section-card:hover {
@@ -927,39 +937,132 @@ h4 {
 
 .custom-text-input {
     width: 100%;
-    height: 42px;
-    background: rgba(11, 17, 32, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 0;
+    height: 44px;
+    background: rgba(11, 17, 32, 0.95);
+    border: 1.5px solid rgba(56, 189, 248, 0.25);
     border-radius: 10px;
     color: #f8fafc;
-    font-size: 0.85rem;
+    font-size: 0.88rem;
     padding: 0 12px;
-    transition: border-color 0.2s ease;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
 }
 
 .custom-text-input:focus {
     border-color: #38bdf8;
+    background: rgba(15, 23, 42, 1);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
     outline: none;
 }
 
 /* 06. Baseline Capabilities */
 .exercise-input-row {
     display: grid;
-    grid-template-columns: 2fr 1fr auto;
+    grid-template-columns: 1.6fr 1fr 44px;
     gap: 8px;
     margin-bottom: 8px;
     align-items: center;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
-.btn-add-ex {
-    height: 42px;
-    width: 42px;
+.exercise-input-row > * {
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.exercise-select {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    background: rgba(11, 17, 32, 0.95);
+    border: 1.5px solid rgba(56, 189, 248, 0.25);
+    border-radius: 10px;
+    color: #f8fafc;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0 10px;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.exercise-select:focus {
+    border-color: #38bdf8;
+    background: rgba(15, 23, 42, 1);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+    outline: none;
+}
+
+.exercise-reps {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    background: rgba(11, 17, 32, 0.95);
+    border: 1.5px solid rgba(56, 189, 248, 0.25);
+    border-radius: 10px;
+    color: #f8fafc;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0 10px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.exercise-reps:focus {
+    border-color: #38bdf8;
+    background: rgba(15, 23, 42, 1);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+    outline: none;
+}
+
+.btn-add-ex,
+.btn-remove-ex {
+    height: 44px;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
     padding: 0;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     font-weight: 800;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 10px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-add-ex {
+    background: rgba(56, 189, 248, 0.15) !important;
+    border: 1.5px solid rgba(56, 189, 248, 0.4) !important;
+    color: #38bdf8 !important;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.2) !important;
+}
+
+.btn-add-ex:hover {
+    background: #38bdf8 !important;
+    color: #0b1120 !important;
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.55) !important;
+    transform: translateY(-1px);
+}
+
+.btn-remove-ex {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border: 1.5px solid rgba(239, 68, 68, 0.4) !important;
+    color: #f87171 !important;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2) !important;
+}
+
+.btn-remove-ex:hover {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.55) !important;
+    transform: translateY(-1px);
 }
 
 /* Submit CTA */
@@ -4547,8 +4650,69 @@ h4 {
 
     .auth-container,
     .setup-container {
-        padding: 20px 14px;
+        padding: 16px 12px 60px 12px;
         width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .setup-section-card {
+        padding: 16px 12px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .exercise-input-row {
+        grid-template-columns: 1.4fr 1fr 40px;
+        gap: 6px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .exercise-input-row > * {
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .btn-add-ex,
+    .btn-remove-ex {
+        width: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        height: 42px;
+        font-size: 1.2rem;
+    }
+
+    .exercise-select,
+    .exercise-reps {
+        height: 42px;
+        font-size: 0.82rem;
+        padding: 0 8px;
+    }
+
+    .medical-conditions-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .medical-card {
+        padding: 9px 12px;
+        font-size: 0.82rem;
+    }
+
+    .setup-submit-btn {
+        width: 100%;
+        height: 52px;
+        font-size: 0.88rem;
+        letter-spacing: 0.5px;
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
     }
 
     .main-title {
@@ -4580,6 +4744,27 @@ h4 {
 
     .objective-path-grid {
         grid-template-columns: 1fr;
+    }
+
+    .exercise-input-row {
+        grid-template-columns: 1.3fr 1fr 36px;
+        gap: 5px;
+    }
+
+    .btn-add-ex,
+    .btn-remove-ex {
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
+        height: 40px;
+        font-size: 1.1rem;
+    }
+
+    .exercise-select,
+    .exercise-reps {
+        height: 40px;
+        font-size: 0.78rem;
+        padding: 0 6px;
     }
 
     .bottom-nav-label {
