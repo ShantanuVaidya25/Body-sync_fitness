@@ -13,6 +13,153 @@ import secrets
 
 import os
 
+try:
+    import libsql
+except ImportError:
+    libsql = None
+
+class LibsqlRow:
+    """A dictionary-like row wrapper to emulate sqlite3.Row for Turso remote connections"""
+    def __init__(self, description, values):
+        self._keys = [col[0] for col in description] if description else []
+        self._values = tuple(values)
+        self._mapping = {name.lower(): idx for idx, name in enumerate(self._keys)}
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return self._values[item]
+        elif isinstance(item, str):
+            idx = self._mapping.get(item.lower())
+            if idx is not None:
+                return self._values[idx]
+            raise KeyError(item)
+        raise TypeError("Indices must be integers or strings")
+
+    def keys(self):
+        return self._keys
+
+    def values(self):
+        return self._values
+
+    def items(self):
+        return list(zip(self._keys, self._values))
+
+    def get(self, item, default=None):
+        try:
+            return self[item]
+        except KeyError:
+            return default
+
+    def __len__(self):
+        return len(self._values)
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __repr__(self):
+        return f"LibsqlRow({dict(zip(self._keys, self._values))})"
+
+
+def libsql_row_factory(cursor, row_values):
+    return LibsqlRow(cursor.description, row_values)
+
+
+class LibsqlCursorWrapper:
+    """Wraps remote libsql cursor to support description, row formatting, and lastrowid"""
+    def __init__(self, raw_cursor, row_factory=None):
+        self._raw_cursor = raw_cursor
+        self._row_factory = row_factory
+        self._lastrowid = None
+
+    @property
+    def description(self):
+        return self._raw_cursor.description
+
+    @property
+    def lastrowid(self):
+        return self._lastrowid
+
+    def execute(self, sql, parameters=None):
+        if parameters is None:
+            self._raw_cursor.execute(sql)
+        else:
+            self._raw_cursor.execute(sql, parameters)
+
+        # Cache last inserted row ID for insertions
+        sql_stripped = sql.strip().upper()
+        if sql_stripped.startswith("INSERT"):
+            try:
+                rowid_cursor = self._raw_cursor.execute("SELECT last_insert_rowid()")
+                row = rowid_cursor.fetchone()
+                if row:
+                    self._lastrowid = row[0]
+            except Exception:
+                pass
+        return self
+
+    def executemany(self, sql, seq_of_parameters):
+        self._raw_cursor.executemany(sql, seq_of_parameters)
+        return self
+
+    def fetchone(self):
+        val = self._raw_cursor.fetchone()
+        if val is None:
+            return None
+        if self._row_factory:
+            return self._row_factory(self, val)
+        return val
+
+    def fetchall(self):
+        rows = self._raw_cursor.fetchall()
+        if self._row_factory:
+            return [self._row_factory(self, r) for r in rows]
+        return rows
+
+    def fetchmany(self, size=None):
+        rows = self._raw_cursor.fetchmany(size) if size is not None else self._raw_cursor.fetchmany()
+        if self._row_factory:
+            return [self._row_factory(self, r) for r in rows]
+        return rows
+
+    def close(self):
+        self._raw_cursor.close()
+
+
+class LibsqlConnectionWrapper:
+    """Wraps remote libsql connection to emulate sqlite3 connection API"""
+    def __init__(self, raw_connection):
+        self._raw_connection = raw_connection
+        self._row_factory = None
+
+    @property
+    def row_factory(self):
+        return self._row_factory
+
+    @row_factory.setter
+    def row_factory(self, val):
+        if val == sqlite3.Row or val is sqlite3.Row:
+            self._row_factory = libsql_row_factory
+        else:
+            self._row_factory = val
+
+    def cursor(self):
+        raw_cursor = self._raw_connection.cursor()
+        return LibsqlCursorWrapper(raw_cursor, self._row_factory)
+
+    def execute(self, sql, parameters=None):
+        cursor = self.cursor()
+        cursor.execute(sql, parameters)
+        return cursor
+
+    def commit(self):
+        self._raw_connection.commit()
+
+    def rollback(self):
+        self._raw_connection.rollback()
+
+    def close(self):
+        self._raw_connection.close()
+
 class Database:
     """Main database handler for the Body Sync Fitness System"""
     
@@ -23,7 +170,21 @@ class Database:
         self.init_database()
     
     def get_connection(self):
-        """Create a new database connection with high-performance & security PRAGMAs"""
+        """Create a new database connection with high-performance & security PRAGMAs or connect to Turso Cloud"""
+        url = os.environ.get("TURSO_DATABASE_URL")
+        token = os.environ.get("TURSO_AUTH_TOKEN")
+
+        if url and token:
+            if libsql is None:
+                print("⚠️ TURSO_DATABASE_URL is set, but the 'libsql' package is not installed. Falling back to local SQLite.")
+            else:
+                try:
+                    raw_conn = libsql.connect(url, auth_token=token)
+                    conn = LibsqlConnectionWrapper(raw_conn)
+                    return conn
+                except Exception as e:
+                    print(f"❌ Failed to connect to Turso Cloud database: {e}. Falling back to local SQLite.")
+
         conn = sqlite3.connect(self.db_path, timeout=15.0)
         conn.row_factory = sqlite3.Row
         try:
