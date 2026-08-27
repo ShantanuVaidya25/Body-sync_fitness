@@ -48,11 +48,19 @@ user_settings = UserSettings(db)
 penalty_manager = PenaltyManager(db)
 routine_manager = RoutineManager(db)
 
-# Auto-seed default admin account on server startup
-try:
-    user_manager.ensure_admin_user()
-except Exception as e:
-    print(f"⚠️ Admin account initialization error: {e}")
+# Lazy DB initialization for gunicorn/Rust async compatibility
+_db_initialized = False
+
+@app.before_request
+def initialize_db_once():
+    global _db_initialized
+    if not _db_initialized:
+        db.init_database()
+        try:
+            user_manager.ensure_admin_user()
+        except Exception as e:
+            print(f"⚠️ Admin account initialization error: {e}")
+        _db_initialized = True
 
 # A server-wide fallback key is OPTIONAL. If the site owner sets
 # GEMINI_API_KEY, users without their own key can still use the feature
