@@ -580,7 +580,8 @@ class User:
             user_id = cursor.lastrowid
             conn.close()
             return user_id
-        except sqlite3.IntegrityError:
+        except Exception as e:
+            print(f"Failed to create user (likely already exists): {e}")
             conn.close()
             return None
     
