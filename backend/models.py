@@ -181,6 +181,7 @@ class Database:
                 try:
                     raw_conn = libsql.connect(url, auth_token=token)
                     conn = LibsqlConnectionWrapper(raw_conn)
+                    conn.row_factory = sqlite3.Row
                     return conn
                 except Exception as e:
                     print(f"❌ Failed to connect to Turso Cloud database: {e}. Falling back to local SQLite.")
