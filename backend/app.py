@@ -1616,6 +1616,9 @@ def search_users():
     escaped_query = query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
     search_param = f"%{escaped_query}%"
     
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
     cursor.execute('''
         SELECT u.id, u.username, ps.level,
                f.status as friendship_status,
