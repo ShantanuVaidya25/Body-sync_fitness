@@ -35,6 +35,9 @@ if app.secret_key == 'dev-only-insecure-default-change-before-deploying':
     print("⚠️  WARNING: Using the default FLASK_SECRET_KEY. This is fine for local")
     print("   testing, but set a real one via the FLASK_SECRET_KEY environment")
     print("   variable before deploying this publicly (see README).")
+
+# Session configuration
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=31)
 CORS(app, supports_credentials=True)
 
 # Initialize database
@@ -163,6 +166,7 @@ def register():
     
     if user_id:
         # Establish session automatically for seamless onboarding
+        session.permanent = True
         session['user_id'] = user_id
         session['username'] = username
         session['is_admin'] = False
@@ -204,6 +208,7 @@ def login():
         return jsonify({'error': 'Incorrect password'}), 401
         
     is_admin = bool(user.get('is_admin'))
+    session.permanent = True
     session['user_id'] = user['id']
     session['username'] = user['username']
     session['is_admin'] = is_admin
