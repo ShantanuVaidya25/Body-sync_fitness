@@ -2280,7 +2280,10 @@ def admin_delete_user(target_id: int):
     if not user:
         return jsonify({'error': 'User not found'}), 404
         
-    user_manager.delete_user_cascade(target_id)
+    success = user_manager.delete_user_cascade(target_id)
+    if not success:
+        return jsonify({'error': 'Failed to delete user due to a database constraint. Check server logs.'}), 500
+
     print(f"👑 Admin deleted user #{target_id} ({user['username']})")
     
     return jsonify({

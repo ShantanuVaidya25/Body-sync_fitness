@@ -768,8 +768,8 @@ function renderAdminUsers(users) {
                     <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
                         <button class="btn btn-small btn-secondary" onclick="openAdminEditModal(${u.id})" title="Edit user stats and permissions">✏️ Edit</button>
                         <button class="btn btn-small" onclick="activateGodMode(${u.id})" style="background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 700;" title="Grant Max Stats & Level 100">⚡ God Mode</button>
-                        <button class="btn btn-small btn-secondary" onclick="openAdminResetPasswordModal(${u.id}, '${escapeHtml(u.username)}')" title="Reset Password">🔑 Password</button>
-                        ${!isSelf ? `<button class="btn btn-small btn-danger" onclick="adminDeleteUser(${u.id}, '${escapeHtml(u.username)}')" title="Delete Account">🗑️ Delete</button>` : ''}
+                        <button class="btn btn-small btn-secondary" onclick="openAdminResetPasswordModal(${u.id}, decodeURIComponent('${encodeURIComponent(u.username)}'))" title="Reset Password">🔑 Password</button>
+                        ${!isSelf ? `<button class="btn btn-small btn-danger" onclick="adminDeleteUser(${u.id}, decodeURIComponent('${encodeURIComponent(u.username)}'))" title="Delete Account">🗑️ Delete</button>` : ''}
                     </div>
                 </td>
             </tr>
@@ -2389,7 +2389,7 @@ async function loadFriends() {
                         <div class="leaderboard-stats">Level ${friend.level || 1} • ${friend.exp || 0} EXP</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <button class="btn btn-small btn-secondary" onclick="removeFriend(${friend.id}, '${escapeHtml(friend.username)}')" style="padding: 4px 10px; font-size: 0.78rem; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5;">
+                        <button class="btn btn-small btn-secondary" onclick="removeFriend(${friend.id}, decodeURIComponent('${encodeURIComponent(friend.username)}'))" style="padding: 4px 10px; font-size: 0.78rem; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5;">
                             Unfriend
                         </button>
                     </div>

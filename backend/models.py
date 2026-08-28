@@ -773,6 +773,7 @@ class User:
             cursor.execute('DELETE FROM user_settings WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM custom_routines WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM penalty_quests WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM strength_calc_history WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM friends WHERE user_id = ? OR friend_id = ?', (user_id, user_id))
             cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
             conn.commit()
