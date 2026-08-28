@@ -2620,11 +2620,17 @@ async function loadPhysiqueHistory() {
             credentials: 'include'
         });
         const data = await response.json();
-        
         const historyDiv = document.getElementById('physique-history');
+        if (!historyDiv) return;
         
-        if (data.history.length === 0) {
-            historyDiv.innerHTML = '<p class="no-data">No build goals analyzed yet. Try one above!</p>';
+        if (!data.history || data.history.length === 0) {
+            historyDiv.innerHTML = `
+                <div class="empty-state-card">
+                    <div style="font-size: 2rem; margin-bottom: 8px; opacity: 0.85; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));">📜</div>
+                    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.95rem; font-weight: 700; color: #e2e8f0; margin-bottom: 4px;">No Build Goals Analyzed Yet</div>
+                    <div style="font-size: 0.82rem; color: #94a3b8; max-width: 320px; margin: 0 auto; line-height: 1.4;">Select a character preset above or enter a custom name to generate your custom quest log!</div>
+                </div>
+            `;
             return;
         }
         
@@ -2934,9 +2940,9 @@ async function loadWeeklyActivity() {
             const rankUps = data.rank_ups || 0;
             
             if (activeCountEl) activeCountEl.textContent = `${activeDays}/7 Days Active`;
-            if (streakValEl) streakValEl.textContent = `${streak} Day${streak === 1 ? '' : 's'}`;
-            if (expValEl) expValEl.textContent = `+${weeklyExp} EXP`;
-            if (rankupsValEl) rankupsValEl.textContent = `${rankUps}`;
+            if (streakValEl) streakValEl.innerHTML = `${streak} <span style="font-size: 0.72rem; font-weight: 600; color: #94a3b8; text-transform: uppercase;">Day${streak === 1 ? '' : 's'}</span>`;
+            if (expValEl) expValEl.innerHTML = `+${weeklyExp} <span style="font-size: 0.72rem; font-weight: 600; color: #94a3b8; text-transform: uppercase;">EXP</span>`;
+            if (rankupsValEl) rankupsValEl.innerHTML = `${rankUps} <span style="font-size: 0.72rem; font-weight: 600; color: #94a3b8; text-transform: uppercase;">Ups</span>`;
             
             // Render 7 clean round day bubbles
             grid.innerHTML = (data.week_days || []).map(day => {
@@ -2958,7 +2964,7 @@ async function loadWeeklyActivity() {
                 const tooltip = `${day.date}: ${day.count || 0} workout(s) • ${day.exp_earned || 0} EXP ${isCompleted ? '(Workout Completed)' : (isToday ? '(Today)' : '')}`;
                 
                 return `
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
                         <div class="${bubbleClass}" title="${tooltip}" onclick="showToast('${tooltip}')">
                             ${dayLabel}
                         </div>
