@@ -855,9 +855,18 @@ def regenerate_quest():
 @login_required
 def get_weekly_schedule():
     """Get the user's 7-day planned quest schedule"""
-    user_id = session['user_id']
-    schedule_data = quest_generator.get_weekly_schedule(user_id)
-    return jsonify(schedule_data)
+    try:
+        user_id = session['user_id']
+        schedule_data = quest_generator.get_weekly_schedule(user_id)
+        return jsonify(schedule_data)
+    except Exception as e:
+        import traceback
+        print(f"⚠️ Error generating weekly schedule: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Internal server error while loading schedule',
+            'details': str(e)
+        }), 500
 
 
 @app.route('/api/quest/log-set-completion', methods=['POST'])

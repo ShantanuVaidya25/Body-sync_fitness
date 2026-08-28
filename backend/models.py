@@ -1258,7 +1258,8 @@ class WeeklyPlanManager:
         for row in rows:
             day_dict = dict(row)
             try:
-                day_dict['exercises'] = json.loads(day_dict['exercises_json'])
+                parsed = json.loads(day_dict['exercises_json'])
+                day_dict['exercises'] = parsed if isinstance(parsed, list) else []
             except (json.JSONDecodeError, TypeError):
                 day_dict['exercises'] = []
             days.append(day_dict)
