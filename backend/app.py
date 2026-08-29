@@ -433,6 +433,10 @@ def setup_profile():
     injuries = data.get('injuries', 'None')
     equipment = data.get('equipment', 'Full Commercial Gym')
     
+    # If user has ANY physical condition or injury, disable Calisthenics
+    if injuries and str(injuries).strip().lower() != 'none' and 'calisthenic' in equipment.lower():
+        equipment = 'Home / Bodyweight'
+    
     if not all([age, height_cm, weight_kg]):
         return jsonify({'error': 'Missing required fields'}), 400
     
@@ -525,6 +529,14 @@ def update_player_settings():
     prev_stats = stats_manager.get_player_stats(user_id) or {}
     old_equipment = prev_stats.get('equipment', 'Full Commercial Gym')
     
+    # If user has ANY physical condition / injury, reject switching to Calisthenics
+    if equipment and 'calisthenic' in equipment.lower():
+        check_inj = injuries if injuries is not None else prev_stats.get('injuries', 'None')
+        if check_inj and str(check_inj).strip().lower() != 'none':
+            return jsonify({
+                'error': f"⚠️ Calisthenics is locked due to registered physical condition: '{check_inj}'."
+            }), 400
+
     # Safe casting
     if age is not None:
         try: age = int(age)
@@ -555,42 +567,38 @@ def update_player_settings():
     )
     
     if not success:
-        return jsonify({'error': 'No settings updated or user not found'}), 400
-    
-    updated_stats = stats_manager.get_player_stats(user_id) or {}
+        return jsonify({'error': 'Failed to update settings'}), 500
+        
+    # Check if equipment changed and adapt routine/quest on the spot
     equipment_changed = equipment and (equipment != old_equipment)
     weekly_plan_adapted = False
     new_quest = None
     
-    # If equipment was updated, adapt active workout routines and daily quest on the spot
-    if equipment_changed or data.get('force_adapt'):
-        active_physique = quest_generator.get_active_physique_quest(user_id)
-        if active_physique:
-            user_analyzer = get_analyzer_for_user(user_id)
-            adapt_res = user_analyzer.adapt_physique_quest_to_equipment(
-                user_id=user_id,
-                active_quest=active_physique,
-                new_equipment=equipment,
-                user_stats=updated_stats,
-                db=db
-            )
-            weekly_plan_adapted = adapt_res.get('success', False)
-        
-        conn = db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM goals WHERE user_id = ? AND status = 'active'", (user_id,))
-        goals = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        
-        primary_focus_areas = stats_manager.get_primary_focus_areas(user_id)
+    if equipment_changed or data.get('force_adapt', False):
         try:
-            new_quest = quest_generator.regenerate_daily_quest(user_id, goals, primary_focus_areas)
-        except Exception as ex_quest:
-            print(f"⚠️ Error regenerating daily quest on settings update: {ex_quest}")
-        
+            # 1. Adapt active character build goal if one exists
+            active_physique = quest_generator.get_active_physique_quest(user_id)
+            user_stats = stats_manager.get_player_stats(user_id) or {}
+            
+            if active_physique:
+                user_analyzer = get_analyzer_for_user(user_id)
+                adapt_res = user_analyzer.adapt_physique_quest_to_equipment(
+                    user_id=user_id,
+                    active_quest=active_physique,
+                    new_equipment=equipment or old_equipment,
+                    user_stats=user_stats,
+                    db=db
+                )
+                weekly_plan_adapted = adapt_res.get('success', False)
+            
+            # 2. Regenerate today's daily quest matching the new equipment
+            new_quest = quest_generator.regenerate_daily_quest(user_id, [], [])
+        except Exception as e:
+            print(f"⚠️ Error adapting workout on settings equipment update: {e}")
+            traceback.print_exc()
+            
     return jsonify({
         'success': True,
-        'equipment': equipment or old_equipment,
         'equipment_changed': equipment_changed,
         'weekly_plan_adapted': weekly_plan_adapted,
         'quest': new_quest,
@@ -605,7 +613,6 @@ def change_player_equipment():
     user_id = session['user_id']
     data = request.json or {}
     new_equipment = data.get('equipment')
-    force_override = data.get('force_override', False)
     
     if not new_equipment:
         return jsonify({'error': 'Equipment location specification required'}), 400
@@ -613,18 +620,15 @@ def change_player_equipment():
     prev_stats = stats_manager.get_player_stats(user_id) or {}
     old_equipment = prev_stats.get('equipment', 'Full Commercial Gym')
     
-    # Check for fatal injuries in Calisthenics (shoulder, wrist, elbow, rotator cuff, severe joint)
+    # Check if user has ANY registered physical condition or injury
     if 'calisthenic' in new_equipment.lower():
-        user_injuries = (prev_stats.get('injuries') or 'None').lower()
-        fatal_keywords = ['shoulder', 'wrist', 'elbow', 'rotator', 'tendonitis', 'dislocation', 'fracture', 'tear', 'impingement', 'joint']
-        has_fatal_calisthenics_injury = any(kw in user_injuries for kw in fatal_keywords) and user_injuries != 'none'
-        
-        if has_fatal_calisthenics_injury and not force_override:
+        user_injuries = (prev_stats.get('injuries') or 'None').strip()
+        if user_injuries and user_injuries.lower() != 'none':
             return jsonify({
                 'success': False,
                 'blocked_by_injury': True,
-                'injury_detected': prev_stats.get('injuries'),
-                'message': f"⚠️ SYSTEM REJECTION: Calisthenics access locked! You have registered '{prev_stats.get('injuries')}'. High-torque bar & inversion movements are unsafe for your recovery. Recommended: Home / Low-Impact."
+                'injury_detected': user_injuries,
+                'message': f"⚠️ SYSTEM REJECTION: Calisthenics access locked! You have registered physical condition: '{user_injuries}'. High-torque bar & inversion movements are unsafe for your recovery. Recommended: Home / Bodyweight or Commercial Gym."
             }), 403
     
     # Update stats

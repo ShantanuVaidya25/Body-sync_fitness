@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     checkSharedHunterUrl();
     initHorizontalMouseScroll();
+    initCalisthenicsInjuryListeners();
 });
 
 // ============================================================================
@@ -321,6 +322,11 @@ async function setupProfile() {
     const injuries = (selectedConditions.length > 0 || medical_notes)
         ? (selectedConditions.join(', ') + (medical_notes ? ` (${medical_notes})` : ''))
         : 'None';
+        
+    let finalEquipment = equipment;
+    if (injuries !== 'None' && equipment.toLowerCase().includes('calisthenic')) {
+        finalEquipment = 'Home / Bodyweight';
+    }
     
     try {
         const response = await fetch(`${API_BASE}/api/setup-profile`, {
@@ -329,7 +335,7 @@ async function setupProfile() {
             body: JSON.stringify({
                 age, height_cm, weight_kg, target_height, target_weight,
                 primary_focus_areas, experience_level, days_per_week,
-                body_type, injuries, equipment, initial_exercises
+                body_type, injuries, equipment: finalEquipment, initial_exercises
             }),
             credentials: 'include'
         });
@@ -3941,11 +3947,104 @@ function openHunterSettingsModal() {
     
     const modal = document.getElementById('hunter-settings-modal');
     if (modal) modal.style.display = 'flex';
+    
+    // Update availability in settings modal immediately
+    updateSettingsCalisthenicsAvailability();
 }
 
 function closeHunterSettingsModal() {
     const modal = document.getElementById('hunter-settings-modal');
     if (modal) modal.style.display = 'none';
+}
+
+function initCalisthenicsInjuryListeners() {
+    // 1. Profile Setup Screen Listeners
+    const setupMedicalCheckboxes = document.querySelectorAll('input[name="setup-medical-condition"]');
+    setupMedicalCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSetupCalisthenicsAvailability);
+    });
+    const setupNotes = document.getElementById('setup-medical-notes');
+    if (setupNotes) {
+        setupNotes.addEventListener('input', updateSetupCalisthenicsAvailability);
+    }
+    
+    // 2. Settings Modal Listeners
+    const settingsMedicalCheckboxes = document.querySelectorAll('input[name="settings-medical-condition"]');
+    settingsMedicalCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSettingsCalisthenicsAvailability);
+    });
+    const settingsNotes = document.getElementById('settings-medical-notes');
+    if (settingsNotes) {
+        settingsNotes.addEventListener('input', updateSettingsCalisthenicsAvailability);
+    }
+    
+    updateSetupCalisthenicsAvailability();
+}
+
+function updateSetupCalisthenicsAvailability() {
+    const checkedConditions = document.querySelectorAll('input[name="setup-medical-condition"]:checked');
+    const notesInput = document.getElementById('setup-medical-notes');
+    const hasNotes = notesInput && notesInput.value.trim().length > 0;
+    const hasCondition = checkedConditions.length > 0 || hasNotes;
+    
+    const calisthenicsRadio = document.getElementById('setup-eq-calisthenics');
+    const calisthenicsCard = document.getElementById('setup-card-calisthenics');
+    const lockBadge = document.getElementById('calisthenics-lock-badge');
+    
+    if (calisthenicsRadio && calisthenicsCard) {
+        if (hasCondition) {
+            calisthenicsRadio.disabled = true;
+            calisthenicsCard.classList.add('disabled-locked');
+            if (lockBadge) lockBadge.style.display = 'inline-block';
+            
+            // If Calisthenics was selected, auto-switch to Home / Bodyweight
+            if (calisthenicsRadio.checked) {
+                calisthenicsRadio.checked = false;
+                const homeRadio = document.querySelector('input[name="setup-equipment"][value="Home / Bodyweight"]');
+                if (homeRadio) {
+                    homeRadio.checked = true;
+                } else {
+                    const gymRadio = document.querySelector('input[name="setup-equipment"][value="Full Commercial Gym"]');
+                    if (gymRadio) gymRadio.checked = true;
+                }
+                showToast('⚠️ Calisthenics locked due to selected physical condition. Switched to Home Bodyweight.');
+            }
+        } else {
+            calisthenicsRadio.disabled = false;
+            calisthenicsCard.classList.remove('disabled-locked');
+            if (lockBadge) lockBadge.style.display = 'none';
+        }
+    }
+}
+
+function updateSettingsCalisthenicsAvailability() {
+    const checkedConditions = document.querySelectorAll('input[name="settings-medical-condition"]:checked');
+    const notesInput = document.getElementById('settings-medical-notes');
+    const hasNotes = notesInput && notesInput.value.trim().length > 0;
+    const hasCondition = checkedConditions.length > 0 || hasNotes;
+    
+    const calisthenicsRadio = document.getElementById('settings-eq-calisthenics');
+    const calisthenicsCard = document.getElementById('settings-card-calisthenics');
+    const lockBadge = document.getElementById('settings-calisthenics-lock-badge');
+    
+    if (calisthenicsRadio && calisthenicsCard) {
+        if (hasCondition) {
+            calisthenicsRadio.disabled = true;
+            calisthenicsCard.classList.add('disabled-locked');
+            if (lockBadge) lockBadge.style.display = 'inline-block';
+            
+            if (calisthenicsRadio.checked) {
+                calisthenicsRadio.checked = false;
+                const homeRadio = document.querySelector('input[name="settings-equipment"][value="Home / Bodyweight"]');
+                if (homeRadio) homeRadio.checked = true;
+                showToast('⚠️ Calisthenics locked due to physical condition. Switched to Home Bodyweight.');
+            }
+        } else {
+            calisthenicsRadio.disabled = false;
+            calisthenicsCard.classList.remove('disabled-locked');
+            if (lockBadge) lockBadge.style.display = 'none';
+        }
+    }
 }
 
 function syncEquipmentUI(equipment) {
@@ -3976,10 +4075,19 @@ function syncEquipmentUI(equipment) {
     const targetKey = getEquipKey(equipment);
 
     // Highlight active location pill buttons across all views (mutually exclusive)
+    const hasInjuries = currentStats && currentStats.injuries && currentStats.injuries.trim().toLowerCase() !== 'none';
     const pillButtons = document.querySelectorAll('.location-pill-btn');
     pillButtons.forEach(btn => {
         const btnEq = btn.getAttribute('data-equipment') || '';
         const btnKey = getEquipKey(btnEq);
+        
+        if (btnKey === 'calisthenics' && hasInjuries) {
+            btn.classList.add('disabled-locked');
+            btn.title = `🔒 Calisthenics locked due to registered physical condition (${currentStats.injuries})`;
+        } else if (btnKey === 'calisthenics') {
+            btn.classList.remove('disabled-locked');
+            btn.title = '';
+        }
         
         if (btnKey === targetKey) {
             btn.classList.add('active');
@@ -4004,13 +4112,8 @@ function checkCalisthenicsInjuryRisk(equipment) {
     const rawInjuries = currentStats.injuries.trim();
     if (rawInjuries.toLowerCase() === 'none' || !rawInjuries) return null;
     
-    const fatalKeywords = ['shoulder', 'wrist', 'elbow', 'rotator', 'tendonitis', 'dislocation', 'fracture', 'tear', 'impingement', 'joint'];
-    const lower = rawInjuries.toLowerCase();
-    const hasFatal = fatalKeywords.some(kw => lower.includes(kw));
-    if (hasFatal) {
-        return rawInjuries;
-    }
-    return null;
+    // ANY registered injury or condition disables Calisthenics
+    return rawInjuries;
 }
 
 function showInjuryWarningModal(injuryName) {
@@ -4018,9 +4121,9 @@ function showInjuryWarningModal(injuryName) {
     const nameEl = document.getElementById('injury-detected-name');
     const msgEl = document.getElementById('injury-warning-message');
     
-    if (nameEl) nameEl.textContent = injuryName || 'Shoulder / Joint Injury';
+    if (nameEl) nameEl.textContent = injuryName || 'Physical Condition / Injury';
     if (msgEl) {
-        msgEl.innerHTML = `The System detected registered <strong style="color: #f87171;">${injuryName || 'Joint Injury'}</strong> in your Hunter profile. High-torque calisthenics (Muscle-ups, Handstand Push-ups, Levers, Deep Dips) impose extreme joint strain and are fatal to your recovery. Access is restricted for your safety.`;
+        msgEl.innerHTML = `The System detected registered <strong style="color: #f87171;">${injuryName || 'Physical Condition'}</strong> in your Hunter profile. High-torque calisthenics (Muscle-ups, Handstand Push-ups, Levers, Deep Dips) impose extreme joint strain and are restricted to prevent injury.`;
     }
     
     if (modal) {
@@ -4044,14 +4147,13 @@ async function confirmSafeEquipmentChoice(safeChoice) {
 
 async function forceUnlockCalisthenics() {
     closeInjuryWarningModal();
-    showToast('⚠️ Proceeding with Calisthenics under joint safety caution.');
-    await switchEquipmentAccess('Calisthenics', true);
+    showToast('⚠️ Calisthenics remains locked due to your physical condition.');
 }
 
 async function switchEquipmentAccess(newEquipment, forceOverride = false) {
     if (!newEquipment) return;
     
-    // Check for fatal injury risk before initiating calisthenics switch
+    // Check for physical condition before initiating calisthenics switch
     if (newEquipment.toLowerCase().includes('calisthenic') && !forceOverride) {
         const detectedInjury = checkCalisthenicsInjuryRisk(newEquipment);
         if (detectedInjury) {
