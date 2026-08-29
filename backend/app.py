@@ -1372,10 +1372,12 @@ def analyze_physique():
         
         # Convert the weekly split into structured data so it drives the
         # actual daily quests, not just a wall of text the user reads once.
+        is_fb = result.get('fallback_used', False)
         weekly_result = analyzer.extract_structured_weekly_plan(
             result['quest_log_markdown'],
             target_name=result.get('target_name'),
-            equipment=user_equipment
+            equipment=user_equipment,
+            is_fallback=is_fb
         )
         if weekly_result.get('success'):
             weekly_plan_manager.save_weekly_plan(user_id, physique_quest_id, weekly_result['days'])

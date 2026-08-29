@@ -2577,7 +2577,14 @@ async function analyzePhysique() {
             credentials: 'include'
         });
         
-        const data = await response.json();
+        let data;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            const rawText = await response.text();
+            data = { error: `Server error (${response.status}): ${rawText.substring(0, 150) || 'Service temporarily unavailable.'}` };
+        }
         
         if (response.ok && data.success) {
             displayPhysiqueResult(data);
@@ -2592,7 +2599,7 @@ async function analyzePhysique() {
             }
         }
     } catch (error) {
-        errorEl.textContent = 'Analysis failed. Please check your connection and try again.';
+        errorEl.textContent = 'Request timeout or connection error. Please try again or check your Gemini API key in Settings.';
         console.error('Physique analysis error:', error);
     } finally {
         document.getElementById('physique-loading').style.display = 'none';
