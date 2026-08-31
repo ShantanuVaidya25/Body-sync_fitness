@@ -254,7 +254,7 @@ class Database:
                 equipment TEXT DEFAULT 'Full Commercial Gym',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
 
@@ -273,7 +273,7 @@ class Database:
                 difficulty_level INTEGER DEFAULT 1,
                 last_performed TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -288,7 +288,7 @@ class Database:
                 exp_reward INTEGER DEFAULT 0,
                 completed_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -304,8 +304,8 @@ class Database:
                 weight_used REAL,
                 duration_seconds INTEGER,
                 completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (quest_id) REFERENCES daily_quests(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (quest_id) REFERENCES daily_quests(id) ON DELETE CASCADE
             )
         ''')
         
@@ -322,7 +322,7 @@ class Database:
                 calories_burned INTEGER DEFAULT 0,
                 notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -340,7 +340,7 @@ class Database:
                 status TEXT DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -353,8 +353,8 @@ class Database:
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 accepted_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (friend_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -368,7 +368,7 @@ class Database:
                 description TEXT,
                 exp_reward INTEGER DEFAULT 0,
                 unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -380,7 +380,7 @@ class Database:
                 rest_day DATE NOT NULL,
                 reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -396,7 +396,7 @@ class Database:
                 quest_log_markdown TEXT NOT NULL,
                 is_active BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -413,8 +413,8 @@ class Database:
                 is_rest BOOLEAN DEFAULT 0,
                 exercises_json TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (physique_quest_id) REFERENCES physique_quests(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (physique_quest_id) REFERENCES physique_quests(id) ON DELETE CASCADE
             )
         ''')
         
@@ -425,7 +425,7 @@ class Database:
                 user_id INTEGER PRIMARY KEY,
                 encrypted_gemini_key TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
 
@@ -441,7 +441,7 @@ class Database:
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 cleared_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
 
@@ -455,7 +455,7 @@ class Database:
                 description TEXT,
                 exercises_json TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
 
@@ -470,7 +470,7 @@ class Database:
                 estimated_1rm REAL NOT NULL,
                 benchmark_level TEXT,
                 calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -756,20 +756,27 @@ class User:
         return True
 
     def delete_user_cascade(self, user_id: int) -> bool:
-        """Completely delete user and clean up all related database tables using static parameterized statements"""
+        """Completely delete user and clean up all related database tables in exact foreign key dependency order"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
         try:
+            # 1. Turn off foreign keys temporarily for this deletion transaction if supported
+            try:
+                cursor.execute('PRAGMA foreign_keys = OFF;')
+            except Exception:
+                pass
+            
+            # 2. Delete child/leaf tables first to respect foreign key hierarchies
+            cursor.execute('DELETE FROM quest_completions WHERE user_id = ? OR quest_id IN (SELECT id FROM daily_quests WHERE user_id = ?)', (user_id, user_id))
+            cursor.execute('DELETE FROM weekly_training_plan WHERE user_id = ? OR physique_quest_id IN (SELECT id FROM physique_quests WHERE user_id = ?)', (user_id, user_id))
+            cursor.execute('DELETE FROM physique_quests WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM daily_quests WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM player_stats WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM exercise_records WHERE user_id = ?', (user_id,))
-            cursor.execute('DELETE FROM daily_quests WHERE user_id = ?', (user_id,))
-            cursor.execute('DELETE FROM quest_completions WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM workout_history WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM goals WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM achievements WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM rest_schedule WHERE user_id = ?', (user_id,))
-            cursor.execute('DELETE FROM physique_quests WHERE user_id = ?', (user_id,))
-            cursor.execute('DELETE FROM weekly_training_plan WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM user_settings WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM custom_routines WHERE user_id = ?', (user_id,))
             cursor.execute('DELETE FROM penalty_quests WHERE user_id = ?', (user_id,))
@@ -777,9 +784,19 @@ class User:
             cursor.execute('DELETE FROM friends WHERE user_id = ? OR friend_id = ?', (user_id, user_id))
             cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
             conn.commit()
+
+            try:
+                cursor.execute('PRAGMA foreign_keys = ON;')
+            except Exception:
+                pass
+
             return True
         except Exception as e:
             print(f"[WARN] Error in delete_user_cascade: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             return False
         finally:
             conn.close()
