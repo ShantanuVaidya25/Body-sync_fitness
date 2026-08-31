@@ -4876,3 +4876,130 @@ h4 {
         font-size: 0.6rem;
     }
 }
+
+/* ============================================================================
+   HUNTER PROGRESSION & GRADUAL DIFFICULTY EVOLUTION HUD
+   ============================================================================ */
+.hunter-progression-card {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(11, 17, 32, 0.96) 100%);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.progression-tiers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.prog-tier-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.prog-tier-item.active {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(15, 23, 42, 0.85) 100%);
+    border-color: #38bdf8;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+}
+
+.prog-tier-item.unlocked:not(.active) {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.06);
+}
+
+.prog-tier-item.locked {
+    opacity: 0.45;
+    filter: grayscale(0.5);
+}
+
+.prog-tier-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-top: 3px;
+    flex-shrink: 0;
+    background: #475569;
+    border: 2px solid #334155;
+    transition: all 0.25s ease;
+}
+
+.prog-tier-item.active .prog-tier-dot {
+    background: #38bdf8;
+    border-color: #7dd3fc;
+    box-shadow: 0 0 10px #38bdf8;
+    animation: pulseGlow 2s infinite;
+}
+
+.prog-tier-item.unlocked:not(.active) .prog-tier-dot {
+    background: #10b981;
+    border-color: #6ee7b7;
+}
+
+.prog-tier-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.prog-tier-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+}
+
+.prog-tier-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.prog-tier-item.active .prog-tier-name {
+    color: #38bdf8;
+}
+
+.prog-tier-tag {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+}
+
+.prog-tier-item.active .prog-tier-tag {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.prog-tier-item.unlocked:not(.active) .prog-tier-tag {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.prog-tier-item.locked .prog-tier-tag {
+    background: rgba(71, 85, 105, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.prog-tier-skills {
+    font-size: 0.76rem;
+    color: #cbd5e1;
+    line-height: 1.35;
+}

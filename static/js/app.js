@@ -1319,6 +1319,13 @@ async function handleExerciseCheckChange(checkbox, exIndex, exerciseName) {
                 showToast(`⚡ +${data.exp_gained} EXP! ${exerciseName} Completed!`);
                 if (data.level_result && data.level_result.leveled_up) {
                     showToast(`🎉 LEVEL UP! You reached Level ${data.level_result.new_level}! (+5 Stat Points)`);
+                    if (data.level_result.stage_advanced) {
+                        setTimeout(() => {
+                            showToast(`⚡ DIFFICULTY EVOLUTION: Unlocked ${data.level_result.new_tier.replace('_', ' ').toUpperCase()} workout progressions!`);
+                            loadWeeklySchedule();
+                            loadTodaysQuest();
+                        }, 1200);
+                    }
                 }
             } else {
                 showToast(`- ${Math.abs(data.exp_gained)} EXP (${exerciseName} unchecked)`);
@@ -1476,6 +1483,7 @@ function showQuestCompletionModal(result) {
                 <h3 style="font-size: 1.6rem; color: #34d399; font-family: 'Orbitron', sans-serif; margin-bottom: 6px;">⬆️ LEVEL UP!</h3>
                 <p style="font-size: 1.3rem; font-weight: 800; color: #ffffff; margin-bottom: 4px;">Level ${result.level_result.new_level}</p>
                 <p style="color: #cbd5e1; font-size: 0.9rem;">You gained ${result.level_result.levels_gained || 1} level(s) and <strong style="color: #fbbf24;">+${result.level_result.stat_points || 5} stat points</strong>!</p>
+                ${result.level_result.stage_advanced ? `<p style="color: #38bdf8; font-weight: 700; margin-top: 8px; font-size: 0.95rem;">⚡ DIFFICULTY EVOLUTION: Unlocked higher-tier workout progressions!</p>` : ''}
             </div>
         `;
     }
@@ -2911,9 +2919,50 @@ async function loadWeeklySchedule() {
                 </div>
             `;
         }).join('');
+        
+        await loadProgressionHUD();
     } catch (error) {
         console.error('Failed to load Main Story Quests schedule:', error);
         if (grid) grid.innerHTML = '<p class="error-message">Failed to load Main Story Quests schedule</p>';
+    }
+}
+
+async function loadProgressionHUD() {
+    const grid = document.getElementById('progression-tiers-grid');
+    const stageTag = document.getElementById('progression-current-stage-tag');
+    if (!grid) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/player/progression-tier`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+            if (stageTag) {
+                const activeTier = data.tiers.find(t => t.is_current) || data.tiers[0];
+                stageTag.textContent = activeTier.label.toUpperCase();
+                stageTag.className = activeTier.stage === 4 ? 'badge badge-gold' : (activeTier.stage >= 2 ? 'badge badge-success' : 'badge badge-primary');
+            }
+            
+            grid.innerHTML = data.tiers.map(t => {
+                const statusClass = t.is_current ? 'active' : (t.unlocked ? 'unlocked' : 'locked');
+                const statusLabel = t.is_current ? 'CURRENT' : (t.unlocked ? 'UNLOCKED' : `REQ: ${t.level_req}`);
+                return `
+                    <div class="prog-tier-item ${statusClass}">
+                        <div class="prog-tier-dot"></div>
+                        <div class="prog-tier-info">
+                            <div class="prog-tier-header">
+                                <span class="prog-tier-name">${t.label}</span>
+                                <span class="prog-tier-tag">${statusLabel}</span>
+                            </div>
+                            <div class="prog-tier-skills">${t.skills}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (e) {
+        console.error('Failed to load progression tier info:', e);
     }
 }
 

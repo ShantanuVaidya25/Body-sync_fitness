@@ -734,6 +734,26 @@
                     </div>
                 </div>
 
+                <!-- Hunter Difficulty & Progression Evolution Card -->
+                <div class="card hunter-progression-card" id="hunter-progression-hud" style="margin-top: 24px;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.15rem; font-family: 'Orbitron', sans-serif; color: #38bdf8;">
+                                📈 Gradual Difficulty & Skill Evolution
+                            </h2>
+                            <p class="info-text" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Workouts automatically evolve into higher-tier skills and greater intensity as you level up.
+                            </p>
+                        </div>
+                        <div id="progression-current-stage-tag" class="badge badge-primary" style="padding: 6px 14px; font-weight: 800; letter-spacing: 0.05em; font-size: 0.85rem;">
+                            STAGE 1 • FOUNDATIONS (E-RANK)
+                        </div>
+                    </div>
+                    <div class="progression-tiers-grid" id="progression-tiers-grid" style="margin-top: 16px;">
+                        <p class="loading">Loading Progression Milestones...</p>
+                    </div>
+                </div>
+
                 <!-- Quest Completion Celebration Modal -->
                 <div id="quest-completion-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeModal()">
                     <div class="modal-content celebration">

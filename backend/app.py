@@ -122,7 +122,7 @@ def check_and_apply_stage_advancement(user_id: int, new_level: int) -> dict:
     the next stage's progression exercises!
     """
     try:
-        from physique_analyzer import get_effective_experience_tier, analyzer
+        from physique_analyzer import get_effective_experience_tier
         user_stats = stats_manager.get_player_stats(user_id)
         if not user_stats:
             return {'advanced': False}
@@ -134,6 +134,7 @@ def check_and_apply_stage_advancement(user_id: int, new_level: int) -> dict:
         if old_tier != new_tier:
             active_quest = quest_generator.get_active_physique_quest(user_id)
             if active_quest:
+                analyzer = get_analyzer_for_user(user_id)
                 analyzer.adapt_physique_quest_to_equipment(
                     user_id=user_id,
                     active_quest=active_quest,
