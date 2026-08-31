@@ -1339,6 +1339,7 @@ def analyze_physique():
     user_body_type = user_stats.get('body_type', 'mesomorph')
     user_injuries = user_stats.get('injuries', 'None')
     user_equipment = user_stats.get('equipment', 'Full Commercial Gym')
+    user_experience = user_stats.get('experience_level', 'beginner')
 
     try:
         result = analyzer.generate_quest_log(
@@ -1346,7 +1347,8 @@ def analyze_physique():
             image_path=image_path,
             current_body_type=user_body_type,
             injuries=user_injuries,
-            equipment=user_equipment
+            equipment=user_equipment,
+            experience_level=user_experience
         )
         
         if not result.get('success'):
@@ -1381,7 +1383,8 @@ def analyze_physique():
             result['quest_log_markdown'],
             target_name=result.get('target_name'),
             equipment=user_equipment,
-            is_fallback=is_fb
+            is_fallback=is_fb,
+            experience_level=user_experience
         )
         if weekly_result.get('success'):
             weekly_plan_manager.save_weekly_plan(user_id, physique_quest_id, weekly_result['days'])

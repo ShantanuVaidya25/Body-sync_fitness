@@ -148,7 +148,8 @@ class PhysiqueAnalyzer:
                          image_path: Optional[str],
                          current_body_type: Optional[str] = None,
                          injuries: Optional[str] = None,
-                         equipment: Optional[str] = None) -> list:
+                         equipment: Optional[str] = None,
+                         experience_level: Optional[str] = "beginner") -> list:
         """Build the multimodal contents list: optional image + text prompt"""
         if target_name:
             target_desc = target_name
@@ -156,6 +157,15 @@ class PhysiqueAnalyzer:
             target_desc = "the person shown in the attached image"
 
         prompt_text = MASTER_PROMPT_TEMPLATE.format(target=target_desc)
+
+        if experience_level:
+            exp = str(experience_level).lower().strip()
+            if exp == 'beginner':
+                prompt_text += "\n\nCRITICAL EXPERIENCE CONSTRAINT - BEGINNER: The user is a COMPLETE BEGINNER (0-6 months training experience). Prescribe ONLY accessible beginner-friendly regression exercises with safe starting volumes (e.g. Incline push-ups, standard push-ups, assisted pull-ups, bodyweight air squats, lat pulldowns, dumbbell goblet squats, basic planks). STRICTLY FORBIDDEN FOR BEGINNERS: Advanced/extreme calisthenics like Muscle-ups, Handstand push-ups, Dragon flags, Levers, Planches, or heavy 1RM powerlifting."
+            elif exp == 'intermediate':
+                prompt_text += "\n\nEXPERIENCE LEVEL - INTERMEDIATE: The user has intermediate training experience (6+ months). Prescribe balanced compound movements with standard hypertrophy rep ranges."
+            elif exp == 'advanced':
+                prompt_text += "\n\nEXPERIENCE LEVEL - ADVANCED: The user is an advanced trainee (2+ years). High-intensity progressions, advanced overload techniques, and skill variations are permitted."
 
         if current_body_type:
             enriched_baseline = enrich_body_type(current_body_type)
@@ -186,7 +196,8 @@ class PhysiqueAnalyzer:
                           image_path: Optional[str] = None,
                           current_body_type: Optional[str] = None,
                           injuries: Optional[str] = None,
-                          equipment: Optional[str] = None) -> Dict:
+                          equipment: Optional[str] = None,
+                          experience_level: Optional[str] = "beginner") -> Dict:
         """
         Generate a Quest Log by analyzing a named character/person or an
         uploaded photo. Uses resilient Gemini AI model cascading with instant
@@ -208,7 +219,8 @@ class PhysiqueAnalyzer:
                     image_path=image_path,
                     current_body_type=current_body_type,
                     injuries=injuries,
-                    equipment=equipment
+                    equipment=equipment,
+                    experience_level=experience_level
                 )
                 quest_log_markdown, generation_error = self._generate_content_resilient(contents)
             except Exception as e:
@@ -230,11 +242,13 @@ class PhysiqueAnalyzer:
             eq = equipment or "Full Commercial Gym"
             bt = current_body_type or "mesomorph"
             inj = injuries or "None"
+            exp = experience_level or "beginner"
             fallback_md, _ = generate_character_equipment_split(
                 target_name=target_name,
                 equipment=eq,
                 body_type=bt,
-                injuries=inj
+                injuries=inj,
+                experience_level=exp
             )
             notice = "[SYSTEM] AI service is experiencing temporary high demand. Generated your authentic build protocol via System Engine so your training isn't interrupted!"
             print(f"[INFO] Used deterministic character engine for '{target_name}' (AI notice: {generation_error})")
@@ -260,7 +274,7 @@ class PhysiqueAnalyzer:
             'error': 'AI vision service is currently experiencing high demand. Please try again in a few moments or enter your character name directly.'
         }
 
-    def extract_structured_weekly_plan(self, quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym", is_fallback: bool = False) -> Dict:
+    def extract_structured_weekly_plan(self, quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym", is_fallback: bool = False, experience_level: str = "beginner") -> Dict:
         """
         Take the freeform Quest Log markdown and convert the "Main Story Quests"
         weekly training split specifically into structured JSON data.
@@ -268,7 +282,7 @@ class PhysiqueAnalyzer:
         """
         # Fast path: If the quest log was generated deterministically or if AI is unconfigured, parse instantly
         if is_fallback or not self.is_configured() or '[SYSTEM]' in quest_log_markdown:
-            fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment)
+            fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment, experience_level=experience_level)
             return {'success': True, 'days': fallback_days, 'fallback_used': True}
 
         if self.is_configured():
@@ -322,12 +336,16 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
 
                     days = parsed.get('days', [])
                     if len(days) == 7:
+                        # Ensure exercises match experience level
+                        for d in days:
+                            if not d.get('is_rest') and 'exercises' in d:
+                                d['exercises'] = [regress_exercise_for_experience(ex, experience_level) for ex in d['exercises']]
                         return {'success': True, 'days': days, 'fallback_used': False}
             except Exception as e:
                 print(f"[WARN] Gemini JSON structuring failed ({e}), falling back to deterministic parser.")
 
         # Deterministic markdown parsing fallback (guarantees a 7-day split is always built)
-        fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment)
+        fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment, experience_level=experience_level)
         return {'success': True, 'days': fallback_days, 'fallback_used': True}
 
     def adapt_physique_quest_to_equipment(self, user_id: int, active_quest: Dict,
@@ -341,6 +359,7 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
         quest_id = active_quest['id']
         current_body_type = user_stats.get('body_type', 'mesomorph')
         injuries = user_stats.get('injuries', 'None')
+        experience_level = user_stats.get('experience_level', 'beginner')
         
         adapted_markdown = None
         structured_days = None
@@ -353,11 +372,17 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
                     image_path=None,
                     current_body_type=current_body_type,
                     injuries=injuries,
-                    equipment=new_equipment
+                    equipment=new_equipment,
+                    experience_level=experience_level
                 )
                 if res.get('success'):
                     adapted_markdown = res['quest_log_markdown']
-                    weekly_res = self.extract_structured_weekly_plan(adapted_markdown, target_name=target_name)
+                    weekly_res = self.extract_structured_weekly_plan(
+                        adapted_markdown,
+                        target_name=target_name,
+                        equipment=new_equipment,
+                        experience_level=experience_level
+                    )
                     if weekly_res.get('success'):
                         structured_days = weekly_res.get('days')
             except Exception as e:
@@ -366,7 +391,7 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
         # 2. Deterministic character adapter fallback
         if not structured_days:
             adapted_markdown, structured_days = generate_character_equipment_split(
-                target_name, new_equipment, current_body_type, injuries
+                target_name, new_equipment, current_body_type, injuries, experience_level=experience_level
             )
 
         # 3. Save to database
@@ -709,9 +734,75 @@ def extract_section(markdown_text: str, header: str) -> str:
     return '\n'.join(section_lines).strip()
 
 
-def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym") -> list:
+def regress_exercise_for_experience(ex: dict, experience_level: str = "beginner") -> dict:
     """
-    Fallback parser that converts markdown text into a structured 7-day plan
+    Ensure exercises match the user's experience level.
+    If the user is a BEGINNER (0-6 months):
+    Regress all elite gymnastics / extreme calisthenics / heavy 1RM powerlifting
+    into accessible, safe, progressive foundations with appropriate volume (3 sets).
+    """
+    if not ex or not experience_level or str(experience_level).lower().strip() != 'beginner':
+        return ex
+        
+    name = ex.get('name', '')
+    name_lower = name.lower()
+    notes = ex.get('notes', '')
+    sets = min(ex.get('sets', 3), 3)  # Cap starting volume to 3 sets for beginners
+    reps = ex.get('reps', '10-12')
+    rest = max(ex.get('rest_seconds', 60), 60)  # Ensure adequate rest
+
+    # Calisthenics Upper Pull Regressions
+    if 'muscle-up' in name_lower or 'muscle up' in name_lower:
+        return {'name': 'Band-Assisted Pull-ups / Negative Pull-ups', 'sets': sets, 'reps': '6-8', 'rest_seconds': 75, 'notes': 'Controlled 3s descent to build vertical pulling base safely'}
+    elif 'typewriter' in name_lower or 'high-pull' in name_lower or 'high bar pull' in name_lower:
+        return {'name': 'Incline Bodyweight Rows / Towel Rows', 'sets': sets, 'reps': '10', 'rest_seconds': 60, 'notes': 'Horizontal pulling foundation for back thickness'}
+    elif 'dragon flag' in name_lower or 'dragon flags' in name_lower:
+        return {'name': 'Lying Leg Tucks / Hollow Body Hold', 'sets': sets, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Safe abdominal brace without lumbar strain'}
+    elif 'l-sit' in name_lower or 'windshield wiper' in name_lower:
+        return {'name': 'Seated Knee Tucks / Deadbugs', 'sets': sets, 'reps': '12', 'rest_seconds': 45, 'notes': 'Core stabilization and hip flexor control'}
+    
+    # Calisthenics Upper Push Regressions
+    elif 'handstand' in name_lower:
+        return {'name': 'Pike Push-ups (Feet on Floor)', 'sets': sets, 'reps': '8-10', 'rest_seconds': 60, 'notes': 'Accessible overhead pressing angle with floor support'}
+    elif 'planche' in name_lower or 'clap push-up' in name_lower or 'knuckle push-up' in name_lower or 'archer push-up' in name_lower:
+        return {'name': 'Standard / Incline Push-ups', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Focus on perfect chest-to-deck form and core tension'}
+    elif 'straight bar dip' in name_lower or 'weighted dip' in name_lower or 'deep parallel bar dip' in name_lower:
+        return {'name': 'Bench / Chair Supported Dips', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Controlled tricep lockout with feet flat on floor'}
+
+    # Calisthenics Lower Body Regressions
+    elif 'pistol squat' in name_lower or 'shrimp squat' in name_lower or 'sissy squat' in name_lower:
+        return {'name': 'Bodyweight Air Squats / Assisted Split Squats', 'sets': sets, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Full depth squat mechanics and knee tracking'}
+    elif 'jump squat' in name_lower or 'tuck jump' in name_lower or 'high jump' in name_lower or 'burpees to pull-up' in name_lower:
+        return {'name': 'Bodyweight Squats (Tempo 3s descent)', 'sets': sets, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Controlled eccentric quad burn without heavy joint impact'}
+
+    # Gym / Heavy Compound Regressions
+    elif 'heavy barbell deadlift' in name_lower or '1rm' in name_lower or 'barbell deadlift' in name_lower:
+        return {'name': 'Dumbbell Romanian Deadlifts (Light/Moderate)', 'sets': sets, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Master hip hinge mechanics and hamstring stretch'}
+    elif 'overhead barbell press' in name_lower or 'behind the neck' in name_lower:
+        return {'name': 'Seated Dumbbell Shoulder Press', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Comfortable natural pressing arc for shoulder safety'}
+    elif 'barbell back squat' in name_lower:
+        return {'name': 'Dumbbell Goblet Squats / Leg Press Machine', 'sets': sets, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Upright posture and controlled quad load'}
+    elif 'close-grip bench press' in name_lower:
+        return {'name': 'Cable Tricep Pushdowns / Push-ups', 'sets': sets, 'reps': '12', 'rest_seconds': 60, 'notes': 'Direct tricep isolation with zero wrist strain'}
+
+    # Dumbbell Regressions
+    elif 'snatch' in name_lower or 'renegade row' in name_lower:
+        return {'name': 'Dumbbell Bent-Over Supported Rows', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Stable back loading with chest support'}
+    elif 'thruster' in name_lower:
+        return {'name': 'Dumbbell Goblet Squats to Press (Light)', 'sets': sets, 'reps': '10', 'rest_seconds': 60, 'notes': 'Fluid full body coordination with light load'}
+
+    return {
+        'name': name,
+        'sets': sets,
+        'reps': reps,
+        'rest_seconds': rest,
+        'notes': notes
+    }
+
+
+def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym", experience_level: str = "beginner") -> list:
+    """
+    Deterministically extracts and structures a 7-day training split
     (Monday through Sunday) respecting the player's equipment access.
     """
     import re
@@ -764,18 +855,19 @@ def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Option
                             sets_val = int(sets_match.group(1)) if sets_match else 3
                             reps_val = reps_match.group(1) if reps_match else "10-12"
                             
-                            exercises.append({
+                            raw_ex = {
                                 'name': ex_name,
                                 'sets': sets_val,
                                 'reps': reps_val,
                                 'rest_seconds': 60,
                                 'notes': f"Part of {t_name}'s Main Story Quest"
-                            })
+                            }
+                            exercises.append(regress_exercise_for_experience(raw_ex, experience_level))
                     
                     if not exercises:
                         exercises = [
-                            {'name': f'{t_name} Power Protocol', 'sets': 4, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Focus on explosive execution'},
-                            {'name': f'{t_name} Core Mastery', 'sets': 3, 'reps': '15-20', 'rest_seconds': 45, 'notes': 'Core stabilization'},
+                            {'name': f'{t_name} Power Protocol', 'sets': 3, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Focus on controlled execution'},
+                            {'name': f'{t_name} Core Mastery', 'sets': 3, 'reps': '12-15', 'rest_seconds': 45, 'notes': 'Core stabilization'},
                             {'name': f'{t_name} Conditioning Circuit', 'sets': 3, 'reps': '10', 'rest_seconds': 60, 'notes': 'Form and control'}
                         ]
                 
@@ -794,22 +886,22 @@ def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Option
                     'focus': 'Rest & Recovery' if is_rest else f'{t_name} Workout Day {idx+1}',
                     'is_rest': is_rest,
                     'exercises': [] if is_rest else [
-                        {'name': f'{t_name} Training Circuit', 'sets': 4, 'reps': '12', 'rest_seconds': 60, 'notes': 'Build strength and stamina'}
+                        {'name': f'{t_name} Training Circuit', 'sets': 3, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Build strength and stamina'}
                     ]
                 })
     else:
         # Generate default split directly matching target character and equipment
-        _, days = generate_character_equipment_split(t_name, equipment)
+        _, days = generate_character_equipment_split(t_name, equipment, experience_level=experience_level)
             
     return days
 
 
-def generate_character_equipment_split(target_name: str, equipment: str, body_type: str = "mesomorph", injuries: str = "None") -> tuple:
+def generate_character_equipment_split(target_name: str, equipment: str, body_type: str = "mesomorph", injuries: str = "None", experience_level: str = "beginner") -> tuple:
     """
     Generates an authentic character training split and gamified Quest Log markdown
-    adapted strictly to the specified equipment access (Home, Dumbbells, Gym).
+    adapted strictly to the specified equipment access (Home, Dumbbells, Gym) and experience level.
     Includes rich themed splits for legendary physiques (Goku, Jin-Woo, Baki, Toji,
-    Saitama, Vegeta, Zoro, Levi, Batman, etc.) and a smart dynamic archetype builder for any custom target.
+    Saitama, Garou, Vegeta, Zoro, Levi, Batman, etc.) and a smart dynamic archetype builder for any custom target.
     """
     t_name = target_name or "Shadow Hunter"
     t_lower = t_name.lower()
@@ -1517,15 +1609,17 @@ def generate_character_equipment_split(target_name: str, equipment: str, body_ty
                 {'focus': f"🛌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
             ]
 
-    # Structure all 7 days with day_of_week indices
+    # Structure all 7 days with day_of_week indices, ensuring exercise difficulty matches experience level
     structured_days = []
     for idx, day_info in enumerate(split_days[:7]):
+        raw_exercises = day_info.get('exercises', [])
+        regressed_exercises = [regress_exercise_for_experience(ex, experience_level) for ex in raw_exercises]
         structured_days.append({
             'day_of_week': idx,
             'day_label': day_names[idx],
             'focus': day_info['focus'],
             'is_rest': day_info['is_rest'],
-            'exercises': day_info.get('exercises', [])
+            'exercises': regressed_exercises if not day_info['is_rest'] else []
         })
 
     # Build formatted markdown
