@@ -202,7 +202,9 @@ class AIQuestGenerator:
                 fallback_days = parse_weekly_plan_from_markdown(
                     active_physique.get('quest_log_markdown', ''),
                     active_physique.get('target_name'),
-                    equipment=user_equipment
+                    equipment=user_equipment,
+                    experience_level=stats.get('experience_level', 'beginner') if stats else 'beginner',
+                    level=stats.get('level', 1) if stats else 1
                 )
                 weekly_plan_manager.save_weekly_plan(user_id, active_physique['id'], fallback_days)
                 todays_plan = weekly_plan_manager.get_plan_for_today(user_id)

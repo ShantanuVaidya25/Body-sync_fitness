@@ -149,7 +149,8 @@ class PhysiqueAnalyzer:
                          current_body_type: Optional[str] = None,
                          injuries: Optional[str] = None,
                          equipment: Optional[str] = None,
-                         experience_level: Optional[str] = "beginner") -> list:
+                         experience_level: Optional[str] = "beginner",
+                         level: int = 1) -> list:
         """Build the multimodal contents list: optional image + text prompt"""
         if target_name:
             target_desc = target_name
@@ -159,13 +160,15 @@ class PhysiqueAnalyzer:
         prompt_text = MASTER_PROMPT_TEMPLATE.format(target=target_desc)
 
         if experience_level:
-            exp = str(experience_level).lower().strip()
-            if exp == 'beginner':
-                prompt_text += "\n\nCRITICAL EXPERIENCE CONSTRAINT - BEGINNER: The user is a COMPLETE BEGINNER (0-6 months training experience). Prescribe ONLY accessible beginner-friendly regression exercises with safe starting volumes (e.g. Incline push-ups, standard push-ups, assisted pull-ups, bodyweight air squats, lat pulldowns, dumbbell goblet squats, basic planks). STRICTLY FORBIDDEN FOR BEGINNERS: Advanced/extreme calisthenics like Muscle-ups, Handstand push-ups, Dragon flags, Levers, Planches, or heavy 1RM powerlifting."
-            elif exp == 'intermediate':
-                prompt_text += "\n\nEXPERIENCE LEVEL - INTERMEDIATE: The user has intermediate training experience (6+ months). Prescribe balanced compound movements with standard hypertrophy rep ranges."
-            elif exp == 'advanced':
-                prompt_text += "\n\nEXPERIENCE LEVEL - ADVANCED: The user is an advanced trainee (2+ years). High-intensity progressions, advanced overload techniques, and skill variations are permitted."
+            tier = get_effective_experience_tier(level, experience_level)
+            if tier == 'beginner':
+                prompt_text += "\n\nCRITICAL EXPERIENCE CONSTRAINT - STAGE 1 (LEVEL 1-5 • E-RANK): The user is at Stage 1 / Beginner. Prescribe ONLY accessible beginner-friendly regression exercises with safe starting volumes of 3 sets (e.g. Incline push-ups, standard push-ups, assisted pull-ups, bodyweight air squats, lat pulldowns, dumbbell goblet squats, basic planks). STRICTLY FORBIDDEN FOR STAGE 1: Muscle-ups, Handstand push-ups, Dragon flags, Levers, Planches, or heavy 1RM powerlifting."
+            elif tier == 'intermediate_entry':
+                prompt_text += "\n\nEXPERIENCE LEVEL - STAGE 2 (LEVEL 6-15 • D-RANK): The user has unlocked Stage 2! Prescribe strict bodyweight pull-ups, parallel bar dips, elevated pike presses, bulgarian split squats, and standard compound movements (3-4 sets)."
+            elif tier == 'intermediate_advanced':
+                prompt_text += "\n\nEXPERIENCE LEVEL - STAGE 3 (LEVEL 16-35 • C/B-RANK): The user is at Stage 3 / Advanced. High-intensity compound movements, L-sit chin-ups, wall handstand pushups, tuck dragon flags, and jump squats are permitted (4 sets)."
+            elif tier == 'advanced':
+                prompt_text += "\n\nEXPERIENCE LEVEL - STAGE 4 (LEVEL 36+ • A/S-RANK): The user is a Shadow Monarch / Master! Full elite gymnastics (Muscle-ups, Handstand push-ups, Dragon flags, Pistol squats) and heavy overload techniques are permitted (4-5 sets)."
 
         if current_body_type:
             enriched_baseline = enrich_body_type(current_body_type)
@@ -197,7 +200,8 @@ class PhysiqueAnalyzer:
                           current_body_type: Optional[str] = None,
                           injuries: Optional[str] = None,
                           equipment: Optional[str] = None,
-                          experience_level: Optional[str] = "beginner") -> Dict:
+                          experience_level: Optional[str] = "beginner",
+                          level: int = 1) -> Dict:
         """
         Generate a Quest Log by analyzing a named character/person or an
         uploaded photo. Uses resilient Gemini AI model cascading with instant
@@ -220,7 +224,8 @@ class PhysiqueAnalyzer:
                     current_body_type=current_body_type,
                     injuries=injuries,
                     equipment=equipment,
-                    experience_level=experience_level
+                    experience_level=experience_level,
+                    level=level
                 )
                 quest_log_markdown, generation_error = self._generate_content_resilient(contents)
             except Exception as e:
@@ -248,7 +253,8 @@ class PhysiqueAnalyzer:
                 equipment=eq,
                 body_type=bt,
                 injuries=inj,
-                experience_level=exp
+                experience_level=exp,
+                level=level
             )
             notice = "[SYSTEM] AI service is experiencing temporary high demand. Generated your authentic build protocol via System Engine so your training isn't interrupted!"
             print(f"[INFO] Used deterministic character engine for '{target_name}' (AI notice: {generation_error})")
@@ -274,15 +280,16 @@ class PhysiqueAnalyzer:
             'error': 'AI vision service is currently experiencing high demand. Please try again in a few moments or enter your character name directly.'
         }
 
-    def extract_structured_weekly_plan(self, quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym", is_fallback: bool = False, experience_level: str = "beginner") -> Dict:
+    def extract_structured_weekly_plan(self, quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym", is_fallback: bool = False, experience_level: str = "beginner", level: int = 1) -> Dict:
         """
         Take the freeform Quest Log markdown and convert the "Main Story Quests"
         weekly training split specifically into structured JSON data.
         If generated via System Engine fallback or AI is unconfigured, parses instantly.
         """
+        tier = get_effective_experience_tier(level, experience_level)
         # Fast path: If the quest log was generated deterministically or if AI is unconfigured, parse instantly
         if is_fallback or not self.is_configured() or '[SYSTEM]' in quest_log_markdown:
-            fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment, experience_level=experience_level)
+            fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment, experience_level=experience_level, level=level)
             return {'success': True, 'days': fallback_days, 'fallback_used': True}
 
         if self.is_configured():
@@ -336,16 +343,16 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
 
                     days = parsed.get('days', [])
                     if len(days) == 7:
-                        # Ensure exercises match experience level
+                        # Ensure exercises match experience tier
                         for d in days:
                             if not d.get('is_rest') and 'exercises' in d:
-                                d['exercises'] = [regress_exercise_for_experience(ex, experience_level) for ex in d['exercises']]
+                                d['exercises'] = [regress_exercise_for_experience(ex, tier) for ex in d['exercises']]
                         return {'success': True, 'days': days, 'fallback_used': False}
             except Exception as e:
                 print(f"[WARN] Gemini JSON structuring failed ({e}), falling back to deterministic parser.")
 
         # Deterministic markdown parsing fallback (guarantees a 7-day split is always built)
-        fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment, experience_level=experience_level)
+        fallback_days = parse_weekly_plan_from_markdown(quest_log_markdown, target_name, equipment=equipment, experience_level=experience_level, level=level)
         return {'success': True, 'days': fallback_days, 'fallback_used': True}
 
     def adapt_physique_quest_to_equipment(self, user_id: int, active_quest: Dict,
@@ -360,6 +367,7 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
         current_body_type = user_stats.get('body_type', 'mesomorph')
         injuries = user_stats.get('injuries', 'None')
         experience_level = user_stats.get('experience_level', 'beginner')
+        user_level = user_stats.get('level', 1)
         
         adapted_markdown = None
         structured_days = None
@@ -373,7 +381,8 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
                     current_body_type=current_body_type,
                     injuries=injuries,
                     equipment=new_equipment,
-                    experience_level=experience_level
+                    experience_level=experience_level,
+                    level=user_level
                 )
                 if res.get('success'):
                     adapted_markdown = res['quest_log_markdown']
@@ -381,7 +390,8 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
                         adapted_markdown,
                         target_name=target_name,
                         equipment=new_equipment,
-                        experience_level=experience_level
+                        experience_level=experience_level,
+                        level=user_level
                     )
                     if weekly_res.get('success'):
                         structured_days = weekly_res.get('days')
@@ -391,7 +401,7 @@ If the source plan doesn't specify all 7 days explicitly, infer reasonable rest/
         # 2. Deterministic character adapter fallback
         if not structured_days:
             adapted_markdown, structured_days = generate_character_equipment_split(
-                target_name, new_equipment, current_body_type, injuries, experience_level=experience_level
+                target_name, new_equipment, current_body_type, injuries, experience_level=experience_level, level=user_level
             )
 
         # 3. Save to database
@@ -734,77 +744,139 @@ def extract_section(markdown_text: str, header: str) -> str:
     return '\n'.join(section_lines).strip()
 
 
-def regress_exercise_for_experience(ex: dict, experience_level: str = "beginner") -> dict:
+def get_effective_experience_tier(level: int = 1, base_experience_level: str = "beginner") -> str:
     """
-    Ensure exercises match the user's experience level.
-    If the user is a BEGINNER (0-6 months):
-    Regress all elite gymnastics / extreme calisthenics / heavy 1RM powerlifting
-    into accessible, safe, progressive foundations with appropriate volume (3 sets).
+    Gradually scales the user's workout difficulty tier based on Level and Hunter Rank progression:
+    - Stage 1 (Level 1-5 • E-Rank): 'beginner' -> Foundations (Assisted pulls, regular push-ups, air squats, planks, 3 sets)
+    - Stage 2 (Level 6-15 • D-Rank): 'intermediate_entry' -> Progressive skills (Strict pull-ups, parallel bar dips, pike push-ups, 3-4 sets)
+    - Stage 3 (Level 16-35 • C/B-Rank): 'intermediate_advanced' -> Advanced strength (L-sit chin-ups, decline/diamond push-ups, jump squats, 4 sets)
+    - Stage 4 (Level 36+ • A/S-Rank): 'advanced' -> Elite Mastery (Muscle-ups, handstand push-ups, dragon flags, pistol squats, 4-5 sets)
     """
-    if not ex or not experience_level or str(experience_level).lower().strip() != 'beginner':
+    base = str(base_experience_level or 'beginner').lower().strip()
+    try:
+        lvl = max(1, int(level or 1))
+    except (TypeError, ValueError):
+        lvl = 1
+        
+    if base == 'advanced':
+        return 'advanced'
+        
+    if base == 'intermediate':
+        if lvl >= 36:
+            return 'advanced'
+        elif lvl >= 16:
+            return 'intermediate_advanced'
+        return 'intermediate_entry'
+        
+    # base is 'beginner'
+    if lvl >= 36:
+        return 'advanced'
+    elif lvl >= 16:
+        return 'intermediate_advanced'
+    elif lvl >= 6:
+        return 'intermediate_entry'
+    
+    return 'beginner'
+
+
+def regress_exercise_for_experience(ex: dict, experience_tier: str = "beginner") -> dict:
+    """
+    Ensure exercises gradually scale and match the user's progression tier:
+    - 'beginner' (Stage 1 • Lv 1-5): Accessible foundations, 3 sets.
+    - 'intermediate_entry' (Stage 2 • Lv 6-15): Strict pull-ups, dips, elevated pike presses, 3-4 sets.
+    - 'intermediate_advanced' (Stage 3 • Lv 16-35): L-sit pulls, wall handstand pushups, tuck dragon flags, 4 sets.
+    - 'advanced' (Stage 4 • Lv 36+): Full elite gymnastics & heavy overloads, 4-5 sets.
+    """
+    if not ex:
         return ex
         
+    tier = str(experience_tier or 'beginner').lower().strip()
+    if tier == 'advanced':
+        return ex
+
     name = ex.get('name', '')
     name_lower = name.lower()
     notes = ex.get('notes', '')
-    sets = min(ex.get('sets', 3), 3)  # Cap starting volume to 3 sets for beginners
+    raw_sets = ex.get('sets', 3)
     reps = ex.get('reps', '10-12')
-    rest = max(ex.get('rest_seconds', 60), 60)  # Ensure adequate rest
+    rest = max(ex.get('rest_seconds', 60), 60)
 
-    # Calisthenics Upper Pull Regressions
-    if 'muscle-up' in name_lower or 'muscle up' in name_lower:
-        return {'name': 'Band-Assisted Pull-ups / Negative Pull-ups', 'sets': sets, 'reps': '6-8', 'rest_seconds': 75, 'notes': 'Controlled 3s descent to build vertical pulling base safely'}
-    elif 'typewriter' in name_lower or 'high-pull' in name_lower or 'high bar pull' in name_lower:
-        return {'name': 'Incline Bodyweight Rows / Towel Rows', 'sets': sets, 'reps': '10', 'rest_seconds': 60, 'notes': 'Horizontal pulling foundation for back thickness'}
-    elif 'dragon flag' in name_lower or 'dragon flags' in name_lower:
-        return {'name': 'Lying Leg Tucks / Hollow Body Hold', 'sets': sets, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Safe abdominal brace without lumbar strain'}
-    elif 'l-sit' in name_lower or 'windshield wiper' in name_lower:
-        return {'name': 'Seated Knee Tucks / Deadbugs', 'sets': sets, 'reps': '12', 'rest_seconds': 45, 'notes': 'Core stabilization and hip flexor control'}
-    
-    # Calisthenics Upper Push Regressions
-    elif 'handstand' in name_lower:
-        return {'name': 'Pike Push-ups (Feet on Floor)', 'sets': sets, 'reps': '8-10', 'rest_seconds': 60, 'notes': 'Accessible overhead pressing angle with floor support'}
-    elif 'planche' in name_lower or 'clap push-up' in name_lower or 'knuckle push-up' in name_lower or 'archer push-up' in name_lower:
-        return {'name': 'Standard / Incline Push-ups', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Focus on perfect chest-to-deck form and core tension'}
-    elif 'straight bar dip' in name_lower or 'weighted dip' in name_lower or 'deep parallel bar dip' in name_lower:
-        return {'name': 'Bench / Chair Supported Dips', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Controlled tricep lockout with feet flat on floor'}
+    # ----------------------------------------------------
+    # TIER 1: BEGINNER (Stage 1 • Lv 1-5 • E-Rank)
+    # ----------------------------------------------------
+    if tier == 'beginner':
+        sets = min(raw_sets, 3)
+        if 'muscle-up' in name_lower or 'muscle up' in name_lower:
+            return {'name': 'Band-Assisted Pull-ups / Negative Pull-ups', 'sets': sets, 'reps': '6-8', 'rest_seconds': 75, 'notes': 'Stage 1: Build vertical pulling base safely'}
+        elif 'typewriter' in name_lower or 'high-pull' in name_lower or 'high bar pull' in name_lower:
+            return {'name': 'Incline Bodyweight Rows / Towel Rows', 'sets': sets, 'reps': '10', 'rest_seconds': 60, 'notes': 'Stage 1: Horizontal pulling foundation for back thickness'}
+        elif 'dragon flag' in name_lower or 'dragon flags' in name_lower:
+            return {'name': 'Lying Leg Tucks / Hollow Body Hold', 'sets': sets, 'reps': '30 sec', 'rest_seconds': 45, 'notes': 'Stage 1: Safe abdominal brace without lumbar strain'}
+        elif 'l-sit' in name_lower or 'windshield wiper' in name_lower:
+            return {'name': 'Seated Knee Tucks / Deadbugs', 'sets': sets, 'reps': '12', 'rest_seconds': 45, 'notes': 'Stage 1: Core stabilization and hip flexor control'}
+        elif 'handstand' in name_lower:
+            return {'name': 'Pike Push-ups (Feet on Floor)', 'sets': sets, 'reps': '8-10', 'rest_seconds': 60, 'notes': 'Stage 1: Accessible overhead pressing angle with floor support'}
+        elif 'planche' in name_lower or 'clap push-up' in name_lower or 'knuckle push-up' in name_lower or 'archer push-up' in name_lower:
+            return {'name': 'Standard / Incline Push-ups', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Stage 1: Focus on perfect chest-to-deck form and core tension'}
+        elif 'straight bar dip' in name_lower or 'weighted dip' in name_lower or 'deep parallel bar dip' in name_lower:
+            return {'name': 'Bench / Chair Supported Dips', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Stage 1: Controlled tricep lockout with feet flat on floor'}
+        elif 'pistol squat' in name_lower or 'shrimp squat' in name_lower or 'sissy squat' in name_lower:
+            return {'name': 'Bodyweight Air Squats / Assisted Split Squats', 'sets': sets, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Stage 1: Full depth squat mechanics and knee tracking'}
+        elif 'jump squat' in name_lower or 'tuck jump' in name_lower or 'high jump' in name_lower or 'burpees to pull-up' in name_lower:
+            return {'name': 'Bodyweight Squats (Tempo 3s descent)', 'sets': sets, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Stage 1: Controlled eccentric quad burn without heavy joint impact'}
+        elif 'heavy barbell deadlift' in name_lower or '1rm' in name_lower or 'barbell deadlift' in name_lower:
+            return {'name': 'Dumbbell Romanian Deadlifts (Light/Moderate)', 'sets': sets, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Stage 1: Master hip hinge mechanics and hamstring stretch'}
+        elif 'overhead barbell press' in name_lower or 'behind the neck' in name_lower:
+            return {'name': 'Seated Dumbbell Shoulder Press', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Stage 1: Comfortable natural pressing arc for shoulder safety'}
+        elif 'barbell back squat' in name_lower:
+            return {'name': 'Dumbbell Goblet Squats / Leg Press Machine', 'sets': sets, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Stage 1: Upright posture and controlled quad load'}
+        elif 'close-grip bench press' in name_lower:
+            return {'name': 'Cable Tricep Pushdowns / Push-ups', 'sets': sets, 'reps': '12', 'rest_seconds': 60, 'notes': 'Stage 1: Direct tricep isolation with zero wrist strain'}
+        elif 'snatch' in name_lower or 'renegade row' in name_lower:
+            return {'name': 'Dumbbell Bent-Over Supported Rows', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Stage 1: Stable back loading with chest support'}
+        elif 'thruster' in name_lower:
+            return {'name': 'Dumbbell Goblet Squats to Press (Light)', 'sets': sets, 'reps': '10', 'rest_seconds': 60, 'notes': 'Stage 1: Fluid full body coordination with light load'}
+        return {'name': name, 'sets': sets, 'reps': reps, 'rest_seconds': rest, 'notes': notes}
 
-    # Calisthenics Lower Body Regressions
-    elif 'pistol squat' in name_lower or 'shrimp squat' in name_lower or 'sissy squat' in name_lower:
-        return {'name': 'Bodyweight Air Squats / Assisted Split Squats', 'sets': sets, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Full depth squat mechanics and knee tracking'}
-    elif 'jump squat' in name_lower or 'tuck jump' in name_lower or 'high jump' in name_lower or 'burpees to pull-up' in name_lower:
-        return {'name': 'Bodyweight Squats (Tempo 3s descent)', 'sets': sets, 'reps': '12-15', 'rest_seconds': 60, 'notes': 'Controlled eccentric quad burn without heavy joint impact'}
+    # ----------------------------------------------------
+    # TIER 2: INTERMEDIATE ENTRY (Stage 2 • Lv 6-15 • D-Rank)
+    # ----------------------------------------------------
+    if tier == 'intermediate_entry':
+        sets = min(raw_sets, 4)
+        if 'muscle-up' in name_lower or 'muscle up' in name_lower:
+            return {'name': 'Strict Pull-ups & Straight Bar Dips', 'sets': sets, 'reps': '8', 'rest_seconds': 75, 'notes': 'Stage 2: Transition strength for bar mastery'}
+        elif 'dragon flag' in name_lower or 'dragon flags' in name_lower:
+            return {'name': 'Hanging Knee Raises / L-Sit Tucks', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Stage 2: Core compression and abdominal armor'}
+        elif 'handstand' in name_lower:
+            return {'name': 'Elevated Pike Push-ups (Feet on Bench)', 'sets': sets, 'reps': '8-10', 'rest_seconds': 75, 'notes': 'Stage 2: Elevated shoulder pressing progression'}
+        elif 'pistol squat' in name_lower or 'shrimp squat' in name_lower:
+            return {'name': 'Bulgarian Split Squats (Bodyweight/Light DB)', 'sets': sets, 'reps': '10 per leg', 'rest_seconds': 60, 'notes': 'Stage 2: Unilateral leg power and stabilization'}
+        return {'name': name, 'sets': sets, 'reps': reps, 'rest_seconds': rest, 'notes': notes}
 
-    # Gym / Heavy Compound Regressions
-    elif 'heavy barbell deadlift' in name_lower or '1rm' in name_lower or 'barbell deadlift' in name_lower:
-        return {'name': 'Dumbbell Romanian Deadlifts (Light/Moderate)', 'sets': sets, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Master hip hinge mechanics and hamstring stretch'}
-    elif 'overhead barbell press' in name_lower or 'behind the neck' in name_lower:
-        return {'name': 'Seated Dumbbell Shoulder Press', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Comfortable natural pressing arc for shoulder safety'}
-    elif 'barbell back squat' in name_lower:
-        return {'name': 'Dumbbell Goblet Squats / Leg Press Machine', 'sets': sets, 'reps': '10-12', 'rest_seconds': 75, 'notes': 'Upright posture and controlled quad load'}
-    elif 'close-grip bench press' in name_lower:
-        return {'name': 'Cable Tricep Pushdowns / Push-ups', 'sets': sets, 'reps': '12', 'rest_seconds': 60, 'notes': 'Direct tricep isolation with zero wrist strain'}
+    # ----------------------------------------------------
+    # TIER 3: INTERMEDIATE ADVANCED (Stage 3 • Lv 16-35 • C/B-Rank)
+    # ----------------------------------------------------
+    if tier == 'intermediate_advanced':
+        sets = min(raw_sets, 4)
+        if 'muscle-up' in name_lower or 'muscle up' in name_lower:
+            return {'name': 'High-Pull Pull-ups to Sternum', 'sets': sets, 'reps': '6', 'rest_seconds': 90, 'notes': 'Stage 3: Explosive vertical pulling velocity'}
+        elif 'dragon flag' in name_lower or 'dragon flags' in name_lower:
+            return {'name': 'Tuck Dragon Flags / Hanging Leg Raises', 'sets': sets, 'reps': '8', 'rest_seconds': 60, 'notes': 'Stage 3: Advanced gymnastic core compression'}
+        elif 'handstand' in name_lower:
+            return {'name': 'Wall-Supported Handstand Push-ups', 'sets': sets, 'reps': '6', 'rest_seconds': 90, 'notes': 'Stage 3: Inversion shoulder strength against wall'}
+        elif 'pistol squat' in name_lower:
+            return {'name': 'Box Pistol Squats / Single-Leg Squats', 'sets': sets, 'reps': '8 per leg', 'rest_seconds': 60, 'notes': 'Stage 3: Deep single-leg balance and drive'}
+        return {'name': name, 'sets': sets, 'reps': reps, 'rest_seconds': rest, 'notes': notes}
 
-    # Dumbbell Regressions
-    elif 'snatch' in name_lower or 'renegade row' in name_lower:
-        return {'name': 'Dumbbell Bent-Over Supported Rows', 'sets': sets, 'reps': '10-12', 'rest_seconds': 60, 'notes': 'Stable back loading with chest support'}
-    elif 'thruster' in name_lower:
-        return {'name': 'Dumbbell Goblet Squats to Press (Light)', 'sets': sets, 'reps': '10', 'rest_seconds': 60, 'notes': 'Fluid full body coordination with light load'}
-
-    return {
-        'name': name,
-        'sets': sets,
-        'reps': reps,
-        'rest_seconds': rest,
-        'notes': notes
-    }
+    return {'name': name, 'sets': raw_sets, 'reps': reps, 'rest_seconds': rest, 'notes': notes}
 
 
-def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym", experience_level: str = "beginner") -> list:
+def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Optional[str] = None, equipment: str = "Full Commercial Gym", experience_level: str = "beginner", level: int = 1) -> list:
     """
     Deterministically extracts and structures a 7-day training split
-    (Monday through Sunday) respecting the player's equipment access.
+    (Monday through Sunday) respecting the player's equipment access and level progression.
     """
+    tier = get_effective_experience_tier(level, experience_level)
     import re
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     main_section = extract_section(quest_log_markdown, 'Main Story Quests')
@@ -896,13 +968,14 @@ def parse_weekly_plan_from_markdown(quest_log_markdown: str, target_name: Option
     return days
 
 
-def generate_character_equipment_split(target_name: str, equipment: str, body_type: str = "mesomorph", injuries: str = "None", experience_level: str = "beginner") -> tuple:
+def generate_character_equipment_split(target_name: str, equipment: str, body_type: str = "mesomorph", injuries: str = "None", experience_level: str = "beginner", level: int = 1) -> tuple:
     """
     Generates an authentic character training split and gamified Quest Log markdown
     adapted strictly to the specified equipment access (Home, Dumbbells, Gym) and experience level.
     Includes rich themed splits for legendary physiques (Goku, Jin-Woo, Baki, Toji,
     Saitama, Garou, Vegeta, Zoro, Levi, Batman, etc.) and a smart dynamic archetype builder for any custom target.
     """
+    tier = get_effective_experience_tier(level, experience_level)
     t_name = target_name or "Shadow Hunter"
     t_lower = t_name.lower()
     eq = (equipment or "Full Commercial Gym").lower()
@@ -1609,11 +1682,11 @@ def generate_character_equipment_split(target_name: str, equipment: str, body_ty
                 {'focus': f"🛌 {t_name}: Full Recovery Rest Day", 'is_rest': True, 'exercises': []}
             ]
 
-    # Structure all 7 days with day_of_week indices, ensuring exercise difficulty matches experience level
+    # Structure all 7 days with day_of_week indices, ensuring exercise difficulty matches experience tier
     structured_days = []
     for idx, day_info in enumerate(split_days[:7]):
         raw_exercises = day_info.get('exercises', [])
-        regressed_exercises = [regress_exercise_for_experience(ex, experience_level) for ex in raw_exercises]
+        regressed_exercises = [regress_exercise_for_experience(ex, tier) for ex in raw_exercises]
         structured_days.append({
             'day_of_week': idx,
             'day_label': day_names[idx],

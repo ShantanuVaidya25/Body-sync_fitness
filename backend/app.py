@@ -115,6 +115,39 @@ def get_rank_from_level(level) -> str:
     return 'E-Rank Hunter'
 
 
+def check_and_apply_stage_advancement(user_id: int, new_level: int) -> dict:
+    """
+    When a hunter levels up across a difficulty stage boundary (e.g. Lv 6, 16, 36),
+    automatically adapt and evolve their active character workout split to unlock
+    the next stage's progression exercises!
+    """
+    try:
+        from physique_analyzer import get_effective_experience_tier, analyzer
+        user_stats = stats_manager.get_player_stats(user_id)
+        if not user_stats:
+            return {'advanced': False}
+        base_exp = user_stats.get('experience_level', 'beginner')
+        old_level = max(1, new_level - 1)
+        old_tier = get_effective_experience_tier(old_level, base_exp)
+        new_tier = get_effective_experience_tier(new_level, base_exp)
+        
+        if old_tier != new_tier:
+            active_quest = quest_generator.get_active_physique_quest(user_id)
+            if active_quest:
+                analyzer.adapt_physique_quest_to_equipment(
+                    user_id=user_id,
+                    active_quest=active_quest,
+                    new_equipment=user_stats.get('equipment', 'Full Commercial Gym'),
+                    user_stats=user_stats,
+                    db=db
+                )
+                print(f"⚡ [SYSTEM] Hunter {user_id} advanced to {new_tier.upper()} (Lv {new_level})! Weekly split evolved.")
+                return {'advanced': True, 'old_tier': old_tier, 'new_tier': new_tier}
+    except Exception as e:
+        print(f"⚠️ [WARN] Error evolving weekly split on level up: {e}")
+    return {'advanced': False}
+
+
 # Authentication decorator
 def login_required(f):
     @wraps(f)
@@ -128,6 +161,64 @@ def login_required(f):
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
+
+@app.route('/api/player/progression-tier', methods=['GET'])
+@login_required
+def get_progression_tier():
+    user_id = session['user_id']
+    user_stats = stats_manager.get_player_stats(user_id) or {}
+    level = user_stats.get('level', 1)
+    base_exp = user_stats.get('experience_level', 'beginner')
+    
+    from physique_analyzer import get_effective_experience_tier
+    current_tier = get_effective_experience_tier(level, base_exp)
+    
+    tiers_info = [
+        {
+            'stage': 1,
+            'key': 'beginner',
+            'label': 'Stage 1: Foundations (E-Rank)',
+            'level_req': 'Lv 1–5',
+            'skills': 'Assisted Pulls, Incline Push-ups, Air Squats (3 sets)',
+            'unlocked': True,
+            'is_current': current_tier == 'beginner'
+        },
+        {
+            'stage': 2,
+            'key': 'intermediate_entry',
+            'label': 'Stage 2: Apprentice (D-Rank)',
+            'level_req': 'Lv 6–15',
+            'skills': 'Strict Pull-ups, Parallel Bar Dips, Pike Presses (3–4 sets)',
+            'unlocked': level >= 6 or base_exp in ['intermediate', 'advanced'],
+            'is_current': current_tier == 'intermediate_entry'
+        },
+        {
+            'stage': 3,
+            'key': 'intermediate_advanced',
+            'label': 'Stage 3: Adept (C/B-Rank)',
+            'level_req': 'Lv 16–35',
+            'skills': 'L-Sit Chin-ups, Tuck Dragon Flags, Jump Squats (4 sets)',
+            'unlocked': level >= 16 or base_exp == 'advanced',
+            'is_current': current_tier == 'intermediate_advanced'
+        },
+        {
+            'stage': 4,
+            'key': 'advanced',
+            'label': 'Stage 4: Shadow Monarch (A/S-Rank)',
+            'level_req': 'Lv 36+',
+            'skills': 'Muscle-Ups, Handstand Push-ups, Dragon Flags, Pistol Squats (4–5 sets)',
+            'unlocked': level >= 36 or base_exp == 'advanced',
+            'is_current': current_tier == 'advanced'
+        }
+    ]
+    
+    return jsonify({
+        'success': True,
+        'level': level,
+        'base_experience_level': base_exp,
+        'current_tier': current_tier,
+        'tiers': tiers_info
+    })
 
 @app.after_request
 def add_header(response):
@@ -932,6 +1023,11 @@ def log_set_completion():
             exp_gained = added_count * set_exp
             if exp_gained > 0:
                 level_result = stats_manager.add_exp(user_id, exp_gained)
+                if level_result.get('leveled_up'):
+                    stage_res = check_and_apply_stage_advancement(user_id, level_result['new_level'])
+                    if stage_res.get('advanced'):
+                        level_result['stage_advanced'] = True
+                        level_result['new_tier'] = stage_res['new_tier']
         else:  # uncompleted
             removed_count = len(completed_sets)
             completed_sets = set()
@@ -969,6 +1065,11 @@ def log_set_completion():
             completed_sets.add(set_key)
             exp_gained = set_exp
             level_result = stats_manager.add_exp(user_id, set_exp)
+            if level_result.get('leveled_up'):
+                stage_res = check_and_apply_stage_advancement(user_id, level_result['new_level'])
+                if stage_res.get('advanced'):
+                    level_result['stage_advanced'] = True
+                    level_result['new_tier'] = stage_res['new_tier']
     else:  # uncompleted
         if set_key in completed_sets:
             completed_sets.remove(set_key)
@@ -1043,7 +1144,12 @@ def complete_quest():
             print(f"✅ Quest completed!")
             print(f"   EXP gained: {result.get('exp_gained', 0)}")
             if result.get('level_result') and result['level_result'].get('leveled_up'):
-                print(f"   🎉 LEVEL UP! New level: {result['level_result']['new_level']}")
+                new_lvl = result['level_result']['new_level']
+                print(f"   🎉 LEVEL UP! New level: {new_lvl}")
+                stage_res = check_and_apply_stage_advancement(user_id, new_lvl)
+                if stage_res.get('advanced'):
+                    result['level_result']['stage_advanced'] = True
+                    result['level_result']['new_tier'] = stage_res['new_tier']
             return jsonify(result)
         else:
             return jsonify(result), 400
@@ -1340,6 +1446,7 @@ def analyze_physique():
     user_injuries = user_stats.get('injuries', 'None')
     user_equipment = user_stats.get('equipment', 'Full Commercial Gym')
     user_experience = user_stats.get('experience_level', 'beginner')
+    user_level = user_stats.get('level', 1)
 
     try:
         result = analyzer.generate_quest_log(
@@ -1348,7 +1455,8 @@ def analyze_physique():
             current_body_type=user_body_type,
             injuries=user_injuries,
             equipment=user_equipment,
-            experience_level=user_experience
+            experience_level=user_experience,
+            level=user_level
         )
         
         if not result.get('success'):
@@ -1384,7 +1492,8 @@ def analyze_physique():
             target_name=result.get('target_name'),
             equipment=user_equipment,
             is_fallback=is_fb,
-            experience_level=user_experience
+            experience_level=user_experience,
+            level=user_level
         )
         if weekly_result.get('success'):
             weekly_plan_manager.save_weekly_plan(user_id, physique_quest_id, weekly_result['days'])
