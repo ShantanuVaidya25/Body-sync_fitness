@@ -155,7 +155,12 @@ class AIQuestGenerator:
             return self.exercise_pools['gym']
     
     def calculate_difficulty_level(self, user_id: int) -> int:
-        """Calculate user's current difficulty level based on stats and history"""
+        """
+        Calculate user's current difficulty level dynamically based on:
+        1. Current Hunter Level (EXP progression)
+        2. Total Allocated Stats (STR, END, AGI, VIT)
+        3. Baseline Exercise Maximums (Recorded during setup or logged PRs)
+        """
         from models import PlayerStats, ExerciseManager
         
         stats_manager = PlayerStats(self.db)
@@ -167,18 +172,42 @@ class AIQuestGenerator:
         if not stats:
             return 1
         
-        # Base difficulty on level
-        base_difficulty = stats['level']
+        # 1. Base difficulty on Hunter Level
+        base_difficulty = stats.get('level', 1)
         
-        # Adjust based on stat total
-        stat_total = (stats['strength'] + stats['endurance'] + 
-                     stats['agility'] + stats['vitality'])
-        stat_modifier = stat_total // 50  # +1 difficulty per 50 total stats
+        # 2. Adjust based on allocated stat total (+1 per 25 stats above baseline)
+        stat_total = (stats.get('strength', 10) + stats.get('endurance', 10) + 
+                     stats.get('agility', 10) + stats.get('vitality', 10))
+        stat_modifier = max(0, (stat_total - 40) // 25)
         
-        # Adjust based on exercise mastery
-        mastery_modifier = len([e for e in exercises if e['personal_record'] > 50]) // 5
-        
-        return min(base_difficulty + stat_modifier + mastery_modifier, 100)
+        # 3. Adjust based on user's recorded exercise maxes (from setup or ongoing PRs)
+        max_modifier = 0
+        for e in exercises:
+            name_lower = (e.get('exercise_name') or '').lower()
+            pr = e.get('personal_record') or e.get('max_reps') or 0
+            
+            # Pulling capabilities
+            if 'pull' in name_lower or 'chin' in name_lower:
+                if pr >= 15: max_modifier += 3
+                elif pr >= 8: max_modifier += 2
+                elif pr >= 3: max_modifier += 1
+            # Pushing capabilities
+            elif 'push' in name_lower or 'dip' in name_lower or 'bench' in name_lower:
+                if pr >= 35: max_modifier += 3
+                elif pr >= 20: max_modifier += 2
+                elif pr >= 10: max_modifier += 1
+            # Leg capabilities
+            elif 'squat' in name_lower or 'lunge' in name_lower:
+                if pr >= 40: max_modifier += 2
+                elif pr >= 20: max_modifier += 1
+            # Core / Ab capabilities
+            elif 'sit' in name_lower or 'plank' in name_lower or 'ab' in name_lower or 'crunch' in name_lower:
+                if pr >= 35: max_modifier += 1
+            # Running / Cardio capabilities
+            elif 'run' in name_lower or 'jog' in name_lower:
+                if pr >= 20: max_modifier += 1
+
+        return min(base_difficulty + stat_modifier + max_modifier, 100)
     
     def generate_daily_quest(self, user_id: int, goals: List[Dict],
                             primary_focus_areas: List[str] = None) -> Dict:
@@ -358,6 +387,9 @@ class AIQuestGenerator:
         training split into the same quest schema the rest of the app uses,
         so it renders and completes identically to an algorithmic quest.
         """
+        from models import ExerciseManager
+        exercise_manager = ExerciseManager(self.db)
+        
         active_physique = self.get_active_physique_quest(user_id)
         target_name = active_physique.get('target_name') if active_physique else None
         
@@ -379,6 +411,13 @@ class AIQuestGenerator:
             reps_str = str(ex.get('reps', '10')).strip()
             digits = ''.join(c for c in reps_str.split('-')[0] if c.isdigit())
             parsed_val = int(digits) if digits else 10
+            
+            # Calibrate working set rep targets based on user's recorded max capability (70-80% working load)
+            matched_rec = exercise_manager.get_exercise_by_name(user_id, ex.get('name', ''))
+            if matched_rec:
+                user_max = matched_rec.get('personal_record') or matched_rec.get('max_reps') or 0
+                if user_max > 0:
+                    parsed_val = max(parsed_val, int(user_max * 0.75))
             
             target_reps = parsed_val if category != 'flexibility' else None
             target_duration = parsed_val if category == 'flexibility' else None
