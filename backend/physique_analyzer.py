@@ -150,7 +150,8 @@ class PhysiqueAnalyzer:
                          injuries: Optional[str] = None,
                          equipment: Optional[str] = None,
                          experience_level: Optional[str] = "beginner",
-                         level: int = 1) -> list:
+                         level: int = 1,
+                         desired_description: Optional[str] = None) -> list:
         """Build the multimodal contents list: optional image + text prompt"""
         if target_name:
             target_desc = target_name
@@ -158,6 +159,9 @@ class PhysiqueAnalyzer:
             target_desc = "the person shown in the attached image"
 
         prompt_text = MASTER_PROMPT_TEMPLATE.format(target=target_desc)
+
+        if desired_description:
+            prompt_text += f"\n\nUSER'S SPECIFIC DESIRED PHYSIQUE / ADJUSTMENTS: **{desired_description}**. You MUST tailor the plan to achieve this specific goal, modifying the {target_desc} baseline if the user requested different proportions, limits, or variations."
 
         if experience_level:
             tier = get_effective_experience_tier(level, experience_level)
@@ -201,7 +205,8 @@ class PhysiqueAnalyzer:
                           injuries: Optional[str] = None,
                           equipment: Optional[str] = None,
                           experience_level: Optional[str] = "beginner",
-                          level: int = 1) -> Dict:
+                          level: int = 1,
+                          desired_description: Optional[str] = None) -> Dict:
         """
         Generate a Quest Log by analyzing a named character/person or an
         uploaded photo. Uses resilient Gemini AI model cascading with instant
@@ -225,7 +230,8 @@ class PhysiqueAnalyzer:
                     injuries=injuries,
                     equipment=equipment,
                     experience_level=experience_level,
-                    level=level
+                    level=level,
+                    desired_description=desired_description
                 )
                 quest_log_markdown, generation_error = self._generate_content_resilient(contents)
             except Exception as e:

@@ -2580,6 +2580,11 @@ async function analyzePhysique() {
         formData.append('image', selectedPhysiqueImage);
     }
     
+    const desiredDescription = document.getElementById('physique-desired-description').value.trim();
+    if (desiredDescription) {
+        formData.append('desired_description', desiredDescription);
+    }
+    
     document.getElementById('physique-loading').style.display = 'block';
     document.getElementById('physique-result-card').style.display = 'none';
     document.getElementById('analyze-btn').disabled = true;

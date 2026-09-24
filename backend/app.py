@@ -1421,6 +1421,7 @@ def analyze_physique():
     analyzer = get_analyzer_for_user(user_id)
     
     target_name = request.form.get('target_name', '').strip() or None
+    desired_description = request.form.get('desired_description', '').strip() or None
     image_file = request.files.get('image')
     image_path = None
     saved_filename = None
@@ -1457,7 +1458,8 @@ def analyze_physique():
             injuries=user_injuries,
             equipment=user_equipment,
             experience_level=user_experience,
-            level=user_level
+            level=user_level,
+            desired_description=desired_description
         )
         
         if not result.get('success'):
