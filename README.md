@@ -91,7 +91,7 @@ this combination. You can update your objective path anytime via the
 ## 🎭 "BECOME LIKE..." — AI PHYSIQUE ANALYZER
 
 A standout feature: name an anime character or real person (or upload a 
-reference photo), and Claude acts as a **Master Fitness RPG Game Master** to:
+reference photo), and Gemini 2.5 acts as a **Master Fitness RPG Game Master** to:
 
 1. **Analyze the physique** — dominant muscle groups, body-fat style 
    (lean/bulky/athletic), and the training approach needed.
@@ -103,33 +103,33 @@ reference photo), and Claude acts as a **Master Fitness RPG Game Master** to:
 
 ### Setup Required
 
-This feature calls the Anthropic API and needs your own API key:
+This feature calls the Google Gemini API and needs your own API key:
 
-1. Get a key at **https://console.anthropic.com/**
+1. Get a key at **https://aistudio.google.com/app/apikey**
 2. Set it as an environment variable before starting the server:
 
    **Mac/Linux:**
    ```bash
-   export ANTHROPIC_API_KEY="your-key-here"
+   export GEMINI_API_KEY="your-key-here"
    cd backend
    python app.py
    ```
 
    **Windows (Command Prompt):**
    ```cmd
-   set ANTHROPIC_API_KEY=your-key-here
+   set GEMINI_API_KEY=your-key-here
    cd backend
    python app.py
    ```
 
    **Windows (PowerShell):**
    ```powershell
-   $env:ANTHROPIC_API_KEY="your-key-here"
+   $env:GEMINI_API_KEY="your-key-here"
    cd backend
    python app.py
    ```
 
-3. Install the SDK (already in requirements.txt): `pip install anthropic`
+3. Install the SDK (already in requirements.txt): `pip install google-generativeai`
 
 Without the key, the rest of the app works normally — you'll just see a 
 warning banner on the "Become Like..." tab until it's configured.
@@ -137,7 +137,7 @@ warning banner on the "Become Like..." tab until it's configured.
 ### How It Works
 
 - **Name mode**: Type any character or public figure's name. The prompt is 
-  sent as text to Claude.
+  sent as text to Gemini.
 - **Photo mode**: Upload a JPG/PNG/WEBP reference photo. It's sent as an 
   image alongside the same structured prompt, so the physique analysis is 
   grounded in the actual photo rather than a name lookup.
