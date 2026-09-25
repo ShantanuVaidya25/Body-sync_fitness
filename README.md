@@ -53,6 +53,17 @@ Transform your fitness journey into an epic RPG adventure! Level up, gain stats,
 - **Target Goals**: Set and track target measurements
 - **Weekly Updates**: Regular check-ins to monitor progress
 
+#### 8. **Advanced Equipment & Progression Scaling**
+- **Dynamic Equipment Adaptation**: AI adjusts quests based on available gear (Bodyweight, Dumbbells, Full Gym).
+- **Baseline Integration**: Difficulty scaling and target reps automatically align with your recorded exercise maximums.
+- **Stage Advancements**: Your workout split dynamically evolves as you level up through different hunter tiers.
+
+#### 9. **Multiple AI Providers**
+- **Claude & Gemini Support**: The AI Physique analyzer can be powered by either Anthropic's Claude or Google's Gemini, with server-wide fallback keys supported.
+
+#### 10. **Remote Database Ready**
+- **Turso / libSQL Integration**: Out-of-the-box support for Turso remote databases via `libsql` alongside the default local SQLite.
+
 ---
 
 ## 🎯 PRIMARY OBJECTIVE PATH (Multi-Select Goals)
