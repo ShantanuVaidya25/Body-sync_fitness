@@ -53,6 +53,12 @@ Transform your fitness journey into an epic RPG adventure! Level up, gain stats,
 - **Target Goals**: Set and track target measurements
 - **Weekly Updates**: Regular check-ins to monitor progress
 
+#### 8. **Dynamic Progression & Equipment Adaptation**
+- **Stage Advancements**: Evolve your weekly training split automatically as you level up and reach new tiers.
+- **Equipment Scaling**: AI seamlessly adapts your exercises depending on available gear (Bodyweight, Dumbbells, Full Gym).
+- **Penalty System**: Accountability mechanics for missed daily quests to keep you motivated.
+- **Custom Routines**: Build and manage your own workout splits alongside the AI's generation.
+
 ---
 
 ## 🎯 PRIMARY OBJECTIVE PATH (Multi-Select Goals)
