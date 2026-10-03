@@ -1519,6 +1519,40 @@ async function generateNewQuest() {
     }
 }
 
+async function increaseDifficulty() {
+    if (!currentQuest || currentQuest.completed) {
+        showToast('Cannot modify a completed quest');
+        return;
+    }
+    
+    if (!confirm('This will increase the reps and duration of today\\'s quest by 20% and add an extra set. Are you ready for a harder challenge?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/quest/increase-difficulty`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ quest_id: currentQuest.id })
+        });
+        const data = await response.json();
+        
+        if (response.ok && data.quest) {
+            currentQuest = data.quest;
+            displayFullQuest(currentQuest);
+            showToast('Quest difficulty increased! Time to push your limits. 💪');
+        } else {
+            showToast(data.error || 'Failed to increase difficulty');
+        }
+    } catch (error) {
+        console.error('Failed to increase difficulty:', error);
+        showToast('Error connecting to server.');
+    }
+}
+
 const BEST_EXERCISES_PER_GOAL = {
     'calisthenics': [
         { name: 'Muscle-Up Progressions', sets: 4, reps: '6-8', benefit: 'Explosive bar transition & full upper body pulling/pressing dominance' },

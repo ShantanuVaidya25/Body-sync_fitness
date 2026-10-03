@@ -882,6 +882,45 @@ class AIQuestGenerator:
         quest_id = self.save_daily_quest(user_id, quest)
         quest['id'] = quest_id
         return quest
+
+    def increase_quest_difficulty(self, user_id: int, quest_id: int) -> Dict:
+        """Increase the difficulty (reps/duration) of the current quest by 20%."""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM daily_quests WHERE id = ? AND user_id = ?', (quest_id, user_id))
+        quest_row = cursor.fetchone()
+        
+        if not quest_row or quest_row['completed']:
+            conn.close()
+            return None
+            
+        quest_data = json.loads(quest_row['quest_data'])
+        
+        # Increase exp reward
+        quest_data['exp_reward'] = int(quest_data.get('exp_reward', 50) * 1.2) + 20
+        quest_data['completion_bonus'] = int(quest_data.get('completion_bonus', 20) * 1.2) + 10
+        
+        # Increase each exercise target
+        for ex in quest_data.get('exercises', []):
+            if ex.get('target_reps'):
+                ex['target_reps'] = int(ex['target_reps'] * 1.2) + 2
+            if ex.get('target_duration_minutes'):
+                ex['target_duration_minutes'] = int(ex['target_duration_minutes'] * 1.2) + 1
+            if ex.get('sets'):
+                ex['sets'] += 1 # Add an extra set
+        
+        cursor.execute('''
+            UPDATE daily_quests
+            SET quest_data = ?, exp_reward = ?
+            WHERE id = ?
+        ''', (json.dumps(quest_data), quest_data['exp_reward'], quest_id))
+        conn.commit()
+        conn.close()
+        
+        quest_data['id'] = quest_row['id']
+        quest_data['completed'] = False
+        return quest_data
     
     def complete_quest(self, user_id: int, quest_id: int, 
                       exercise_completions: List[Dict]) -> Dict:

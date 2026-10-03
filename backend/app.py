@@ -952,6 +952,24 @@ def regenerate_quest():
     return jsonify({'success': True, 'quest': quest, 'message': 'New quest generated!'})
 
 
+@app.route('/api/quest/increase-difficulty', methods=['POST'])
+@login_required
+def increase_quest_difficulty():
+    """Increase difficulty of today's quest"""
+    user_id = session['user_id']
+    data = request.json or {}
+    quest_id = data.get('quest_id')
+    
+    if not quest_id:
+        return jsonify({'error': 'Quest ID required'}), 400
+        
+    quest = quest_generator.increase_quest_difficulty(user_id, quest_id)
+    if not quest:
+        return jsonify({'error': 'Quest not found or already completed'}), 404
+        
+    return jsonify({'success': True, 'quest': quest, 'message': 'Difficulty increased!'})
+
+
 @app.route('/api/quest/weekly-schedule', methods=['GET'])
 @login_required
 def get_weekly_schedule():
