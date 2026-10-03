@@ -1525,7 +1525,7 @@ async function increaseDifficulty() {
         return;
     }
     
-    if (!confirm('This will increase the reps and duration of today\\'s quest by 20% and add an extra set. Are you ready for a harder challenge?')) {
+    if (!confirm("This will increase the reps and duration of today's quest by 20% and add an extra set. Are you ready for a harder challenge?")) {
         return;
     }
     
