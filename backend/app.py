@@ -3,7 +3,7 @@ Body Sync Fitness - Flask Backend API (IMPROVED)
 Fixed quest generation with better error handling
 """
 
-from flask import Flask, request, jsonify, session, render_template
+from flask import Flask, request, jsonify, session, render_template, url_for, redirect
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from functools import wraps
@@ -16,6 +16,7 @@ import traceback
 import sqlite3
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from authlib.integrations.flask_client import OAuth
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -43,6 +44,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=31)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = False # Set to True in production with HTTPS
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024 # 5 MB max request size globally
 
 # CORS hardening (Restrict to specific origins)
 CORS(app, supports_credentials=True, origins=["http://localhost:5000", "http://127.0.0.1:5000"])
@@ -52,6 +54,14 @@ limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"]
+)
+
+# OAuth configuration for Google Login
+oauth = OAuth(app)
+oauth.register(
+    name='google',
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
 )
 # Initialize database
 db = Database()
@@ -291,6 +301,44 @@ def register():
     else:
         return jsonify({'error': 'Username or email already exists'}), 409
 
+
+
+@app.route('/api/auth/google/login')
+def google_login():
+    """Redirect to Google's OAuth consent screen"""
+    redirect_uri = url_for('google_callback', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route('/api/auth/google/callback')
+def google_callback():
+    """Handle Google OAuth callback, login or create user"""
+    try:
+        token = oauth.google.authorize_access_token()
+        user_info = token.get('userinfo')
+        if not user_info:
+            return redirect('/?error=google_auth_failed')
+            
+        email = user_info.get('email')
+        name = user_info.get('name', email.split('@')[0])
+        
+        # Check if user exists
+        user = user_manager.get_user_by_email(email)
+        if not user:
+            # Create new user without password (generate a random impossible password hash)
+            user_id = user_manager.create_user(name, email, str(uuid.uuid4()))
+            if not user_id:
+                return redirect('/?error=registration_failed')
+            user = user_manager.get_user_by_id(user_id)
+            
+        session.permanent = True
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        
+        return redirect('/') # redirect to dashboard
+    except Exception as e:
+        print(f"Google auth error: {e}")
+        return redirect('/?error=google_auth_failed')
 
 
 @app.route('/api/login', methods=['POST'])
@@ -1455,13 +1503,19 @@ def analyze_physique():
     
     target_name = request.form.get('target_name', '').strip() or None
     desired_description = request.form.get('desired_description', '').strip() or None
+    
     image_file = request.files.get('image')
     image_path = None
     saved_filename = None
+
+    user_image_file = request.files.get('user_image')
+    user_image_path = None
+    saved_user_filename = None
     
     print(f"\n🎭 Physique analysis request from {username}")
     print(f"   Target name: {target_name}")
     print(f"   Image uploaded: {image_file is not None and image_file.filename}")
+    print(f"   User image uploaded: {user_image_file is not None and user_image_file.filename}")
     print(f"   Using personal key: {user_settings.has_gemini_key(user_id)}")
     
     if image_file and image_file.filename:
@@ -1472,6 +1526,15 @@ def analyze_physique():
         saved_filename = f"{user_id}_{uuid.uuid4().hex}.{ext}"
         image_path = os.path.join(UPLOAD_FOLDER, saved_filename)
         image_file.save(image_path)
+
+    if user_image_file and user_image_file.filename:
+        if not allowed_image(user_image_file.filename):
+            return jsonify({'error': 'Unsupported image type for user physique. Use JPG, PNG, or WEBP.'}), 400
+        
+        ext = user_image_file.filename.rsplit('.', 1)[1].lower()
+        saved_user_filename = f"user_{user_id}_{uuid.uuid4().hex}.{ext}"
+        user_image_path = os.path.join(UPLOAD_FOLDER, saved_user_filename)
+        user_image_file.save(user_image_path)
     
     if not target_name and not image_path:
         return jsonify({'error': 'Provide a character/person name or upload a photo.'}), 400
@@ -1487,6 +1550,7 @@ def analyze_physique():
         result = analyzer.generate_quest_log(
             target_name=target_name,
             image_path=image_path,
+            user_image_path=user_image_path,
             current_body_type=user_body_type,
             injuries=user_injuries,
             equipment=user_equipment,
@@ -1573,6 +1637,80 @@ def physique_history():
     conn.close()
     
     return jsonify({'history': history})
+
+@app.route('/api/physique/system-scan', methods=['POST'])
+@login_required
+def perform_system_scan():
+    """
+    Perform an RPG-style 'System Scan' on the user's physique.
+    Uses Google Gemini Vision to evaluate body fat, muscle mass, rank, and weak points.
+    """
+    user_id = session['user_id']
+    username = session.get('username', 'Unknown')
+    
+    image_file = request.files.get('image')
+    if not image_file or not image_file.filename:
+        return jsonify({'error': 'No image provided for the system scan.'}), 400
+        
+    if not allowed_image(image_file.filename):
+        return jsonify({'error': 'Unsupported image type. Use JPG, PNG, or WEBP.'}), 400
+        
+    ext = image_file.filename.rsplit('.', 1)[1].lower()
+    saved_filename = f"scan_{user_id}_{uuid.uuid4().hex}.{ext}"
+    image_path = os.path.join(UPLOAD_FOLDER, saved_filename)
+    image_file.save(image_path)
+    
+    analyzer = get_analyzer_for_user(user_id)
+    result = analyzer.perform_system_scan(image_path=image_path)
+    
+    if not result.get('success'):
+        print(f"❌ System Scan failed: {result.get('error')}")
+        return jsonify(result), 400 if result.get('setup_required') else 500
+        
+    # Save the scan in the evolution timeline
+    # Convert dict to JSON string for storage
+    import json
+    scan_json = json.dumps({
+        'body_fat_estimate': result.get('body_fat_estimate'),
+        'muscle_mass': result.get('muscle_mass'),
+        'posture_issues': result.get('posture_issues', []),
+        'stats': result.get('stats', {}),
+        'rank': result.get('rank'),
+        'weak_points': result.get('weak_points', []),
+        'urgent_quests': result.get('urgent_quests', []),
+        'analysis_text': result.get('analysis_text', '')
+    })
+    
+    # Store in database
+    image_url = f"/api/uploads/{saved_filename}" # wait, is there an uploads route? If not, we should save in static/avatars or create a route.
+    # Actually, we don't have an uploads serving route, let's just save to static/scans
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'scans')
+    os.makedirs(static_dir, exist_ok=True)
+    import shutil
+    final_path = os.path.join(static_dir, saved_filename)
+    shutil.move(image_path, final_path)
+    
+    image_url = f"/static/scans/{saved_filename}"
+    stats_manager.save_physique_scan(user_id, image_url, scan_json)
+    
+    # Optional: Auto-update player body_type
+    new_body_type = result.get('body_type', '').lower()
+    if new_body_type in ['ectomorph', 'mesomorph', 'endomorph']:
+        stats_manager.update_player_stats(user_id, body_type=new_body_type)
+        
+    return jsonify(result)
+
+@app.route('/api/physique/scans', methods=['GET'])
+@login_required
+def get_physique_scans():
+    user_id = session['user_id']
+    scans = stats_manager.get_physique_scans(user_id)
+    # Parse json for frontend
+    import json
+    for scan in scans:
+        if scan.get('scan_data'):
+            scan['scan_data'] = json.loads(scan['scan_data'])
+    return jsonify({'success': True, 'scans': scans})
 
 
 @app.route('/api/workout/generate-by-bodytype', methods=['POST'])
@@ -2063,6 +2201,58 @@ def get_leaderboard():
     conn.close()
     
     return jsonify({'leaderboard': leaderboard[:10]})
+
+
+@app.route('/api/user/profile', methods=['PUT'])
+@login_required
+def update_profile():
+    data = request.json or {}
+    user_id = session['user_id']
+    username = data.get('username')
+    email = data.get('email')
+    
+    if not username or not email:
+        return jsonify({'error': 'Username and email are required'}), 400
+        
+    success = user_manager.update_user_profile(user_id, username, email)
+    if success:
+        session['username'] = username
+        return jsonify({'success': True, 'message': 'Profile updated successfully!'})
+    else:
+        return jsonify({'error': 'Username or email already exists'}), 409
+
+
+@app.route('/api/user/avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    import time
+    if 'avatar' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+        
+    if file:
+        user_id = session['user_id']
+        if '.' not in file.filename:
+            return jsonify({'error': 'Invalid file'}), 400
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+            return jsonify({'error': 'Invalid file type'}), 400
+            
+        filename = f"avatar_{user_id}_{int(time.time())}.{ext}"
+        
+        # Save to static/avatars
+        static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'avatars')
+        os.makedirs(static_dir, exist_ok=True)
+        filepath = os.path.join(static_dir, filename)
+        
+        file.save(filepath)
+        
+        avatar_url = f"/static/avatars/{filename}"
+        user_manager.update_avatar(user_id, avatar_url)
+        
+        return jsonify({'success': True, 'avatar_url': avatar_url})
 
 
 @app.route('/api/user/<int:user_id>/profile', methods=['GET'])

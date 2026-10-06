@@ -38,6 +38,20 @@
                     </button>
                 </div>
 
+                <!-- Google Auth Button -->
+                <div class="google-auth-container" style="text-align: center; margin: 20px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 20px;">
+                    <a href="/api/auth/google/login" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        <span>Continue with Google</span>
+                    </a>
+                    <div style="margin-top: 15px; font-size: 0.85rem; color: #94a3b8;">or use email</div>
+                </div>
+
                 <!-- Login Form -->
                 <form id="login-form" class="auth-form" onsubmit="event.preventDefault(); login();">
                     <div class="form-group">
@@ -469,6 +483,9 @@
                 <a href="#" onclick="showTab('physique')" class="nav-link" data-tab="physique">
                     🎭 Become Like...
                 </a>
+                <a href="#" onclick="showTab('system-scan')" class="nav-link" data-tab="system-scan">
+                    👁️ System Scan
+                </a>
                 <a href="#" onclick="showTab('routines')" class="nav-link" data-tab="routines">
                     📝 Workout Splits
                 </a>
@@ -504,10 +521,13 @@
                         <button class="btn btn-small" onclick="openHunterCardModal()" style="background: rgba(192, 132, 252, 0.15); border: 1px solid #c084fc; color: #c084fc; font-weight: 700; font-size: 0.8rem;">🪪 License Card</button>
                     </div>
                     <div class="player-info">
-                        <div class="player-avatar">
+                        <div class="player-avatar" id="player-avatar-container" style="cursor: pointer; background-size: cover; background-position: center;" onclick="document.getElementById('avatar-upload').click()">
                             <div class="level-badge" id="player-level">1</div>
+                            <div style="position: absolute; bottom: 8px; width: 100%; text-align: center; color: rgba(255,255,255,0.7); font-size: 0.6rem; pointer-events: none; text-shadow: 0 1px 2px black;">EDIT</div>
                         </div>
-                        <h3 id="player-name">Hunter</h3>
+                        <input type="file" id="avatar-upload" style="display: none;" accept="image/*" onchange="uploadAvatar(event)">
+                        <h3 id="player-name" style="margin-bottom: 2px;">Hunter</h3>
+                        <button class="btn btn-small" onclick="openEditAccountModal()" style="background: none; border: none; color: #94a3b8; font-size: 0.75rem; padding: 0; margin-bottom: 8px; cursor: pointer; text-decoration: underline;">✏️ Edit Account Info</button>
                         <div class="rank-badge" id="player-rank">E-Rank</div>
                     </div>
                     
@@ -950,8 +970,118 @@
             </div>
         </div>
 
+        <!-- System Scan Tab -->
+        <div id="tab-system-scan" class="tab-content" style="display: none;">
+            <div class="card" style="text-align: center;">
+                <h2>👁️ System Scan & Evolution</h2>
+                <p class="info-text">Upload a full-body photo for the System to analyze your current Rank, body fat, muscle mass, and hidden weaknesses.</p>
+                
+                <div class="physique-upload-box" onclick="document.getElementById('system-scan-file').click()" style="border-style: dashed; border-color: rgba(56, 189, 248, 0.4); margin: 20px auto; max-width: 400px;">
+                    <div style="font-size: 2.2rem; margin-bottom: 8px;">📷</div>
+                    <div style="color: #38bdf8; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;">Click to select photo for System Scan</div>
+                    <div style="color: #64748b; font-size: 0.8rem;">Supports JPG, PNG, or WEBP (Max 2MB)</div>
+                    <input type="file" id="system-scan-file" accept="image/png,image/jpeg,image/webp" style="display: none;" onchange="performSystemScan(event)">
+                </div>
+
+                <div id="system-scan-loading" style="display: none; margin: 20px 0;">
+                    <div class="loading-spinner"></div>
+                    <p class="loading">The System is evaluating the host...</p>
+                </div>
+
+                <div id="system-scan-error" class="error-message"></div>
+            </div>
+
+            <!-- Status Window Result -->
+            <div id="system-scan-result" class="card" style="display: none; border: 2px solid rgba(56, 189, 248, 0.5); box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);">
+                <div class="card-header" style="justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 15px;">
+                    <h2 style="font-family: 'Orbitron', sans-serif; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px;">STATUS WINDOW</h2>
+                </div>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <h3 style="color: #a855f7; margin-bottom: 10px;">Player Analysis</h3>
+                        <p id="scan-analysis-text" style="font-style: italic; color: #cbd5e1; line-height: 1.5; font-size: 0.9rem; margin-bottom: 15px;"></p>
+                        
+                        <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="color: #94a3b8;">Body Fat:</span>
+                                <strong id="scan-body-fat" style="color: white;">--</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="color: #94a3b8;">Muscle Mass:</span>
+                                <strong id="scan-muscle-mass" style="color: white;">--</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="color: #94a3b8;">Body Type:</span>
+                                <strong id="scan-body-type" style="color: #38bdf8; text-transform: uppercase;">--</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; margin-top: 8px;">
+                                <span style="color: #94a3b8;">Current Rank:</span>
+                                <strong id="scan-rank" style="color: #f59e0b; font-size: 1.1rem;">--</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="flex: 1; min-width: 200px;">
+                        <h3 style="color: #10b981; margin-bottom: 10px;">Attributes</h3>
+                        <div class="stat-bars" style="margin-bottom: 20px;">
+                            <div style="margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+                                    <span>STR (Size)</span>
+                                    <span id="scan-str-val">0</span>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                    <div id="scan-str-bar" style="background: #ef4444; height: 100%; width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+                                    <span>AGI (Definition)</span>
+                                    <span id="scan-agi-val">0</span>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                    <div id="scan-agi-bar" style="background: #10b981; height: 100%; width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+                                    <span>VIT (Frame/Core)</span>
+                                    <span id="scan-vit-val">0</span>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                    <div id="scan-vit-bar" style="background: #3b82f6; height: 100%; width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 style="color: #ef4444; margin-bottom: 10px; font-size: 0.9rem;">⚠️ Detected Weaknesses</h3>
+                        <ul id="scan-weak-points" style="color: #fca5a5; font-size: 0.85rem; padding-left: 20px; margin-bottom: 15px;"></ul>
+                        
+                        <h3 style="color: #f59e0b; margin-bottom: 10px; font-size: 0.9rem;">🛑 Posture Issues</h3>
+                        <ul id="scan-posture" style="color: #fcd34d; font-size: 0.85rem; padding-left: 20px;"></ul>
+                    </div>
+                </div>
+
+                <div id="scan-urgent-quests-container" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; display: none;">
+                    <h3 style="color: #ef4444; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        <span class="warning-pulse" style="width: 10px; height: 10px; background: #ef4444; border-radius: 50%; display: inline-block;"></span>
+                        [URGENT QUESTS] GENERATED
+                    </h3>
+                    <div id="scan-urgent-quests" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                </div>
+            </div>
+
+            <!-- Evolution Timeline -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>📈 Evolution Timeline</h2>
+                <div id="evolution-timeline" style="display: flex; gap: 15px; overflow-x: auto; padding: 10px 0; scroll-snap-type: x mandatory;">
+                    <!-- Scans loaded dynamically -->
+                </div>
+            </div>
+        </div>
+
         <!-- Physique Goals Tab ("Become Like...") -->
-        <div id="tab-physique" class="tab-content">
+        <div id="tab-physique" class="tab-content" style="display: none;">
             <div class="physique-container">
                 <div class="card physique-intro-card">
                     <div class="card-header">
@@ -1061,6 +1191,17 @@
                             </div>
                             <div id="physique-image-preview"></div>
                         </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label class="physique-section-label">Upload Your Current Physique (Optional, but highly recommended for accurate AI comparison)</label>
+                        <div class="physique-upload-box" onclick="document.getElementById('physique-user-image-file').click()" style="border-style: dashed; border-color: rgba(168, 85, 247, 0.4);">
+                            <div style="font-size: 2.2rem; margin-bottom: 8px;">👤</div>
+                            <div style="color: #a855f7; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;">Click to select your current photo</div>
+                            <div style="color: #64748b; font-size: 0.8rem;">Supports JPG, PNG, or WEBP</div>
+                            <input type="file" id="physique-user-image-file" accept="image/png,image/jpeg,image/webp" style="display: none;">
+                        </div>
+                        <div id="physique-user-image-preview"></div>
                     </div>
 
                     <div class="form-group" style="margin-top: 16px;">
@@ -1992,6 +2133,25 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Edit Account Modal -->
+    <div id="edit-account-modal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal('edit-account-modal')">&times;</button>
+            <h2 class="modal-title">✏️ Edit Account Info</h2>
+            <form id="edit-account-form" onsubmit="event.preventDefault(); saveAccountInfo();" style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="edit-account-username" required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="edit-account-email" required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top: 10px;">💾 Save Changes</button>
+            </form>
         </div>
     </div>
 

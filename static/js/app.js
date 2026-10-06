@@ -2479,16 +2479,42 @@ function selectPresetPhysique(name) {
     }
 }
 
+let selectedUserPhysiqueImage = null;
+
 document.addEventListener('change', (e) => {
     if (e.target.id === 'physique-image-file') {
         const file = e.target.files[0];
+        if (file && file.size > 2 * 1024 * 1024) {
+            showToast('Image too large. Max 2MB allowed.', 'error');
+            e.target.value = '';
+            return;
+        }
         selectedPhysiqueImage = file || null;
         
         const preview = document.getElementById('physique-image-preview');
         if (file) {
             const reader = new FileReader();
             reader.onload = (evt) => {
-                preview.innerHTML = `<img src="${evt.target.result}" class="physique-preview-img" alt="Preview">`;
+                preview.innerHTML = `<img src="${evt.target.result}" class="physique-preview-img" alt="Preview" style="margin-top: 10px; border-radius: 8px;">`;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.innerHTML = '';
+        }
+    } else if (e.target.id === 'physique-user-image-file') {
+        const file = e.target.files[0];
+        if (file && file.size > 2 * 1024 * 1024) {
+            showToast('Image too large. Max 2MB allowed.', 'error');
+            e.target.value = '';
+            return;
+        }
+        selectedUserPhysiqueImage = file || null;
+        
+        const preview = document.getElementById('physique-user-image-preview');
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                preview.innerHTML = `<img src="${evt.target.result}" class="physique-preview-img" alt="Your Physique Preview" style="margin-top: 10px; border-radius: 8px; border: 2px dashed rgba(168, 85, 247, 0.4);">`;
             };
             reader.readAsDataURL(file);
         } else {
@@ -2620,6 +2646,10 @@ async function analyzePhysique() {
     const desiredDescription = document.getElementById('physique-desired-description').value.trim();
     if (desiredDescription) {
         formData.append('desired_description', desiredDescription);
+    }
+    
+    if (selectedUserPhysiqueImage) {
+        formData.append('user_image', selectedUserPhysiqueImage);
     }
     
     document.getElementById('physique-loading').style.display = 'block';
@@ -4558,4 +4588,242 @@ function initHorizontalMouseScroll() {
     });
 }
 
+// -----------------------------------------
+// Edit Account Info feature
+// -----------------------------------------
+function openEditAccountModal() {
+    if (!currentUser) return;
+    document.getElementById('edit-account-username').value = currentUser.username;
+    // Email is technically on currentUser but we don't return it normally, so it might be empty on frontend.
+    // If not present, that's fine, user has to put it.
+    document.getElementById('edit-account-email').value = currentUser.email || '';
+    openModal('edit-account-modal');
+}
 
+async function saveAccountInfo() {
+    const newUsername = document.getElementById('edit-account-username').value.trim();
+    const newEmail = document.getElementById('edit-account-email').value.trim();
+    
+    if (!newUsername || !newEmail) {
+        showToast('Username and Email are required', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/user/profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: newUsername,
+                email: newEmail
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentUser.username = newUsername;
+            currentUser.email = newEmail;
+            document.getElementById('player-name').textContent = sanitizeHTML(newUsername);
+            document.getElementById('nav-username').textContent = sanitizeHTML(newUsername);
+            showToast('Account Info Updated!', 'success');
+            closeModal('edit-account-modal');
+        } else {
+            showToast(data.error || 'Failed to update info', 'error');
+        }
+    } catch (err) {
+        console.error('Error updating account info:', err);
+        showToast('Network error while updating info', 'error');
+    }
+}
+
+// -----------------------------------------
+// Avatar Upload feature
+// -----------------------------------------
+async function uploadAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 1 * 1024 * 1024) {
+        showToast('Image too large. Maximum size is 1MB', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    showToast('Uploading avatar...', 'info');
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/user/avatar`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentUser.avatar_url = data.avatar_url;
+            updateAvatarUI(data.avatar_url);
+            showToast('Avatar updated!', 'success');
+        } else {
+            showToast(data.error || 'Failed to upload avatar', 'error');
+        }
+    } catch (err) {
+        console.error('Error uploading avatar:', err);
+        showToast('Network error while uploading avatar', 'error');
+    }
+}
+
+function updateAvatarUI(url) {
+    const avatarContainer = document.getElementById('player-avatar-container');
+    if (avatarContainer && url) {
+        avatarContainer.style.backgroundImage = `url('${url}')`;
+        // Keep the level badge intact but hide the default background gradient if needed
+        avatarContainer.style.backgroundSize = 'cover';
+        avatarContainer.style.backgroundPosition = 'center';
+    }
+}
+
+// Override updateDashboard to also render avatar on load
+const originalUpdateDashboard = updateDashboard;
+updateDashboard = function(data) {
+    originalUpdateDashboard(data);
+    if (currentUser && currentUser.avatar_url) {
+        updateAvatarUI(currentUser.avatar_url);
+    }
+};
+
+// -----------------------------------------
+// System Scan & Evolution
+// -----------------------------------------
+async function performSystemScan(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+        showToast('Image too large. Maximum size is 2MB', 'error');
+        event.target.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    document.getElementById('system-scan-loading').style.display = 'block';
+    document.getElementById('system-scan-result').style.display = 'none';
+    document.getElementById('system-scan-error').textContent = '';
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/physique/system-scan`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        document.getElementById('system-scan-loading').style.display = 'none';
+        
+        if (response.ok && data.success) {
+            renderSystemScanResult(data);
+            loadEvolutionTimeline();
+            showToast('System Scan Complete!', 'success');
+        } else {
+            document.getElementById('system-scan-error').textContent = data.error || 'Failed to analyze physique.';
+        }
+    } catch (err) {
+        console.error(err);
+        document.getElementById('system-scan-loading').style.display = 'none';
+        document.getElementById('system-scan-error').textContent = 'Network error while analyzing physique.';
+    }
+}
+
+function renderSystemScanResult(data) {
+    document.getElementById('system-scan-result').style.display = 'block';
+    
+    document.getElementById('scan-analysis-text').textContent = `"${data.analysis_text}"`;
+    document.getElementById('scan-body-fat').textContent = data.body_fat_estimate;
+    document.getElementById('scan-muscle-mass').textContent = data.muscle_mass;
+    document.getElementById('scan-body-type').textContent = data.body_type;
+    document.getElementById('scan-rank').textContent = data.rank;
+    
+    // Stats
+    const str = data.stats.STR || 0;
+    const agi = data.stats.AGI || 0;
+    const vit = data.stats.VIT || 0;
+    document.getElementById('scan-str-val').textContent = str;
+    document.getElementById('scan-str-bar').style.width = `${str}%`;
+    document.getElementById('scan-agi-val').textContent = agi;
+    document.getElementById('scan-agi-bar').style.width = `${agi}%`;
+    document.getElementById('scan-vit-val').textContent = vit;
+    document.getElementById('scan-vit-bar').style.width = `${vit}%`;
+    
+    // Lists
+    const weakPointsEl = document.getElementById('scan-weak-points');
+    weakPointsEl.innerHTML = data.weak_points && data.weak_points.length > 0 
+        ? data.weak_points.map(w => `<li>${sanitizeHTML(w)}</li>`).join('') 
+        : '<li>None detected</li>';
+        
+    const postureEl = document.getElementById('scan-posture');
+    postureEl.innerHTML = data.posture_issues && data.posture_issues.length > 0
+        ? data.posture_issues.map(p => `<li>${sanitizeHTML(p)}</li>`).join('')
+        : '<li>Optimal Posture Detected</li>';
+        
+    // Urgent Quests
+    const uqContainer = document.getElementById('scan-urgent-quests-container');
+    const uqList = document.getElementById('scan-urgent-quests');
+    if (data.urgent_quests && data.urgent_quests.length > 0) {
+        uqContainer.style.display = 'block';
+        uqList.innerHTML = data.urgent_quests.map(q => `
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px; border-radius: 6px;">
+                <div style="color: #ef4444; font-weight: bold; font-size: 0.9rem;">⚠️ ${sanitizeHTML(q.title)}</div>
+                <div style="color: #fca5a5; font-size: 0.85rem; margin-top: 4px;">Task: ${sanitizeHTML(q.task)}</div>
+            </div>
+        `).join('');
+    } else {
+        uqContainer.style.display = 'none';
+    }
+}
+
+async function loadEvolutionTimeline() {
+    try {
+        const response = await fetch(`${API_BASE}/api/physique/scans`, { credentials: 'include' });
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            const container = document.getElementById('evolution-timeline');
+            if (!data.scans || data.scans.length === 0) {
+                container.innerHTML = '<p style="color: #64748b; font-style: italic;">No scans recorded yet. Upload a photo to begin your evolution timeline.</p>';
+                return;
+            }
+            
+            container.innerHTML = data.scans.map(scan => {
+                const date = new Date(scan.created_at).toLocaleDateString();
+                const rank = scan.scan_data?.rank || 'Unknown';
+                const bodyFat = scan.scan_data?.body_fat_estimate || '--';
+                
+                return `
+                    <div style="min-width: 150px; max-width: 150px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; scroll-snap-align: start; flex-shrink: 0;">
+                        <img src="${scan.image_url}" alt="Physique at ${date}" style="width: 100%; height: 150px; object-fit: cover;">
+                        <div style="padding: 10px; text-align: center;">
+                            <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;">${date}</div>
+                            <div style="font-weight: bold; color: #f59e0b; font-size: 1rem; margin-bottom: 2px;">${rank}</div>
+                            <div style="font-size: 0.75rem; color: #cbd5e1;">BF: ${bodyFat}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (err) {
+        console.error('Failed to load evolution timeline', err);
+    }
+}
+
+// Load timeline when tab is shown
+const originalShowTab = showTab;
+showTab = function(tabId) {
+    originalShowTab(tabId);
+    if (tabId === 'system-scan') {
+        loadEvolutionTimeline();
+    }
+};

@@ -146,6 +146,7 @@ class PhysiqueAnalyzer:
 
     def _build_contents(self, target_name: Optional[str],
                          image_path: Optional[str],
+                         user_image_path: Optional[str] = None,
                          current_body_type: Optional[str] = None,
                          injuries: Optional[str] = None,
                          equipment: Optional[str] = None,
@@ -174,9 +175,12 @@ class PhysiqueAnalyzer:
             elif tier == 'advanced':
                 prompt_text += "\n\nEXPERIENCE LEVEL - STAGE 4 (LEVEL 36+ • A/S-RANK): The user is a Shadow Monarch / Master! Full elite gymnastics (Muscle-ups, Handstand push-ups, Dragon flags, Pistol squats) and heavy overload techniques are permitted (4-5 sets)."
 
-        if current_body_type:
+        if current_body_type and not user_image_path:
             enriched_baseline = enrich_body_type(current_body_type)
             prompt_text += f"\n\nCRITICAL ADAPTIVE CONTEXT: The client's current physical baseline is: **{enriched_baseline}** ({current_body_type.upper()}). Please tailor the exercise selection, volume, and cardio recommendations to optimize results for this specific baseline as they transform into {target_desc}."
+
+        if user_image_path:
+            prompt_text += f"\n\nCRITICAL ADAPTIVE CONTEXT: The client has provided a photo of their CURRENT PHYSIQUE (the second image attached). Please visually analyze their current body fat percentage, muscle mass, and weak points. Compare their current physique to {target_desc} and tailor the exercise selection and volume to bridge this exact gap."
 
         if injuries and str(injuries).lower() != 'none':
             prompt_text += f"\n\nINJURIES / MEDICAL LIMITATIONS: **{injuries}**. You MUST avoid any exercises that aggravate these conditions (e.g. no heavy spinal loading for back pain, no heavy knee-bending for knee pain). Prescribe 100% safe, joint-friendly alternative movements."
@@ -190,17 +194,76 @@ class PhysiqueAnalyzer:
             mime_type, _ = mimetypes.guess_type(image_path)
             if not mime_type or not mime_type.startswith('image/'):
                 mime_type = 'image/jpeg'
-
             with open(image_path, 'rb') as f:
-                image_bytes = f.read()
+                contents.append(types.Part.from_bytes(data=f.read(), mime_type=mime_type))
 
-            contents.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
+        if user_image_path and os.path.exists(user_image_path):
+            mime_type, _ = mimetypes.guess_type(user_image_path)
+            if not mime_type or not mime_type.startswith('image/'):
+                mime_type = 'image/jpeg'
+            with open(user_image_path, 'rb') as f:
+                contents.append(types.Part.from_bytes(data=f.read(), mime_type=mime_type))
 
         contents.append(prompt_text)
         return contents
 
+    def perform_system_scan(self, image_path: str) -> Dict:
+        """Analyze the user's physique photo to generate an RPG Status Window and extract weak points."""
+        if not self.is_configured() or not image_path or not os.path.exists(image_path):
+            return {'success': False, 'error': 'Invalid image or API key not configured.'}
+
+        prompt_text = """
+ACT AS 'THE SYSTEM' FROM SOLO LEVELING.
+Analyze the attached physique photo of the user (the 'Player'). Provide a highly accurate, critical, and brutally honest RPG-style "System Scan" evaluation.
+
+Output STRICTLY in the following JSON format. Do NOT wrap it in ```json blocks or include any other text.
+{
+    "body_fat_estimate": "string (e.g. 15-18%)",
+    "muscle_mass": "string (e.g. Low, Moderate, High)",
+    "posture_issues": ["list of strings (e.g. Rounded Shoulders)"],
+    "body_type": "string (strictly one of: ectomorph, mesomorph, endomorph)",
+    "stats": {
+        "STR": integer (1-100 based on size/mass),
+        "AGI": integer (1-100 based on leanness/definition),
+        "VIT": integer (1-100 based on core thickness/overall frame)
+    },
+    "rank": "string (E-Rank, D-Rank, C-Rank, B-Rank, A-Rank, S-Rank)",
+    "weak_points": ["list of strings naming specific lagging muscle groups"],
+    "urgent_quests": [
+        {"title": "Quest Title", "task": "Specific exercise or fix. e.g. 3x15 Face Pulls for posture"}
+    ],
+    "analysis_text": "A dramatic, system-like paragraph evaluating the player's potential and current physical shortcomings."
+}
+"""
+        contents = []
+        mime_type, _ = mimetypes.guess_type(image_path)
+        if not mime_type or not mime_type.startswith('image/'):
+            mime_type = 'image/jpeg'
+        with open(image_path, 'rb') as f:
+            contents.append(types.Part.from_bytes(data=f.read(), mime_type=mime_type))
+        contents.append(prompt_text)
+
+        try:
+            from google.genai import types
+            config = types.GenerateContentConfig(temperature=0.4)
+            response_text, error = self._generate_content_resilient(contents, generation_config=config)
+            
+            if error or not response_text:
+                return {'success': False, 'error': error or 'Empty response from AI.'}
+                
+            # Clean JSON
+            json_str = response_text.replace("```json", "").replace("```", "").strip()
+            import json
+            data = json.loads(json_str)
+            data['success'] = True
+            return data
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+
     def generate_quest_log(self, target_name: Optional[str] = None,
                           image_path: Optional[str] = None,
+                          user_image_path: Optional[str] = None,
                           current_body_type: Optional[str] = None,
                           injuries: Optional[str] = None,
                           equipment: Optional[str] = None,
@@ -226,6 +289,7 @@ class PhysiqueAnalyzer:
                 contents = self._build_contents(
                     target_name=target_name,
                     image_path=image_path,
+                    user_image_path=user_image_path,
                     current_body_type=current_body_type,
                     injuries=injuries,
                     equipment=equipment,

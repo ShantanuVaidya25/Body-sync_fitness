@@ -227,6 +227,8 @@ class Database:
             cursor.execute("ALTER TABLE users ADD COLUMN reset_code_expires TIMESTAMP")
         if 'is_admin' not in cols:
             cursor.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
+        if 'avatar_url' not in cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
         
         # Player stats table
         cursor.execute('''
@@ -475,6 +477,18 @@ class Database:
             )
         ''')
         
+        # System Physique Scans Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS physique_scans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                image_url TEXT,
+                scan_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        
         # Performance Indexes
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_daily_quests_user_date ON daily_quests(user_id, quest_date);')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_penalty_quests_user_status ON penalty_quests(user_id, status);')
@@ -572,6 +586,36 @@ class User:
         # Legacy plain SHA-256 check
         legacy_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
         return secrets.compare_digest(legacy_hash, stored_hash)
+
+    def update_user_profile(self, user_id: int, username: str, email: str) -> bool:
+        """Update user profile details by the user themselves"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE users
+                SET username = ?, email = ?
+                WHERE id = ?
+            ''', (username.strip(), email.strip().lower(), user_id))
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.IntegrityError:
+            conn.close()
+            return False
+
+    def update_avatar(self, user_id: int, avatar_url: str) -> bool:
+        """Update user avatar URL"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('UPDATE users SET avatar_url = ? WHERE id = ?', (avatar_url, user_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            conn.close()
+            return False
 
     def create_user(self, username: str, email: str, password: str) -> Optional[int]:
         """Create a new user account"""
@@ -1119,6 +1163,34 @@ class PlayerStats:
         conn.commit()
         conn.close()
         return True
+
+    def save_physique_scan(self, user_id: int, image_url: str, scan_data: str) -> bool:
+        """Save a new physique scan for the evolution timeline"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO physique_scans (user_id, image_url, scan_data)
+            VALUES (?, ?, ?)
+        ''', (user_id, image_url, scan_data))
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_physique_scans(self, user_id: int) -> List[Dict]:
+        """Get the evolution timeline (past physique scans)"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM physique_scans
+            WHERE user_id = ?
+            ORDER BY created_at ASC
+        ''', (user_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+
+
 
 
 class ExerciseManager:
@@ -1721,5 +1793,4 @@ class RoutineManager:
         rows = [dict(r) for r in cursor.fetchall()]
         conn.close()
         return rows
-
-
+        return rows
