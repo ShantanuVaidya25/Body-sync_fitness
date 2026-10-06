@@ -14,6 +14,8 @@ import sys
 import uuid
 import traceback
 import sqlite3
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -36,10 +38,21 @@ if app.secret_key == 'dev-only-insecure-default-change-before-deploying':
     print("   testing, but set a real one via the FLASK_SECRET_KEY environment")
     print("   variable before deploying this publicly (see README).")
 
-# Session configuration
+# Session configuration (Secure)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=31)
-CORS(app, supports_credentials=True)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = False # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
+# CORS hardening (Restrict to specific origins)
+CORS(app, supports_credentials=True, origins=["http://localhost:5000", "http://127.0.0.1:5000"])
+
+# Rate Limiter setup
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"]
+)
 # Initialize database
 db = Database()
 user_manager = User(db)
@@ -236,6 +249,7 @@ def index():
 
 
 @app.route('/api/register', methods=['POST'])
+@limiter.limit("5 per minute")
 def register():
     """Register a new user and automatically log them in"""
     data = request.json or {}
@@ -280,6 +294,7 @@ def register():
 
 
 @app.route('/api/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
     """Authenticate user"""
     data = request.json or {}

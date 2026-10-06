@@ -8,6 +8,9 @@ let currentQuest = null;
 // API Base URL
 const API_BASE = '';
 
+// Security Helper: Sanitize user-controlled input before inserting it into innerHTML
+const sanitizeHTML = (html) => typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     const savedEquipment = localStorage.getItem('hunter_equipment');
@@ -1081,10 +1084,10 @@ function displayFullQuest(quest) {
         titleHtml = `⚔️ Main Story Quest: Becoming ${quest.target_name}`;
     }
     
-    document.getElementById('quest-title').innerHTML = `
+    document.getElementById('quest-title').innerHTML = sanitizeHTML(`
         ${quest.target_name ? `<span class="quest-target-badge">🎭 Target: ${quest.target_name}</span><br>` : ''}
         ${titleHtml}
-    `;
+    `);
     
     const rankLetter = getQuestRankLetter(quest.difficulty || 1);
     document.getElementById('quest-difficulty').textContent = `Rank: ${rankLetter}`;

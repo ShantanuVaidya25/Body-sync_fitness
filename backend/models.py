@@ -9,6 +9,7 @@ import sqlite3
 import json
 import hashlib
 import secrets
+import bcrypt
 
 
 import os
@@ -543,14 +544,21 @@ class User:
         self.db = db
     
     def hash_password(self, password: str, salt: Optional[str] = None) -> str:
-        """Hash password using PBKDF2 HMAC SHA-256 with a random salt"""
-        if not salt:
-            salt = secrets.token_hex(16)
-        key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
-        return f"pbkdf2:sha256:100000${salt}${key.hex()}"
+        """Hash password using bcrypt"""
+        if not isinstance(password, str):
+            password = str(password)
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        return f"bcrypt:{hashed.decode('utf-8')}"
 
     def verify_password(self, password: str, stored_hash: str) -> bool:
-        """Verify password against stored hash (supports PBKDF2 and legacy plain SHA-256)"""
+        """Verify password against stored hash (supports bcrypt, PBKDF2 and legacy plain SHA-256)"""
+        if stored_hash.startswith("bcrypt:"):
+            try:
+                hash_str = stored_hash.split("bcrypt:", 1)[1]
+                return bcrypt.checkpw(password.encode('utf-8'), hash_str.encode('utf-8'))
+            except Exception:
+                return False
+        
         if stored_hash.startswith("pbkdf2:sha256:"):
             try:
                 parts = stored_hash.split('$')
@@ -560,6 +568,7 @@ class User:
                     return secrets.compare_digest(recomputed, key_hex)
             except Exception:
                 return False
+        
         # Legacy plain SHA-256 check
         legacy_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
         return secrets.compare_digest(legacy_hash, stored_hash)
@@ -601,7 +610,7 @@ class User:
         
         if user and self.verify_password(password, user['password_hash']):
             # Auto-upgrade legacy hash if needed
-            if not user['password_hash'].startswith("pbkdf2:sha256:"):
+            if not user['password_hash'].startswith("bcrypt:"):
                 new_hash = self.hash_password(password)
                 cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, user['id']))
             cursor.execute(
