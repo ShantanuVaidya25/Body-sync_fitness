@@ -2864,6 +2864,8 @@ function showTab(tabName) {
         calculate1RM();
     } else if (tabName === 'routines') {
         loadRoutines();
+    } else if (tabName === 'system-scan') {
+        loadEvolutionTimeline();
     }
 }
 
@@ -3416,9 +3418,15 @@ function openPenaltyModal() {
     if (!modal) return;
 
     if (currentPenaltyData && currentPenaltyData.quest_data) {
-        const qData = typeof currentPenaltyData.quest_data === 'string'
-            ? JSON.parse(currentPenaltyData.quest_data)
-            : currentPenaltyData.quest_data;
+        let qData = currentPenaltyData.quest_data;
+        if (typeof qData === 'string') {
+            try {
+                qData = JSON.parse(qData);
+            } catch (e) {
+                console.error('Failed to parse penalty quest data', e);
+                qData = {};
+            }
+        }
 
         const desc = document.getElementById('penalty-description');
         if (desc && qData.description) desc.textContent = qData.description;
@@ -4003,10 +4011,6 @@ async function launchRoutineWorkout(routineId) {
     }
 }
 
-async function checkPenaltyStatus() {
-    // Penalty Zone feature disabled
-    return;
-}
 
 function openHunterSettingsModal() {
     if (!currentStats) {
@@ -4822,12 +4826,3 @@ async function loadEvolutionTimeline() {
         console.error('Failed to load evolution timeline', err);
     }
 }
-
-// Load timeline when tab is shown
-const originalShowTab = showTab;
-showTab = function(tabId) {
-    originalShowTab(tabId);
-    if (tabId === 'system-scan') {
-        loadEvolutionTimeline();
-    }
-};
