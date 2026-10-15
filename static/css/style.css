@@ -1395,7 +1395,7 @@ h4 {
 }
 
 .tab-content.active {
-    display: block;
+    display: block !important;
 }
 
 @keyframes fadeInUp {

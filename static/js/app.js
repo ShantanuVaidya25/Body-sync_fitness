@@ -2835,9 +2835,13 @@ function showTab(tabName) {
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
+        tab.style.display = '';
     });
     const targetTab = document.getElementById(`tab-${tabName}`);
-    if (targetTab) targetTab.classList.add('active');
+    if (targetTab) {
+        targetTab.classList.add('active');
+        targetTab.style.display = '';
+    }
     
     // Load data for specific tabs
     if (tabName === 'quest') {
